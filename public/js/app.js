@@ -2867,14 +2867,14 @@ async function loadStaffUsersList() {
         return `<span class="badge" style="background: ${meta.color}15; color: ${meta.color}; border: 1px solid ${meta.color}40; margin: 2px; font-size: 11px;">${r}</span>`;
       }).join(' ');
 
-      const tutorGroups = (u.tutor_groups && u.tutor_groups.length > 0)
-        ? u.tutor_groups.map(g => `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size: 11px;">${g}</span>`).join(' ')
+      const tutorGroups = ((u.tutor_groups || u.groups) && (u.tutor_groups || u.groups).length > 0)
+        ? (u.tutor_groups || u.groups).map(g => `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size: 11px;">${g}</span>`).join(' ')
         : '<span style="color: var(--text-muted); font-size: 11px;">—</span>';
 
       return `
         <tr>
           <td>
-            <code style="font-weight: 700; color: #1E293B;">${u.username}</code>
+            <code style="font-weight: 700; color: #1E293B;">${u.username || u.id}</code>
           </td>
           <td>
             <div style="font-weight: 600; color: var(--text-main);">${u.full_name}</div>
@@ -3068,7 +3068,7 @@ async function showEditStaffModal(userId) {
         <div class="grid grid-2 mb-3">
           <div class="form-group">
             <label class="form-label">Login (O'zgartirib bo'lmaydi):</label>
-            <input type="text" class="form-control" value="${u.username}" disabled style="background:#F1F5F9;">
+            <input type="text" class="form-control" value="${u.username || u.id}" disabled style="background:#F1F5F9;">
           </div>
           <div class="form-group">
             <label class="form-label">Yangi Parol (ixtiyoriy):</label>
@@ -3115,7 +3115,7 @@ async function showEditStaffModal(userId) {
 
         <div id="edit-tutor-group-box" class="form-group mb-3" style="display: ${(u.roles || []).includes('tutor') ? 'block' : 'none'}; background: #EFF6FF; padding: 12px; border-radius: var(--radius-md); border: 1px solid #BFDBFE;">
           <label class="form-label" style="color: #1E3A8A; font-weight: 600;">Tyutor Guruhlari (vergul bilan ajrating):</label>
-          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${(u.tutor_groups || []).join(', ')}" placeholder="210-21, 210-22">
+          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${(u.tutor_groups || u.groups || []).join(', ')}" placeholder="210-21, 210-22">
         </div>
 
         <div class="form-group">

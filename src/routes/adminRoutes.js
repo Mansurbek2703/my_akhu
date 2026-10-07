@@ -237,6 +237,8 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
     const studentId = 'std_' + crypto.randomBytes(6).toString('hex');
     const now = new Date().toISOString();
 
+    const normGender = (gender && (String(gender).toLowerCase().startsWith('f') || String(gender).toLowerCase().startsWith('ay') || String(gender).toLowerCase().startsWith('q'))) ? 'f' : 'm';
+
     db.prepare(`
       INSERT INTO student (
         id, external_id, first_name, last_name, group_code, program_code,
@@ -251,7 +253,7 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       program_code || 'IT',
       level,
       Number(course) || 1,
-      gender,
+      normGender,
       email || null,
       phone || null,
       tutor_id || null,
@@ -306,6 +308,10 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       status
     } = req.body;
 
+    const normGender = gender !== undefined
+      ? ((String(gender).toLowerCase().startsWith('f') || String(gender).toLowerCase().startsWith('ay') || String(gender).toLowerCase().startsWith('q')) ? 'f' : 'm')
+      : student.gender;
+
     const now = new Date().toISOString();
 
     db.prepare(`
@@ -317,7 +323,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
           program_code = COALESCE(?, program_code),
           level = COALESCE(?, level),
           course = COALESCE(?, course),
-          gender = COALESCE(?, gender),
+          gender = ?,
           email = ?,
           phone = ?,
           tutor_id = ?,
@@ -332,7 +338,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       program_code !== undefined ? program_code : student.program_code,
       level !== undefined ? level : student.level,
       course !== undefined ? Number(course) : student.course,
-      gender !== undefined ? gender : student.gender,
+      normGender,
       email !== undefined ? email : student.email,
       phone !== undefined ? phone : student.phone,
       tutor_id !== undefined ? tutor_id : student.tutor_id,
@@ -570,24 +576,34 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
   try {
     const {
       id,
+      username,
       full_name,
       email,
+      phone,
       roles = [],
       groups = [],
+      tutor_groups = [],
       telegram_user_id,
+      telegram_id,
+      is_active,
+      active,
       password = 'admin'
     } = req.body;
 
-    if (!full_name || !email) {
-      return res.status(400).json({ error: 'Ism-familiya va email majburiy' });
+    if (!full_name) {
+      return res.status(400).json({ error: 'Ism-familiya majburiy' });
     }
 
-    const userId = id ? String(id).trim() : 'staff_' + crypto.randomBytes(5).toString('hex');
+    const userId = (id || username) ? String(id || username).trim() : 'staff_' + crypto.randomBytes(5).toString('hex');
+    const userEmail = email ? String(email).trim() : `${userId}@akhu.uz`;
+    const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id || null);
+    const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : (active !== undefined ? (active ? 1 : 0) : 1);
+    const targetGroups = groups.length > 0 ? groups : tutor_groups;
 
-    // Email mavjudligini tekshirish
-    const existing = db.prepare(`SELECT id FROM staff_user WHERE email = ? OR id = ?`).get(email, userId);
+    // Email yoki ID mavjudligini tekshirish
+    const existing = db.prepare(`SELECT id FROM staff_user WHERE id = ? OR (email = ? AND email IS NOT NULL)`).get(userId, userEmail);
     if (existing) {
-      return res.status(400).json({ error: 'Ushbu email yoki ID allaqachon mavjud' });
+      return res.status(400).json({ error: `Ushbu foydalanuvchi (${userId}) allaqachon mavjud` });
     }
 
     const now = new Date().toISOString();
@@ -597,23 +613,25 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       // 1. staff_user jadvaliga yozish
       db.prepare(`
         INSERT INTO staff_user (
-          id, full_name, email, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?, ?)
+          id, full_name, email, phone, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
       `).run(
         userId,
         full_name,
-        email,
+        userEmail,
+        phone || null,
         `sso_${userId}`,
         JSON.stringify(roles),
+        activeVal,
         passHash,
-        telegram_user_id || null,
+        tgId,
         now
       );
 
       // 2. Agar tyutor roli bo'lsa guruhlarini yozish
-      if (roles.includes('tutor') && Array.isArray(groups)) {
+      if (roles.includes('tutor') && Array.isArray(targetGroups)) {
         const stmtGroup = db.prepare(`INSERT OR REPLACE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
-        for (const g of groups) {
+        for (const g of targetGroups) {
           if (String(g).trim()) stmtGroup.run(userId, String(g).trim());
         }
       }
@@ -624,7 +642,7 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
         action: 'CREATE_STAFF_USER',
         object_type: 'staff_user',
         object_id: userId,
-        after: { full_name, email, roles, groups },
+        after: { full_name, email: userEmail, roles, groups: targetGroups },
         ip: req.ip || '127.0.0.1'
       });
     })();
@@ -647,12 +665,20 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     const {
       full_name,
       email,
+      phone,
       roles,
       groups,
+      tutor_groups,
       telegram_user_id,
+      telegram_id,
       active,
+      is_active,
       password
     } = req.body;
+
+    const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
+    const targetGroups = groups !== undefined ? groups : tutor_groups;
+    const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
 
     db.transaction(() => {
       // Yangi parol bo'lsa yangilash
@@ -662,12 +688,12 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       }
 
       const updatedRoles = roles !== undefined ? JSON.stringify(roles) : user.roles;
-      const updatedActive = active !== undefined ? (active ? 1 : 0) : user.active;
 
       db.prepare(`
         UPDATE staff_user
         SET full_name = COALESCE(?, full_name),
           email = COALESCE(?, email),
+          phone = COALESCE(?, phone),
           roles = ?,
           telegram_user_id = ?,
           active = ?,
@@ -676,18 +702,19 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       `).run(
         full_name,
         email,
+        phone,
         updatedRoles,
-        telegram_user_id !== undefined ? telegram_user_id : user.telegram_user_id,
-        updatedActive,
+        tgId,
+        activeVal,
         passHash,
         req.params.id
       );
 
       // Tyutor guruhlarini yangilash
-      if (groups !== undefined && Array.isArray(groups)) {
+      if (targetGroups !== undefined && Array.isArray(targetGroups)) {
         db.prepare(`DELETE FROM tutor_group WHERE tutor_id = ?`).run(req.params.id);
         const stmtGroup = db.prepare(`INSERT INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
-        for (const g of groups) {
+        for (const g of targetGroups) {
           if (String(g).trim()) stmtGroup.run(req.params.id, String(g).trim());
         }
       }
