@@ -613,13 +613,12 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       // 1. staff_user jadvaliga yozish
       db.prepare(`
         INSERT INTO staff_user (
-          id, full_name, email, phone, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+          id, full_name, email, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
       `).run(
         userId,
         full_name,
         userEmail,
-        phone || null,
         `sso_${userId}`,
         JSON.stringify(roles),
         activeVal,
@@ -665,7 +664,6 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     const {
       full_name,
       email,
-      phone,
       roles,
       groups,
       tutor_groups,
@@ -693,7 +691,6 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         UPDATE staff_user
         SET full_name = COALESCE(?, full_name),
           email = COALESCE(?, email),
-          phone = COALESCE(?, phone),
           roles = ?,
           telegram_user_id = ?,
           active = ?,
@@ -702,7 +699,6 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       `).run(
         full_name,
         email,
-        phone,
         updatedRoles,
         tgId,
         activeVal,
