@@ -310,10 +310,25 @@ function navigateTo(pageName) {
       pageDesc.textContent = 'Yangi tadbir e\'lon qilish va Check-in QR kodini chop etish (B-04)';
       renderDeptEvents(contentArea);
       break;
+    case 'dept-students-manage':
+      pageTitle.textContent = 'Talabalar Ro\'yxati & Import (Registrator)';
+      pageDesc.textContent = 'Talabalarni ro\'yxatga olish, Excel import, yangi talaba qo\'shish va tahrirlash';
+      renderStudentsManagement(contentArea, 'Registrator');
+      break;
     case 'dept-gpa-import':
       pageTitle.textContent = 'GPA & Davomat Import';
       pageDesc.textContent = 'Semestr yakuni bo\'yicha avtomatik ballar importi (O\'quv bo\'limi)';
       renderGpaImport(contentArea);
+      break;
+    case 'admin-students-manage':
+      pageTitle.textContent = 'Talabalar Boshqaruvi & Import (Superadmin)';
+      pageDesc.textContent = 'Barcha talabalar bazasi, ommaviy Excel import, yangi talaba qo\'shish va tahrirlash';
+      renderStudentsManagement(contentArea, 'Superadmin');
+      break;
+    case 'admin-users-manage':
+      pageTitle.textContent = 'Xodimlar & Rollar Boshqaruvi (Superadmin Full Access)';
+      pageDesc.textContent = 'Xodimlarni ro\'yxatdan o\'tkazish, ixtiyoriy rollarni biriktirish yoki olib tashlash';
+      renderStaffUsersManagement(contentArea);
       break;
     case 'prorektor-queue':
       pageTitle.textContent = 'Prorektor Nazorati — 2-bosqich Tasdiq (PV)';
@@ -2079,3 +2094,1108 @@ async function submitResubmit(entryId) {
     alert(e.message);
   }
 }
+
+// ====================================================================
+// 8. TALABALAR BOSHQARUVI & EXCEL IMPORT (REGISTRATOR & SUPERADMIN)
+// ====================================================================
+
+const StudentMgmtState = {
+  page: 1,
+  limit: 20,
+  q: '',
+  group: '',
+  status: '',
+  totalPages: 1,
+  totalStudents: 0
+};
+
+async function renderStudentsManagement(container, roleTitle = 'Registrator') {
+  container.innerHTML = `
+    <!-- YUQORI SOHAVIY BLOK -->
+    <div class="card mb-4" style="background: linear-gradient(135deg, #1E293B, #0F172A); color: white; border: none;">
+      <div class="card-body" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span style="font-size: 24px;">🎓</span>
+              <h2 style="font-size: 20px; font-weight: 700; color: #fff;">Talabalar Ro'yxati & Boshqaruvi (${roleTitle})</h2>
+              <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6;">1-bosqich Integratsiya</span>
+            </div>
+            <p style="color: #94A3B8; font-size: 13px; max-width: 700px; margin: 0;">
+              Universitet talabalarining yagona manbasi (Registrator). Kunlik yoki davriy Excel/CSV import orqali bazani yangilang, 
+              yangi talabalarni qo'lda kiriting yoki holatini boshqaring.
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn btn-outline" style="color: #F8FAFC; border-color: rgba(255,255,255,0.25); display: flex; align-items: center; gap: 6px;">
+              <span>📥</span> Excel Shablon Yuklab Olish
+            </a>
+            <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: flex; align-items: center; gap: 6px;">
+              <span>📊</span> Excel / CSV Import
+            </button>
+            <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: flex; align-items: center; gap: 6px; background: #10B981; border-color: #10B981;">
+              <span>➕</span> Yangi Talaba Qo'shish
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXCEL IMPORT PANEL (YASHIRIN / OCHILADI) -->
+    <div id="student-import-panel" class="card mb-4" style="display: none; border: 2px dashed #3B82F6; background: #F8FAFC;">
+      <div class="card-header" style="background: #EFF6FF; border-bottom: 1px solid #DBEAFE;">
+        <h3 style="font-size: 15px; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <span>📤</span> Talabalar Ro'yxatini Ommaviy Import Qilish (.xlsx / .csv)
+        </h3>
+        <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="toggleImportPanel()">Yopish</button>
+      </div>
+      <div class="card-body">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+          <div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+              Fayldagi ustunlar tartibi yoki sarlavhalari quyidagicha bo'lishi mumkin:
+            </p>
+            <ul style="font-size: 12px; color: var(--text-muted); padding-left: 20px; line-height: 1.8;">
+              <li><strong>external_id / id:</strong> Talaba ID kodi (masalan, STD-0012)</li>
+              <li><strong>familiya, ism:</strong> Talabaning to'liq familiyasi va ismi</li>
+              <li><strong>guruh / group_code:</strong> Guruh kodi (masalan, 210-21)</li>
+              <li><strong>yo'nalish / fakultet:</strong> Ta'lim yo'nalishi yoki fakultet</li>
+              <li><strong>kurs:</strong> Bosqich (1, 2, 3, 4)</li>
+              <li><strong>jins:</strong> Erkak / Ayol (M / F)</li>
+              <li><strong>telefon, email:</strong> Shaxsiy aloqa ma'lumotlari</li>
+              <li><strong>holat:</strong> active (faol) yoki left (chiqarilgan)</li>
+            </ul>
+            <div style="margin-top: 12px; font-size: 12px; color: #2563EB;">
+              💡 <em>Eslatma: Mavjud talabalar ID bo'yicha yangilanadi, yangilari esa qo'shiladi va boshlang'ich 0 ball beriladi.</em>
+            </div>
+          </div>
+
+          <div style="background: white; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+            <div class="form-group mb-3">
+              <label class="form-label" style="font-weight: 600;">Excel / CSV faylini tanlang:</label>
+              <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" class="form-control" style="padding: 8px;">
+            </div>
+            <button id="btn-do-import" class="btn btn-primary w-100" onclick="handleStudentExcelUpload()" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+              <span>🚀</span> Importni Boshlash
+            </button>
+            <div id="import-result-box" style="margin-top: 14px; display: none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- METRIKA KARTALARI -->
+    <div id="students-metrics-cards" class="metrics-grid mb-4">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">👥</div>
+        <div class="stat-data">
+          <span class="stat-label">Jami Ro'yxatdagi</span>
+          <h3 class="stat-val" id="stat-total-students">-</h3>
+          <span class="stat-sub">Barcha talabalar</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#ECFDF5; color:#059669;">✅</div>
+        <div class="stat-data">
+          <span class="stat-label">Faol Talabalar</span>
+          <h3 class="stat-val" id="stat-active-students">-</h3>
+          <span class="stat-sub">Reytingda ishtirok etadi</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#FEF2F2; color:#DC2626;">🚫</div>
+        <div class="stat-data">
+          <span class="stat-label">Chiqarilganlar (Left)</span>
+          <h3 class="stat-val" id="stat-left-students">-</h3>
+          <span class="stat-sub">Ballari saqlanadi</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">🏫</div>
+        <div class="stat-data">
+          <span class="stat-label">Guruhlar Soni</span>
+          <h3 class="stat-val" id="stat-total-groups">-</h3>
+          <span class="stat-sub">Akademik guruhlar</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILTRLAR VA JADVAL -->
+    <div class="card">
+      <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 280px;">
+          <input type="text" id="filter-student-search" class="form-control" placeholder="Qidirish: ism, familiya, ID kod..." style="max-width: 300px;">
+          <input type="text" id="filter-student-group" class="form-control" placeholder="Guruh (masalan: 210-21)" style="max-width: 160px;">
+          <select id="filter-student-status" class="form-control" style="max-width: 150px;">
+            <option value="">Barcha holatlar</option>
+            <option value="active">Faqat Faol</option>
+            <option value="left">Chiqarilgan (Left)</option>
+          </select>
+          <button class="btn btn-primary" onclick="applyStudentsFilter()">Filtrlash</button>
+          <button class="btn btn-outline" onclick="resetStudentsFilter()">Tozalash</button>
+        </div>
+        <div id="students-pagination-info" style="font-size: 13px; color: var(--text-muted);">
+          Yuklanmoqda...
+        </div>
+      </div>
+
+      <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+          <table class="data-table" id="students-data-table">
+            <thead>
+              <tr>
+                <th style="width: 110px;">ID Kod</th>
+                <th>Talaba F.I.Sh</th>
+                <th>Guruh</th>
+                <th>Fakultet / Kurs</th>
+                <th>Aloqa (Tel / Email)</th>
+                <th>Ball (Mavsum / Jami)</th>
+                <th>Holat</th>
+                <th style="text-align: right; width: 140px;">Amallar</th>
+              </tr>
+            </thead>
+            <tbody id="students-table-body">
+              <tr><td colspan="8" style="text-align:center; padding: 24px;">Talabalar yuklanmoqda...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PAGINATION BAR -->
+      <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
+        <div style="font-size: 13px; color: var(--text-muted);" id="students-page-counter">
+          Sahifa 1
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-prev-page" class="btn btn-outline" style="padding: 6px 14px;" onclick="changeStudentsPage(-1)" disabled>◀ Oldingi</button>
+          <button id="btn-next-page" class="btn btn-outline" style="padding: 6px 14px;" onclick="changeStudentsPage(1)">Keyingi ▶</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Qidiruv inputlariga Enter tinglovchisi
+  document.getElementById('filter-student-search')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') applyStudentsFilter();
+  });
+  document.getElementById('filter-student-group')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') applyStudentsFilter();
+  });
+
+  await loadStudentsData();
+}
+
+function toggleImportPanel() {
+  const panel = document.getElementById('student-import-panel');
+  if (panel) {
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+async function loadStudentsData() {
+  const tbody = document.getElementById('students-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px;"><div class="spinner"></div></td></tr>';
+
+  try {
+    const params = new URLSearchParams({
+      page: StudentMgmtState.page,
+      limit: StudentMgmtState.limit,
+      q: StudentMgmtState.q,
+      group: StudentMgmtState.group,
+      status: StudentMgmtState.status
+    });
+
+    const res = await apiFetch(`/api/admin/students?${params.toString()}`);
+    StudentMgmtState.totalPages = res.totalPages || 1;
+    StudentMgmtState.totalStudents = res.total || 0;
+
+    // Metrikalarni yangilash
+    const statTotal = document.getElementById('stat-total-students');
+    const statActive = document.getElementById('stat-active-students');
+    const statLeft = document.getElementById('stat-left-students');
+    const statGroups = document.getElementById('stat-total-groups');
+
+    if (statTotal) statTotal.textContent = `${res.total} nafar`;
+    
+    // Guruhlar va statuslar hisobi
+    const activeCount = res.students.filter(s => s.status === 'active').length;
+    const leftCount = res.students.filter(s => s.status === 'left').length;
+    const uniqueGroups = new Set(res.students.map(s => s.group_code)).size;
+
+    if (statActive) statActive.textContent = `${activeCount}`;
+    if (statLeft) statLeft.textContent = `${leftCount}`;
+    if (statGroups) statGroups.textContent = `${uniqueGroups} ta`;
+
+    // Pagination info
+    const infoEl = document.getElementById('students-pagination-info');
+    const counterEl = document.getElementById('students-page-counter');
+    const prevBtn = document.getElementById('btn-prev-page');
+    const nextBtn = document.getElementById('btn-next-page');
+
+    if (infoEl) infoEl.textContent = `Jami: ${res.total} ta talaba (${res.page}-sahifa / ${res.totalPages})`;
+    if (counterEl) counterEl.textContent = `Sahifa ${res.page} / ${res.totalPages}`;
+    if (prevBtn) prevBtn.disabled = res.page <= 1;
+    if (nextBtn) nextBtn.disabled = res.page >= res.totalPages;
+
+    if (!res.students || res.students.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--text-muted);">Talabalar topilmadi</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = res.students.map(st => `
+      <tr>
+        <td>
+          <code style="background: #F1F5F9; padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #1E293B;">
+            ${st.external_id || st.id.slice(0, 8)}
+          </code>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main);">${st.last_name || ''} ${st.first_name || ''}</div>
+          <small style="color: var(--text-muted);">${st.gender === 'female' ? '👩 Qiz' : '👨 O\'g\'il'}</small>
+        </td>
+        <td>
+          <span class="badge" style="background: #EFF6FF; color: #1D4ED8; font-weight: 600;">${st.group_code}</span>
+        </td>
+        <td>
+          <div style="font-size: 13px;">${st.faculty || '—'}</div>
+          <small style="color: var(--text-muted);">${st.course ? st.course + '-kurs' : ''}</small>
+        </td>
+        <td>
+          <div style="font-size: 12px;">${st.phone || '—'}</div>
+          <div style="font-size: 11px; color: var(--text-muted);">${st.email || '—'}</div>
+        </td>
+        <td>
+          <strong style="color: #2563EB;">${st.season_points || 0}</strong>
+          <span style="color: var(--text-muted); font-size: 12px;"> / ${st.total_points || 0}</span>
+        </td>
+        <td>
+          ${st.status === 'active' 
+            ? '<span class="status-badge" style="background:#ECFDF5; color:#059669; border: 1px solid #10B981;">Faol</span>'
+            : '<span class="status-badge" style="background:#FEF2F2; color:#DC2626; border: 1px solid #EF4444;">Left</span>'
+          }
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Tahrirlash" onclick="showEditStudentModal('${st.id}')">
+              ✏️
+            </button>
+            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: ${st.status === 'active' ? '#DC2626' : '#059669'};" 
+                    title="${st.status === 'active' ? 'Left qilish' : 'Faollashtirish'}"
+                    onclick="toggleStudentStatus('${st.id}', '${st.status}')">
+              ${st.status === 'active' ? '🚫' : '✅'}
+            </button>
+            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Batafsil profil" onclick="showStudentModal('${st.id}')">
+              👁️
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align:center; padding: 20px;">Xatolik: ${err.message}</td></tr>`;
+  }
+}
+
+function applyStudentsFilter() {
+  StudentMgmtState.q = document.getElementById('filter-student-search')?.value.trim() || '';
+  StudentMgmtState.group = document.getElementById('filter-student-group')?.value.trim() || '';
+  StudentMgmtState.status = document.getElementById('filter-student-status')?.value || '';
+  StudentMgmtState.page = 1;
+  loadStudentsData();
+}
+
+function resetStudentsFilter() {
+  if (document.getElementById('filter-student-search')) document.getElementById('filter-student-search').value = '';
+  if (document.getElementById('filter-student-group')) document.getElementById('filter-student-group').value = '';
+  if (document.getElementById('filter-student-status')) document.getElementById('filter-student-status').value = '';
+  StudentMgmtState.q = '';
+  StudentMgmtState.group = '';
+  StudentMgmtState.status = '';
+  StudentMgmtState.page = 1;
+  loadStudentsData();
+}
+
+function changeStudentsPage(delta) {
+  const newPage = StudentMgmtState.page + delta;
+  if (newPage >= 1 && newPage <= StudentMgmtState.totalPages) {
+    StudentMgmtState.page = newPage;
+    loadStudentsData();
+  }
+}
+
+async function handleStudentExcelUpload() {
+  const fileInput = document.getElementById('import-file-input');
+  const resultBox = document.getElementById('import-result-box');
+  const btn = document.getElementById('btn-do-import');
+
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert('Iltimos, avval Excel (.xlsx / .csv) faylini tanlang!');
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;"></div> Import qilinmoqda...';
+  if (resultBox) {
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = '<p style="color: #2563EB;">Fayl o\'qilmoqda va bazaga yozilmoqda...</p>';
+  }
+
+  try {
+    const res = await fetch('/api/admin/import/students', {
+      method: 'POST',
+      headers: { 'x-user-id': AppState.user.id },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Import xatosi');
+
+    resultBox.innerHTML = `
+      <div style="background: #ECFDF5; border: 1px solid #10B981; padding: 12px; border-radius: var(--radius-md); font-size: 13px;">
+        <h4 style="color: #065F46; margin-bottom: 6px; font-weight: 700;">✅ ${data.message}</h4>
+        <ul style="color: #047857; margin: 0; padding-left: 18px;">
+          <li>Fayldagi jami qatorlar: <strong>${data.total} ta</strong></li>
+          <li>Yangi qo'shilgan talabalar: <strong>${data.inserted} ta</strong></li>
+          <li>Yangilangan talabalar: <strong>${data.updated} ta</strong></li>
+          <li>Chiqarilgan (left) talabalar: <strong>${data.left} ta</strong></li>
+          <li>O'tkazib yuborilgan: <strong>${data.skipped} ta</strong></li>
+        </ul>
+        ${data.errors && data.errors.length > 0 ? `
+          <div style="margin-top: 8px; color: #DC2626;">
+            <strong>Xatoliklar (${data.errors.length}):</strong>
+            <div style="max-height: 80px; overflow-y: auto; font-size: 11px; margin-top: 4px;">
+              ${data.errors.map(e => `<div>${e}</div>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    fileInput.value = '';
+    await loadStudentsData();
+  } catch (err) {
+    if (resultBox) {
+      resultBox.innerHTML = `
+        <div style="background: #FEF2F2; border: 1px solid #EF4444; padding: 12px; border-radius: var(--radius-md); font-size: 13px; color: #991B1B;">
+          <strong>❌ Xatolik yuz berdi:</strong> ${err.message}
+        </div>
+      `;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>🚀</span> Importni Boshlash';
+  }
+}
+
+async function toggleStudentStatus(studentId, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'left' : 'active';
+  const confirmMsg = newStatus === 'left' 
+    ? 'Talabani "Left" (o\'qishdan ketgan/chiqarilgan) holatiga o\'tkazmoqchimisiz? Uning ballari saqlanadi, lekin ommaviy reytingda ko\'rinmaydi.'
+    : 'Talabani qayta "Faol" holatiga o\'tkazmoqchimisiz?';
+
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    await apiFetch(`/api/admin/students/${studentId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status: newStatus })
+    });
+    alert('Talaba holati muvaffaqiyatli o\'zgartirildi');
+    await loadStudentsData();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function showCreateStudentModal() {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.textContent = 'Yangi Talaba Qo\'shish (Registrator / Superadmin)';
+  modalBody.innerHTML = `
+    <form id="create-student-form">
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">ID Kod (external_id) *:</label>
+          <input type="text" id="new-stud-id" class="form-control" placeholder="Masalan: STD-2026-001" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Guruh kodi *:</label>
+          <input type="text" id="new-stud-group" class="form-control" placeholder="Masalan: 210-21" required>
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Ismi *:</label>
+          <input type="text" id="new-stud-first-name" class="form-control" placeholder="Ism" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Familiyasi *:</label>
+          <input type="text" id="new-stud-last-name" class="form-control" placeholder="Familiya" required>
+        </div>
+      </div>
+
+      <div class="grid grid-3 mb-3">
+        <div class="form-group">
+          <label class="form-label">Fakultet / Yo'nalish:</label>
+          <input type="text" id="new-stud-faculty" class="form-control" placeholder="Dasturiy injiniring">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kurs (bosqich):</label>
+          <select id="new-stud-course" class="form-control">
+            <option value="1">1-kurs</option>
+            <option value="2">2-kurs</option>
+            <option value="3">3-kurs</option>
+            <option value="4">4-kurs</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Jinsi:</label>
+          <select id="new-stud-gender" class="form-control">
+            <option value="male">Erkak (Yigit)</option>
+            <option value="female">Ayol (Qiz)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Telefon raqami:</label>
+          <input type="tel" id="new-stud-phone" class="form-control" placeholder="+998901234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email manzili:</label>
+          <input type="email" id="new-stud-email" class="form-control" placeholder="talaba@akhu.uz">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Boshlang'ich holat:</label>
+        <select id="new-stud-status" class="form-control">
+          <option value="active">Faol (Active - Reytingda qatnashadi)</option>
+          <option value="left">Chiqarilgan (Left - Reytingda ko'rinmaydi)</option>
+        </select>
+      </div>
+    </form>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+    <button class="btn btn-primary" onclick="submitCreateStudent()">Saqlash</button>
+  `;
+
+  openModal();
+}
+
+async function submitCreateStudent() {
+  const external_id = document.getElementById('new-stud-id')?.value.trim();
+  const group_code = document.getElementById('new-stud-group')?.value.trim();
+  const first_name = document.getElementById('new-stud-first-name')?.value.trim();
+  const last_name = document.getElementById('new-stud-last-name')?.value.trim();
+  const faculty = document.getElementById('new-stud-faculty')?.value.trim();
+  const course = Number(document.getElementById('new-stud-course')?.value) || 1;
+  const gender = document.getElementById('new-stud-gender')?.value || 'male';
+  const phone = document.getElementById('new-stud-phone')?.value.trim();
+  const email = document.getElementById('new-stud-email')?.value.trim();
+  const status = document.getElementById('new-stud-status')?.value || 'active';
+
+  if (!external_id || !first_name || !last_name || !group_code) {
+    alert('Iltimos, barcha majburiy maydonlarni (ID, Guruh, Ism, Familiya) to\'ldiring!');
+    return;
+  }
+
+  try {
+    await apiFetch('/api/admin/students', {
+      method: 'POST',
+      body: JSON.stringify({
+        external_id, group_code, first_name, last_name,
+        faculty, course, gender, phone, email, status
+      })
+    });
+
+    closeModal();
+    alert('Talaba muvaffaqiyatli qo\'shildi!');
+    await loadStudentsData();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function showEditStudentModal(studentId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.textContent = 'Talaba Ma\'lumotlarini Tahrirlash';
+  modalBody.innerHTML = '<div class="spinner"></div>';
+  modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
+  openModal();
+
+  try {
+    const data = await apiFetch(`/api/observe/students/${studentId}`);
+    const st = data.student;
+
+    modalBody.innerHTML = `
+      <form id="edit-student-form">
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">ID Kod (external_id):</label>
+            <input type="text" id="edit-stud-id" class="form-control" value="${st.external_id || ''}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Guruh kodi:</label>
+            <input type="text" id="edit-stud-group" class="form-control" value="${st.group_code || ''}" required>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">Ismi:</label>
+            <input type="text" id="edit-stud-first-name" class="form-control" value="${st.first_name || ''}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Familiyasi:</label>
+            <input type="text" id="edit-stud-last-name" class="form-control" value="${st.last_name || ''}" required>
+          </div>
+        </div>
+
+        <div class="grid grid-3 mb-3">
+          <div class="form-group">
+            <label class="form-label">Fakultet / Yo'nalish:</label>
+            <input type="text" id="edit-stud-faculty" class="form-control" value="${st.faculty || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kurs:</label>
+            <select id="edit-stud-course" class="form-control">
+              <option value="1" ${st.course === 1 ? 'selected' : ''}>1-kurs</option>
+              <option value="2" ${st.course === 2 ? 'selected' : ''}>2-kurs</option>
+              <option value="3" ${st.course === 3 ? 'selected' : ''}>3-kurs</option>
+              <option value="4" ${st.course === 4 ? 'selected' : ''}>4-kurs</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jinsi:</label>
+            <select id="edit-stud-gender" class="form-control">
+              <option value="male" ${st.gender === 'male' ? 'selected' : ''}>Erkak</option>
+              <option value="female" ${st.gender === 'female' ? 'selected' : ''}>Ayol</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">Telefon:</label>
+            <input type="tel" id="edit-stud-phone" class="form-control" value="${st.phone || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email:</label>
+            <input type="email" id="edit-stud-email" class="form-control" value="${st.email || ''}">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Holat:</label>
+          <select id="edit-stud-status" class="form-control">
+            <option value="active" ${st.status === 'active' ? 'selected' : ''}>Faol (Active)</option>
+            <option value="left" ${st.status === 'left' ? 'selected' : ''}>Chiqarilgan (Left)</option>
+          </select>
+        </div>
+      </form>
+    `;
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+      <button class="btn btn-primary" onclick="submitEditStudent('${studentId}')">O'zgarishlarni Saqlash</button>
+    `;
+  } catch (err) {
+    modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+  }
+}
+
+async function submitEditStudent(studentId) {
+  const external_id = document.getElementById('edit-stud-id')?.value.trim();
+  const group_code = document.getElementById('edit-stud-group')?.value.trim();
+  const first_name = document.getElementById('edit-stud-first-name')?.value.trim();
+  const last_name = document.getElementById('edit-stud-last-name')?.value.trim();
+  const faculty = document.getElementById('edit-stud-faculty')?.value.trim();
+  const course = Number(document.getElementById('edit-stud-course')?.value) || 1;
+  const gender = document.getElementById('edit-stud-gender')?.value || 'male';
+  const phone = document.getElementById('edit-stud-phone')?.value.trim();
+  const email = document.getElementById('edit-stud-email')?.value.trim();
+  const status = document.getElementById('edit-stud-status')?.value || 'active';
+
+  try {
+    await apiFetch(`/api/admin/students/${studentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        external_id, group_code, first_name, last_name,
+        faculty, course, gender, phone, email, status
+      })
+    });
+
+    closeModal();
+    alert('Talaba ma\'lumotlari yangilandi!');
+    await loadStudentsData();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// ====================================================================
+// 9. XODIMLAR & TIZIM ROLLARI BOSHQARUVI (SUPERADMIN FULL ACCESS)
+// ====================================================================
+
+const ALL_ROLES_META = [
+  { role: 'superadmin', name: 'Superadmin (Full Access)', color: '#DC2626', desc: 'Barcha tizim boshqaruvi, xodimlar va konfiguratsiya' },
+  { role: 'dep_ob', name: 'O\'quv bo\'limi (Registrator)', color: '#2563EB', desc: 'Talabalar bazasi, Excel import, GPA va davomat nazorati' },
+  { role: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', color: '#D97706', desc: 'Yoshlar siyosati, tadbirlar, arizalarni tasdiqlash' },
+  { role: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', color: '#7C3AED', desc: 'Ma\'naviy tadbirlar, teatr, kitobxonlik tasdiqlari' },
+  { role: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', color: '#059669', desc: 'Maqolalar, patentlar, ilmiy yutuqlarni tasdiqlash' },
+  { role: 'dep_sb', name: 'Sanoat bilan hamkorlik bo\'limi', color: '#0D9488', desc: 'Amaliyot, innovatsion loyihalar, sanoat sertifikatlari' },
+  { role: 'dep_pb', name: 'Matbuot xizmati (PR)', color: '#DB2777', desc: 'Ijtimoiy tarmoqlar, media-kontent, universitet imiji' },
+  { role: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', color: '#4F46E5', desc: '2-bosqich tasdiqlari (PV: 25+ ball, -30 jarimalar), xavf nazorati' },
+  { role: 'tutor', name: 'Guruh Tyutori', color: '#10B981', desc: 'Guruh talabalariga dalil asosida ball kiritish' },
+  { role: 'observer', name: 'Kuzatuvchi (Rektorat / Dekanat)', color: '#64748B', desc: 'Faqat statistikani kuzatish va hisobotlarni ko\'rish' }
+];
+
+async function renderStaffUsersManagement(container) {
+  container.innerHTML = `
+    <!-- HEADER -->
+    <div class="card mb-4" style="background: linear-gradient(135deg, #1E1B4B, #0F172A); color: white; border: none;">
+      <div class="card-body" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span style="font-size: 26px;">🛡️</span>
+              <h2 style="font-size: 20px; font-weight: 700; color: #fff;">Xodimlar & Rollar Boshqaruvi (Superadmin Full Access)</h2>
+              <span class="badge" style="background: rgba(220, 38, 38, 0.2); color: #F87171; border: 1px solid #EF4444;">To'liq Ruxsat</span>
+            </div>
+            <p style="color: #94A3B8; font-size: 13px; max-width: 750px; margin: 0;">
+              Superadmin sifatida istalgan bo'lim xodimlarini tizimga kiritishingiz, ularga bir yoki bir nechta rollarni 
+              (Tyutor, Registrator, Bo'limlar, Prorektor) biriktirishingiz yoki istalgan paytda olib tashlashingiz mumkin.
+            </p>
+          </div>
+          <button class="btn btn-primary" onclick="showCreateStaffModal()" style="display: flex; align-items: center; gap: 8px; background: #2563EB; border-color: #2563EB; font-weight: 600;">
+            <span>➕</span> Yangi Xodim Qo'shish
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROLLAR SHIFRI VA TAVSIFI -->
+    <div class="card mb-4">
+      <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border);">
+        <h3 style="font-size: 14px; color: var(--text-main); font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <span>📋</span> Tizimdagi Mavjud Bo'limlar va Rollar Ro'yxati (10 ta rol)
+        </h3>
+      </div>
+      <div class="card-body" style="padding: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;">
+          ${ALL_ROLES_META.map(r => `
+            <div style="background: #F8FAFC; border-left: 3px solid ${r.color}; padding: 10px 12px; border-radius: var(--radius-sm);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <code style="font-size: 11px; font-weight: 700; color: ${r.color};">${r.role}</code>
+                <span style="font-size: 11px; font-weight: 600; color: var(--text-main);">${r.name.split(' (')[0]}</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;">${r.desc}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- XODIMLAR JADVALI -->
+    <div class="card">
+      <div class="card-header" style="justify-content: space-between;">
+        <h3 style="font-size: 15px; font-weight: 600;">Ro'yxatdan O'tgan Xodimlar</h3>
+        <div id="staff-users-count" style="font-size: 13px; color: var(--text-muted);">Yuklanmoqda...</div>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 140px;">Login / ID</th>
+                <th>Xodim F.I.Sh</th>
+                <th>Aloqa (Email / Tel)</th>
+                <th>Telegram ID</th>
+                <th>Biriktirilgan Rollar</th>
+                <th>Tyutor Guruhlari</th>
+                <th>Holat</th>
+                <th style="text-align: right; width: 130px;">Amallar</th>
+              </tr>
+            </thead>
+            <tbody id="staff-users-tbody">
+              <tr><td colspan="8" style="text-align:center; padding: 24px;"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await loadStaffUsersList();
+}
+
+async function loadStaffUsersList() {
+  const tbody = document.getElementById('staff-users-tbody');
+  const countEl = document.getElementById('staff-users-count');
+  if (!tbody) return;
+
+  try {
+    const res = await apiFetch('/api/admin/users');
+    const users = res.users || [];
+
+    if (countEl) countEl.textContent = `Jami xodimlar: ${users.length} nafar`;
+
+    if (users.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px;">Xodimlar mavjud emas</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+      const roleBadges = (u.roles || []).map(r => {
+        const meta = ALL_ROLES_META.find(m => m.role === r) || { name: r, color: '#64748B' };
+        return `<span class="badge" style="background: ${meta.color}15; color: ${meta.color}; border: 1px solid ${meta.color}40; margin: 2px; font-size: 11px;">${r}</span>`;
+      }).join(' ');
+
+      const tutorGroups = (u.tutor_groups && u.tutor_groups.length > 0)
+        ? u.tutor_groups.map(g => `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size: 11px;">${g}</span>`).join(' ')
+        : '<span style="color: var(--text-muted); font-size: 11px;">—</span>';
+
+      return `
+        <tr>
+          <td>
+            <code style="font-weight: 700; color: #1E293B;">${u.username}</code>
+          </td>
+          <td>
+            <div style="font-weight: 600; color: var(--text-main);">${u.full_name}</div>
+          </td>
+          <td>
+            <div style="font-size: 12px;">${u.email || '—'}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">${u.phone || '—'}</div>
+          </td>
+          <td>
+            ${u.telegram_id 
+              ? `<code style="font-size: 12px; background: #E0F2FE; color: #0284C7; padding: 2px 6px; border-radius: 4px;">${u.telegram_id}</code>`
+              : '<span style="color: var(--text-muted); font-size: 11px;">Ulanmagan</span>'
+            }
+          </td>
+          <td>
+            <div style="display: flex; flex-wrap: wrap; gap: 2px; max-width: 250px;">
+              ${roleBadges || '<span style="color: var(--text-muted);">Rol belgilanmagan</span>'}
+            </div>
+          </td>
+          <td>${tutorGroups}</td>
+          <td>
+            ${u.is_active 
+              ? '<span class="status-badge" style="background:#ECFDF5; color:#059669; border: 1px solid #10B981;">Faol</span>'
+              : '<span class="status-badge" style="background:#FEF2F2; color:#DC2626; border: 1px solid #EF4444;">Nofaol</span>'
+            }
+          </td>
+          <td style="text-align: right;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+              <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Tahrirlash va Rollarni boshqarish" onclick="showEditStaffModal('${u.id}')">
+                ✏️ Rollar
+              </button>
+              <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: ${u.is_active ? '#DC2626' : '#059669'};" 
+                      title="${u.is_active ? 'Nofaol qilish' : 'Faollashtirish'}"
+                      onclick="toggleStaffStatus('${u.id}', ${u.is_active})">
+                ${u.is_active ? '🚫' : '✅'}
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align:center; padding: 24px;">Xatolik: ${err.message}</td></tr>`;
+  }
+}
+
+function showCreateStaffModal() {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.textContent = 'Yangi Xodim Qo\'shish & Rollar Biriktirish (Superadmin)';
+  modalBody.innerHTML = `
+    <form id="create-staff-form">
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Tizim Logini (username) *:</label>
+          <input type="text" id="new-staff-username" class="form-control" placeholder="masalan: jasur_m yoki dep_math" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Parol *:</label>
+          <input type="password" id="new-staff-password" class="form-control" placeholder="Kamida 6 belgi" required>
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Xodim F.I.Sh *:</label>
+        <input type="text" id="new-staff-fullname" class="form-control" placeholder="To'liq ismi va familiyasi" required>
+      </div>
+
+      <div class="grid grid-3 mb-3">
+        <div class="form-group">
+          <label class="form-label">Email:</label>
+          <input type="email" id="new-staff-email" class="form-control" placeholder="xodim@akhu.uz">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon:</label>
+          <input type="tel" id="new-staff-phone" class="form-control" placeholder="+998901234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram Chat ID:</label>
+          <input type="number" id="new-staff-tgid" class="form-control" placeholder="123456789">
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight: 700; color: #1E3A8A; display: block; margin-bottom: 8px;">
+          Biriktiriladigan Rollar (Ixtiyoriy kombinatsiya tanlanishi mumkin):
+        </label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+          ${ALL_ROLES_META.map(r => `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+              <input type="checkbox" name="staff-roles-checkbox" value="${r.role}" onchange="checkTutorSelection('create')">
+              <span style="font-weight: 600; color: ${r.color};">${r.role}</span>
+              <span style="font-size: 11px; color: var(--text-muted);">- ${r.name.split(' (')[0]}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <div id="create-tutor-group-box" class="form-group mb-3" style="display: none; background: #EFF6FF; padding: 12px; border-radius: var(--radius-md); border: 1px solid #BFDBFE;">
+        <label class="form-label" style="color: #1E3A8A; font-weight: 600;">Tyutor Guruhlari (vergul bilan ajrating):</label>
+        <input type="text" id="new-staff-tutor-groups" class="form-control" placeholder="Masalan: 210-21, 210-22, 210-23">
+        <small style="color: #2563EB; font-size: 11px; display: block; margin-top: 4px;">Ushbu tyutor faqat belgilangan guruh talabalariga ball kirita oladi.</small>
+      </div>
+
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="new-staff-active" checked>
+          <span style="font-weight: 600;">Hisob faol (tizimga kira oladi)</span>
+        </label>
+      </div>
+    </form>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+    <button class="btn btn-primary" onclick="submitCreateStaff()">Xodimni Yaratish</button>
+  `;
+
+  openModal();
+}
+
+function checkTutorSelection(prefix) {
+  const isChecked = Array.from(document.querySelectorAll(`input[name="staff-roles-checkbox"]:checked`))
+    .some(cb => cb.value === 'tutor');
+  const box = document.getElementById(`${prefix}-tutor-group-box`);
+  if (box) box.style.display = isChecked ? 'block' : 'none';
+}
+
+async function submitCreateStaff() {
+  const username = document.getElementById('new-staff-username')?.value.trim();
+  const password = document.getElementById('new-staff-password')?.value;
+  const full_name = document.getElementById('new-staff-fullname')?.value.trim();
+  const email = document.getElementById('new-staff-email')?.value.trim();
+  const phone = document.getElementById('new-staff-phone')?.value.trim();
+  const telegram_id = document.getElementById('new-staff-tgid')?.value.trim();
+  const is_active = document.getElementById('new-staff-active')?.checked ? 1 : 0;
+
+  const roles = Array.from(document.querySelectorAll(`input[name="staff-roles-checkbox"]:checked`))
+    .map(cb => cb.value);
+
+  const rawGroups = document.getElementById('new-staff-tutor-groups')?.value.trim();
+  const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
+
+  if (!username || !password || !full_name) {
+    alert('Iltimos, Login, Parol va F.I.Sh maydonlarini to\'ldiring!');
+    return;
+  }
+
+  if (roles.length === 0) {
+    alert('Iltimos, kamida bitta rol tanlang!');
+    return;
+  }
+
+  try {
+    await apiFetch('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        username, password, full_name, email, phone,
+        telegram_id: telegram_id ? Number(telegram_id) : null,
+        is_active, roles, tutor_groups
+      })
+    });
+
+    closeModal();
+    alert('Yangi xodim muvaffaqiyatli saqlandi!');
+    await loadStaffUsersList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function showEditStaffModal(userId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.textContent = 'Xodimni Tahrirlash va Rollarni O\'zgartirish';
+  modalBody.innerHTML = '<div class="spinner"></div>';
+  modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
+  openModal();
+
+  try {
+    const res = await apiFetch('/api/admin/users');
+    const u = (res.users || []).find(x => x.id === userId);
+    if (!u) throw new Error('Xodim topilmadi');
+
+    modalBody.innerHTML = `
+      <form id="edit-staff-form">
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">Login (O'zgartirib bo'lmaydi):</label>
+            <input type="text" class="form-control" value="${u.username}" disabled style="background:#F1F5F9;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Yangi Parol (ixtiyoriy):</label>
+            <input type="password" id="edit-staff-password" class="form-control" placeholder="Bo'sh qoldirilsa o'zgarmaydi">
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label">Xodim F.I.Sh *:</label>
+          <input type="text" id="edit-staff-fullname" class="form-control" value="${u.full_name || ''}" required>
+        </div>
+
+        <div class="grid grid-3 mb-3">
+          <div class="form-group">
+            <label class="form-label">Email:</label>
+            <input type="email" id="edit-staff-email" class="form-control" value="${u.email || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telefon:</label>
+            <input type="tel" id="edit-staff-phone" class="form-control" value="${u.phone || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telegram Chat ID:</label>
+            <input type="number" id="edit-staff-tgid" class="form-control" value="${u.telegram_id || ''}">
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight: 700; color: #1E3A8A; display: block; margin-bottom: 8px;">
+            Biriktirilgan Rollar (Ixtiyoriy qo'shish yoki olib tashlash):
+          </label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+            ${ALL_ROLES_META.map(r => `
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+                <input type="checkbox" name="edit-staff-roles-checkbox" value="${r.role}" 
+                       ${(u.roles || []).includes(r.role) ? 'checked' : ''} 
+                       onchange="checkTutorSelection('edit')">
+                <span style="font-weight: 600; color: ${r.color};">${r.role}</span>
+                <span style="font-size: 11px; color: var(--text-muted);">- ${r.name.split(' (')[0]}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="edit-tutor-group-box" class="form-group mb-3" style="display: ${(u.roles || []).includes('tutor') ? 'block' : 'none'}; background: #EFF6FF; padding: 12px; border-radius: var(--radius-md); border: 1px solid #BFDBFE;">
+          <label class="form-label" style="color: #1E3A8A; font-weight: 600;">Tyutor Guruhlari (vergul bilan ajrating):</label>
+          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${(u.tutor_groups || []).join(', ')}" placeholder="210-21, 210-22">
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="edit-staff-active" ${u.is_active ? 'checked' : ''}>
+            <span style="font-weight: 600;">Hisob faol</span>
+          </label>
+        </div>
+      </form>
+    `;
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+      <button class="btn btn-primary" onclick="submitEditStaff('${userId}')">O'zgarishlarni Saqlash</button>
+    `;
+  } catch (err) {
+    modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+  }
+}
+
+async function submitEditStaff(userId) {
+  const full_name = document.getElementById('edit-staff-fullname')?.value.trim();
+  const password = document.getElementById('edit-staff-password')?.value;
+  const email = document.getElementById('edit-staff-email')?.value.trim();
+  const phone = document.getElementById('edit-staff-phone')?.value.trim();
+  const telegram_id = document.getElementById('edit-staff-tgid')?.value.trim();
+  const is_active = document.getElementById('edit-staff-active')?.checked ? 1 : 0;
+
+  const roles = Array.from(document.querySelectorAll(`input[name="edit-staff-roles-checkbox"]:checked`))
+    .map(cb => cb.value);
+
+  const rawGroups = document.getElementById('edit-staff-tutor-groups')?.value.trim();
+  const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
+
+  if (!full_name) {
+    alert('F.I.Sh kiritilishi shart!');
+    return;
+  }
+
+  if (roles.length === 0) {
+    alert('Kamida bitta rol tanlanishi shart!');
+    return;
+  }
+
+  try {
+    const payload = {
+      full_name, email, phone,
+      telegram_id: telegram_id ? Number(telegram_id) : null,
+      is_active, roles, tutor_groups
+    };
+    if (password) payload.password = password;
+
+    await apiFetch(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    closeModal();
+    alert('Xodim ma\'lumotlari va rollari yangilandi!');
+    await loadStaffUsersList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function toggleStaffStatus(userId, currentActive) {
+  const newActive = currentActive ? 0 : 1;
+  const actionText = newActive ? 'faollashtirmoqchimisiz' : 'bloklamoqchimisiz (nofaol)';
+
+  if (!confirm(`Xodimni ${actionText}?`)) return;
+
+  try {
+    await apiFetch(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_active: newActive })
+    });
+    alert('Xodim holati yangilandi');
+    await loadStaffUsersList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
