@@ -6,6 +6,10 @@ const { logAudit } = require('./pointService');
 
 const BOT_TOKEN = config.telegram.botToken;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const SUPERADMIN_TG_ID = '1202082857';
+
+let isPolling = false;
+let pollingOffset = 0;
 
 /**
  * Telegram API ga xabar yuborish
@@ -30,6 +34,53 @@ async function sendTelegramMessage(chatId, text, options = {}) {
     return data;
   } catch (err) {
     console.error('Telegram sendMessage error:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Telegram Callback Query ga javob qaytarish
+ */
+async function answerCallbackQuery(callbackQueryId, text = '', showAlert = false) {
+  try {
+    const url = `${TELEGRAM_API}/answerCallbackQuery`;
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text,
+        show_alert: showAlert
+      })
+    });
+  } catch (err) {
+    console.error('answerCallbackQuery error:', err.message);
+  }
+}
+
+/**
+ * Telegram xabarini tahrirlash
+ */
+async function editTelegramMessage(chatId, messageId, text, options = {}) {
+  try {
+    const url = `${TELEGRAM_API}/editMessageText`;
+    const body = {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML',
+      ...options
+    };
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    return await resp.json();
+  } catch (err) {
+    console.error('editTelegramMessage error:', err.message);
     return null;
   }
 }
@@ -73,11 +124,8 @@ function verifyTelegramInitData(initData) {
  * M-01, N-10: Talabaning telefon raqami orqali Telegram akkauntini bog'lash va +5 kirish balli berish
  */
 function linkStudentTelegramAccount(telegramUserId, phoneNumber) {
-  // Telefon raqam formatini normallashtirish: +998901234567
   let cleanPhone = String(phoneNumber).replace(/[^0-9]/g, '');
   if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
-
-  // Boshqa variant: 998901234567
   const phoneWithoutPlus = cleanPhone.replace('+', '');
 
   const student = db.prepare(`
@@ -160,31 +208,31 @@ async function notifyStudent(studentId, templateCode, data = {}) {
   let message = '';
 
   switch (templateCode) {
-    case 'N-01': // Yozuv tasdiqlandi
+    case 'N-01':
       message = `🎯 <b>+${data.points} ball</b> — ${data.category_name} · ${data.item_name}.\nKiritdi: tyutor <i>${data.tutor_name || 'Tyutor'}</i>, tasdiqladi: <i>${data.dept_name || 'Bo\'lim'}</i>.\nJami ballingiz: <b>${total}</b>.`;
       break;
-    case 'N-02': // Yozuv kiritildi (pending)
+    case 'N-02':
       message = `⏳ Tyutoringiz <b>+${data.points} ball</b> (${data.item_name}) kiritdi — ${data.dept_name || 'Bo\'lim'} tasdig'ini kutmoqda.`;
       break;
-    case 'N-03': // Rad etildi
+    case 'N-03':
       message = `↩️ <b>${data.item_name} (+${data.points})</b> rad etildi.\nSabab: <i>${data.reason}</i>\n⚠️ 3 kun ichida ilovadan e'tiroz bildirishingiz mumkin.`;
       break;
-    case 'N-04': // QR check-in
+    case 'N-04':
       message = `✅ <b>${data.event_title}</b>: +${data.points} ball yozildi.\nJami ballingiz: <b>${total}</b>.`;
       break;
-    case 'N-05': // Tadbir eslatmasi
+    case 'N-05':
       message = `📅 Ertaga <b>${data.time}</b> — <b>${data.event_title}</b> (+${data.points} ball).\nSiz ro'yxatdasiz. Manzil: ${data.place}.`;
       break;
-    case 'N-06': // Haftaning yulduzlari
+    case 'N-06':
       message = `🏆 <b>Haftaning yulduzlari e'lon qilindi!</b>\nSiz o'z guruhingizda <b>${data.rank || 1}-o'rin</b>dasiz.`;
       break;
-    case 'N-08': // Passiv talaba eslatmasi
+    case 'N-08':
       message = `👋 <b>Salom, ${student.first_name}!</b>\n30 kundan beri ball olmadingiz. Reytingda orqada qolib ketmang! Yaqin tadbirlar ro'yxatini ilovada ko'ring.`;
       break;
-    case 'N-09': // -30 ball
+    case 'N-09':
       message = `⚠️ <b>Ogohlantirish:</b> Qoidabuzarlik bo'yicha <b>-30 ball</b> yozildi (Asos: ${data.doc || 'Rektor buyrug\'i'}).\n3 kun ichida e'tiroz berishingiz mumkin.`;
       break;
-    case 'N-10': // Kirish
+    case 'N-10':
       message = `🎉 <b>Xush kelibsiz!</b>\n+5 kirish balli yozildi. Ballaringiz va reyting — pastdagi <b>"Kabinet"</b> tugmasida.`;
       break;
   }
@@ -208,23 +256,107 @@ async function notifyStaffDept(deptRole, pendingCount, lateCount) {
 }
 
 /**
- * Telegram Webhook Handler (/api/telegram/webhook)
+ * Superadmin klaviaturasi
+ */
+function getSuperadminKeyboard() {
+  const miniappUrl = `${config.baseUrl}/miniapp`;
+  const portalUrl = `${config.baseUrl}/`;
+  const tvUrl = `${config.baseUrl}/tv?token=${config.secrets.tvToken}`;
+
+  return {
+    inline_keyboard: [
+      [
+        { text: '📱 Talabalar Kabineti (Mini App)', web_app: { url: miniappUrl } }
+      ],
+      [
+        { text: '💻 Superadmin Portali (Web)', url: portalUrl },
+        { text: '📺 Katta Ekran (TV)', url: tvUrl }
+      ],
+      [
+        { text: '🔄 Reytinglarni Yangilash', callback_data: 'admin_recalc' },
+        { text: '📥 Kutilayotgan Arizalar', callback_data: 'admin_pending' }
+      ]
+    ]
+  };
+}
+
+/**
+ * Telegram Update Handler (Webhook va Polling uchun yagona)
  */
 async function handleTelegramWebhook(update) {
   if (!update) return;
 
+  // 1. Callback Query (Inline tugmalar)
+  if (update.callback_query) {
+    const cb = update.callback_query;
+    const chatId = cb.message.chat.id;
+    const data = cb.data;
+
+    if (data === 'admin_recalc') {
+      recalculateStudentScores();
+      await answerCallbackQuery(cb.id, '✅ Reytinglar muvaffaqiyatli qayta hisoblandi!', true);
+    } else if (data === 'admin_pending') {
+      const pendingList = db.prepare(`
+        SELECT pe.*, st.first_name, st.last_name, ci.name as item_name
+        FROM point_entry pe
+        JOIN student st ON pe.student_id = st.id
+        JOIN catalog_item ci ON pe.item_id = ci.id
+        WHERE pe.status IN ('pending', 'pending_pv')
+        ORDER BY pe.created_at DESC LIMIT 5
+      `).all();
+
+      let text = `📥 <b>Kutilayotgan arizalar (oxirgi 5 ta):</b>\n\n`;
+      if (pendingList.length === 0) {
+        text += `Hozirda tasdiqlanishi kerak bo'lgan ariza yo'q.`;
+      } else {
+        pendingList.forEach((p, idx) => {
+          text += `${idx + 1}. <b>${p.first_name} ${p.last_name}</b>: +${p.points} ball (${p.item_name})\n`;
+        });
+      }
+      await answerCallbackQuery(cb.id);
+      await sendTelegramMessage(chatId, text);
+    }
+    return;
+  }
+
+  // 2. Oddiy xabarlar
   const msg = update.message;
   if (!msg) return;
 
   const chatId = msg.chat.id;
   const text = msg.text || '';
+  const isSuperadmin = String(chatId) === SUPERADMIN_TG_ID;
 
   // 1. /start buyrug'i
   if (text.startsWith('/start')) {
+    // Agar Superadmin bo'lsa (Mansurbek Qazaqov)
+    if (isSuperadmin) {
+      // Superadminni bazada telegram_user_id ga bog'lash
+      db.prepare(`UPDATE staff_user SET telegram_user_id = ? WHERE id = 'superadmin'`).run(SUPERADMIN_TG_ID);
+      db.prepare(`UPDATE student SET telegram_user_id = ? WHERE id = 'std_mansurbek'`).run(SUPERADMIN_TG_ID);
+
+      const totalStudents = db.prepare(`SELECT COUNT(*) as c FROM student WHERE status = 'active'`).get().c;
+      const pendingCount = db.prepare(`SELECT COUNT(*) as c FROM point_entry WHERE status IN ('pending', 'pending_pv')`).get().c;
+      const totalPoints = db.prepare(`SELECT COALESCE(SUM(season), 0) as s FROM student_score`).get().s;
+
+      const adminWelcome = `🏛️ <b>Assalomu alaykum, Mansurbek Qazaqov!</b>\n` +
+        `Siz AKHU Talabalar reytingi tizimi <b>Superadmini</b> sifatida tasdiqlangansiz (ID: <code>${chatId}</code>).\n\n` +
+        `📊 <b>Tizimning joriy holati:</b>\n` +
+        `• Faol talabalar: <b>${totalStudents} nafar</b>\n` +
+        `• Kutilayotgan tasdiqlar: <b>${pendingCount} ta</b>\n` +
+        `• Mavsumning jami ballari: <b>${totalPoints.toLocaleString()} ball</b>\n\n` +
+        `Tizimni boshqarish va sinovdan o'tkazish uchun pastdagi tugmalardan foydalaning:`;
+
+      await sendTelegramMessage(chatId, adminWelcome, {
+        reply_markup: getSuperadminKeyboard()
+      });
+      return;
+    }
+
+    // Oddiy talaba yoki foydalanuvchi
     const student = db.prepare(`SELECT * FROM student WHERE telegram_user_id = ?`).get(String(chatId));
 
     if (student) {
-      // Allaqachon ulangan talaba
       const score = db.prepare(`SELECT * FROM student_score WHERE student_id = ?`).get(student.id) || { total: 0, season: 0, rank_cohort: 1 };
       const reply = `Assalomu alaykum, <b>${student.first_name} ${student.last_name}</b>!\n\n` +
         `🎓 Guruh: <b>${student.group_code}</b>\n` +
@@ -245,7 +377,6 @@ async function handleTelegramWebhook(update) {
         }
       });
     } else {
-      // Hali bog'lanmagan: Telefon raqamini so'rash (M-01)
       const welcome = `Assalomu alaykum! Al-Xorazmiy universiteti Talabalar Reytingi tizimiga xush kelibsiz.\n\n` +
         `Tizimga kirish uchun telefon raqamingizni tasdiqlang. Pastdagi <b>"📱 Telefon raqamni yuborish"</b> tugmasini bosing:`;
 
@@ -267,7 +398,7 @@ async function handleTelegramWebhook(update) {
     return;
   }
 
-  // 2. Contact yuborilganda
+  // 2. Contact yuborilganda (Telefon raqam orqali bog'lash)
   if (msg.contact) {
     const phone = msg.contact.phone_number;
     const result = linkStudentTelegramAccount(chatId, phone);
@@ -282,8 +413,7 @@ async function handleTelegramWebhook(update) {
                 web_app: { url: `${config.baseUrl}/miniapp` }
               }
             ]
-          ],
-          remove_keyboard: true
+          ]
         }
       });
     } else {
@@ -292,11 +422,62 @@ async function handleTelegramWebhook(update) {
   }
 }
 
+/**
+ * Telegram Long Polling mexanizmi (Har doim 100% ishlaydi)
+ */
+async function startTelegramPolling() {
+  if (isPolling) return;
+  isPolling = true;
+  console.log('🤖 Telegram Bot Long Polling ishga tushdi...');
+
+  // Webhookni o'chirish (aks holda getUpdates ishlamaydi)
+  try {
+    await fetch(`${TELEGRAM_API}/deleteWebhook`, { method: 'POST' });
+  } catch (e) {}
+
+  // Polling sikli
+  (async () => {
+    while (isPolling) {
+      try {
+        const url = `${TELEGRAM_API}/getUpdates?offset=${pollingOffset}&timeout=20&allowed_updates=["message","callback_query"]`;
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+
+        const data = await resp.json();
+        if (data.ok && data.result && data.result.length > 0) {
+          for (const update of data.result) {
+            pollingOffset = update.update_id + 1;
+            try {
+              await handleTelegramWebhook(update);
+            } catch (err) {
+              console.error('Update processing error:', err.message);
+            }
+          }
+        }
+      } catch (err) {
+        // Tarmoq xatolarida 2 soniya kutib qayta ulanish
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  })();
+}
+
+function stopTelegramPolling() {
+  isPolling = false;
+}
+
 module.exports = {
   sendTelegramMessage,
+  answerCallbackQuery,
+  editTelegramMessage,
   verifyTelegramInitData,
   linkStudentTelegramAccount,
   notifyStudent,
   notifyStaffDept,
-  handleTelegramWebhook
+  handleTelegramWebhook,
+  startTelegramPolling,
+  stopTelegramPolling
 };

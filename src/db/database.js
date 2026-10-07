@@ -24,6 +24,14 @@ db.pragma('foreign_keys = ON');
 function initSchema() {
   const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   db.exec(schemaSql);
+
+  // Migration: ensure telegram_user_id exists on staff_user
+  try {
+    const cols = db.pragma('table_info(staff_user)').map(c => c.name);
+    if (!cols.includes('telegram_user_id')) {
+      db.exec('ALTER TABLE staff_user ADD COLUMN telegram_user_id TEXT;');
+    }
+  } catch (e) {}
 }
 
 module.exports = {

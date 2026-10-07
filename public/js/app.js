@@ -3,14 +3,29 @@
 // ====================================================================
 
 const AppState = {
-  currentRole: 'observer',
+  currentRole: 'superadmin',
   currentPage: 'observe-dashboard',
   catalog: { categories: [], items: [], scale: [] },
   user: {
-    id: 'observer',
-    name: 'Kuzatuvchi (Rektorat)',
-    roles: ['observer']
+    id: 'superadmin',
+    name: 'Mansurbek Qazaqov (Superadmin)',
+    roles: ['superadmin']
   }
+};
+
+const ROLE_MAP = {
+  'observer': { id: 'observer', name: 'Kuzatuvchi (Rektorat)', roles: ['observer'], tagColor: '#60A5FA' },
+  'tutor_1': { id: 'tutor_1', name: 'Jasur Mahmudov (Tyutor)', roles: ['tutor'], tagColor: '#34D399' },
+  'tutor_2': { id: 'tutor_2', name: 'Aziza Qodirova (Tyutor)', roles: ['tutor'], tagColor: '#34D399' },
+  'tutor_3': { id: 'tutor_3', name: 'Bobur Alimov (Tyutor)', roles: ['tutor'], tagColor: '#34D399' },
+  'dep_yb': { id: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', roles: ['dep_yb'], tagColor: '#FBBF24' },
+  'dep_mb': { id: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', roles: ['dep_mb'], tagColor: '#FBBF24' },
+  'dep_ob': { id: 'dep_ob', name: 'O\'quv bo\'limi (Registrator)', roles: ['dep_ob'], tagColor: '#FBBF24' },
+  'dep_ib': { id: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', roles: ['dep_ib'], tagColor: '#FBBF24' },
+  'dep_sb': { id: 'dep_sb', name: 'Sanoat bilan hamkorlik', roles: ['dep_sb'], tagColor: '#FBBF24' },
+  'dep_pb': { id: 'dep_pb', name: 'Matbuot xizmati (PR)', roles: ['dep_pb'], tagColor: '#FBBF24' },
+  'prorektor': { id: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', roles: ['prorektor'], tagColor: '#A78BFA' },
+  'superadmin': { id: 'superadmin', name: 'Mansurbek Qazaqov (Superadmin)', roles: ['superadmin'], tagColor: '#F87171' }
 };
 
 // API so'rov yuborish uchun yordamchi funksiya
@@ -35,9 +50,18 @@ async function apiFetch(endpoint, options = {}) {
 
 // Boshlang'ich yuklash
 document.addEventListener('DOMContentLoaded', async () => {
+  // Saqlangan rolni tekshirish
+  const savedRole = localStorage.getItem('akhu_staff_role') || 'superadmin';
+  if (ROLE_MAP[savedRole]) {
+    const info = ROLE_MAP[savedRole];
+    AppState.currentRole = savedRole;
+    AppState.user = { id: info.id, name: info.name, roles: info.roles };
+  }
+
   initRoleSwitcher();
   initNavigation();
   initModals();
+  initLoginForm();
   await loadCatalogData();
   navigateTo(AppState.currentPage);
 
@@ -54,48 +78,109 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initRoleSwitcher() {
   const selector = document.getElementById('role-selector');
   const roleTag = document.getElementById('role-tag');
+  const topbarUser = document.getElementById('topbar-user-name');
 
-  const ROLE_MAP = {
-    'observer': { id: 'observer', name: 'Kuzatuvchi (Rektorat)', roles: ['observer'], tagColor: '#60A5FA' },
-    'tutor_1': { id: 'tutor_1', name: 'Jasur Mahmudov (Tyutor)', roles: ['tutor'], tagColor: '#34D399' },
-    'tutor_2': { id: 'tutor_2', name: 'Aziza Qodirova (Tyutor)', roles: ['tutor'], tagColor: '#34D399' },
-    'tutor_3': { id: 'tutor_3', name: 'Bobur Alimov (Tyutor)', roles: ['tutor'], tagColor: '#34D399' },
-    'dep_yb': { id: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', roles: ['dep_yb'], tagColor: '#FBBF24' },
-    'dep_mb': { id: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', roles: ['dep_mb'], tagColor: '#FBBF24' },
-    'dep_ob': { id: 'dep_ob', name: 'O\'quv bo\'limi (Registrator)', roles: ['dep_ob'], tagColor: '#FBBF24' },
-    'dep_ib': { id: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', roles: ['dep_ib'], tagColor: '#FBBF24' },
-    'dep_sb': { id: 'dep_sb', name: 'Sanoat bilan hamkorlik', roles: ['dep_sb'], tagColor: '#FBBF24' },
-    'dep_pb': { id: 'dep_pb', name: 'Matbuot xizmati (PR)', roles: ['dep_pb'], tagColor: '#FBBF24' },
-    'prorektor': { id: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', roles: ['prorektor'], tagColor: '#A78BFA' },
-    'superadmin': { id: 'superadmin', name: 'Superadmin (IT markazi)', roles: ['superadmin'], tagColor: '#F87171' }
-  };
+  if (selector) selector.value = AppState.currentRole;
+  if (roleTag) {
+    roleTag.textContent = AppState.user.name.split(' ')[0];
+    roleTag.style.color = ROLE_MAP[AppState.currentRole]?.tagColor || '#60A5FA';
+  }
+  if (topbarUser) {
+    topbarUser.textContent = AppState.user.name;
+  }
 
-  selector.addEventListener('change', (e) => {
-    const val = e.target.value;
-    const info = ROLE_MAP[val];
-    AppState.currentRole = val;
-    AppState.user = { id: info.id, name: info.name, roles: info.roles };
-
-    roleTag.textContent = info.name.split(' ')[0];
-    roleTag.style.color = info.tagColor;
-
-    updateSidebarPermissions();
-
-    // Rolga mos sahifaga yo'naltirish
-    if (info.roles.includes('tutor')) {
-      navigateTo('tutor-my-students');
-    } else if (info.roles.includes('prorektor')) {
-      navigateTo('prorektor-queue');
-    } else if (info.roles.some(r => r.startsWith('dep_'))) {
-      navigateTo('dept-approvals');
-    } else if (info.roles.includes('superadmin')) {
-      navigateTo('admin-catalog');
-    } else {
-      navigateTo('observe-dashboard');
-    }
-  });
+  if (selector) {
+    selector.addEventListener('change', (e) => {
+      setUserRole(e.target.value);
+    });
+  }
 
   updateSidebarPermissions();
+}
+
+function setUserRole(roleKey) {
+  const info = ROLE_MAP[roleKey];
+  if (!info) return;
+
+  AppState.currentRole = roleKey;
+  AppState.user = { id: info.id, name: info.name, roles: info.roles };
+  localStorage.setItem('akhu_staff_role', roleKey);
+
+  const selector = document.getElementById('role-selector');
+  const roleTag = document.getElementById('role-tag');
+  const topbarUser = document.getElementById('topbar-user-name');
+
+  if (selector) selector.value = roleKey;
+  if (roleTag) {
+    roleTag.textContent = info.name.split(' ')[0];
+    roleTag.style.color = info.tagColor;
+  }
+  if (topbarUser) {
+    topbarUser.textContent = info.name;
+  }
+
+  updateSidebarPermissions();
+
+  if (info.roles.includes('tutor')) {
+    navigateTo('tutor-my-students');
+  } else if (info.roles.includes('prorektor')) {
+    navigateTo('prorektor-queue');
+  } else if (info.roles.some(r => r.startsWith('dep_'))) {
+    navigateTo('dept-approvals');
+  } else if (info.roles.includes('superadmin')) {
+    navigateTo('admin-catalog');
+  } else {
+    navigateTo('observe-dashboard');
+  }
+}
+
+// LOGIN MODAL
+function openLoginModal() {
+  const modal = document.getElementById('login-modal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeLoginModal() {
+  const modal = document.getElementById('login-modal');
+  if (modal) modal.classList.remove('active');
+}
+
+function quickLoginRole(roleKey) {
+  setUserRole(roleKey);
+  closeLoginModal();
+}
+
+function initLoginForm() {
+  const form = document.getElementById('portal-login-form');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    const errBox = document.getElementById('login-error-msg');
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Kirish xatosi');
+
+      setUserRole(data.user.roles[0] || 'superadmin');
+      closeLoginModal();
+      alert(`Xush kelibsiz, ${data.user.full_name}!`);
+    } catch (err) {
+      if (errBox) {
+        errBox.textContent = err.message;
+        errBox.style.display = 'block';
+      } else {
+        alert(err.message);
+      }
+    }
+  });
 }
 
 function updateSidebarPermissions() {

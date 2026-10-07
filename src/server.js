@@ -4,7 +4,7 @@ const path = require('path');
 const config = require('./config');
 const { initSchema } = require('./db/database');
 const { initBackgroundJobs } = require('./services/cronService');
-const { handleTelegramWebhook } = require('./services/telegramService');
+const { handleTelegramWebhook, startTelegramPolling } = require('./services/telegramService');
 
 // Initialize Database Schema if not exists
 initSchema();
@@ -60,6 +60,9 @@ app.use((req, res) => {
 
 // Start Background Jobs (recalculate scores, cron)
 initBackgroundJobs();
+
+// Start Telegram Polling (ensures bot responds immediately to all users)
+startTelegramPolling();
 
 // Start Server
 const server = app.listen(config.port, '0.0.0.0', () => {

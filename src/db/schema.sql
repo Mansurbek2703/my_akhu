@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS staff_user (
     twofa_enabled INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
     password_hash TEXT,
+    telegram_user_id TEXT,
     created_at TEXT NOT NULL
 );
 

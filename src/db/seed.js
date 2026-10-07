@@ -193,12 +193,12 @@ function seedDatabase() {
   // 6. XODIMLAR (staff_user) & ROLLAR
   const passHash = bcrypt.hashSync('akhu2026!', 8);
   const insertStaff = db.prepare(`
-    INSERT OR REPLACE INTO staff_user (id, full_name, email, sso_subject, roles, twofa_enabled, active, password_hash, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO staff_user (id, full_name, email, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const staffList = [
-    { id: 'tutor_1', full_name: 'Jasur Mahmudov (Tyutor 1)', email: 'tutor1@akhu.uz', roles: ['tutor'], groups: ['210-21', '210-22', '210-23'] },
+    { id: 'tutor_1', full_name: 'Jasur Mahmudov (Tyutor 1)', email: 'tutor1@akhu.uz', roles: ['tutor'], groups: ['210-21', '210-22', '210-23', 'ADMIN-01'] },
     { id: 'tutor_2', full_name: 'Aziza Qodirova (Tyutor 2)', email: 'tutor2@akhu.uz', roles: ['tutor'], groups: ['211-21', '211-22'] },
     { id: 'tutor_3', full_name: 'Bobur Alimov (Tyutor 3)', email: 'tutor3@akhu.uz', roles: ['tutor'], groups: ['310-21', '310-22', 'M-101'] },
     { id: 'dep_yb', full_name: 'Sardorbek Ergashev (Yoshlar bo\'limi)', email: 'yoshlar@akhu.uz', roles: ['dep_yb'] },
@@ -209,7 +209,7 @@ function seedDatabase() {
     { id: 'dep_pb', full_name: 'Dilshod Rahmatov (Matbuot xizmati / PR)', email: 'pr@akhu.uz', roles: ['dep_pb'] },
     { id: 'prorektor', full_name: 'Prof. Alisher Vohidov (Yoshlar bo\'yicha prorektor)', email: 'prorektor@akhu.uz', roles: ['prorektor'], twofa: 1 },
     { id: 'observer', full_name: 'Universitet Kuzatuv Kengashi / Rektorat', email: 'observer@akhu.uz', roles: ['observer'] },
-    { id: 'superadmin', full_name: 'Axborot Texnologiyalari Markazi (Superadmin)', email: 'superadmin@akhu.uz', roles: ['superadmin'], twofa: 1 }
+    { id: 'superadmin', full_name: 'Mansurbek Qazaqov (Superadmin)', email: 'superadmin@akhu.uz', roles: ['superadmin'], twofa: 1, tg: '1202082857' }
   ];
 
   const insertTutorGroup = db.prepare(`
@@ -226,6 +226,7 @@ function seedDatabase() {
       s.twofa ? 1 : 0,
       1,
       passHash,
+      s.tg || null,
       now
     );
     if (s.groups) {
@@ -243,6 +244,7 @@ function seedDatabase() {
   `);
 
   const students = [
+    { id: 'std_mansurbek', ext: 'AKHU-2024-777', fn: 'Mansurbek', ln: 'Qazaqov', gr: 'ADMIN-01', pr: 'Sun\'iy intellekt va Dasturiy injiniring', lvl: 'mag', cr: 2, gen: 'm', em: 'mansurbek@akhu.uz', ph: '+998901234567', tut: 'tutor_1', tg: '1202082857' },
     { id: 'std_01', ext: 'AKHU-2024-001', fn: 'Diyorbek', ln: 'Ismoilov', gr: '210-21', pr: 'Dasturiy injiniring', lvl: 'bak', cr: 2, gen: 'm', em: 'diyorbek@student.akhu.uz', ph: '+998901112233', tut: 'tutor_1', tg: '987654321' },
     { id: 'std_02', ext: 'AKHU-2024-002', fn: 'Malika', ln: 'Nazarova', gr: '210-21', pr: 'Dasturiy injiniring', lvl: 'bak', cr: 2, gen: 'f', em: 'malika@student.akhu.uz', ph: '+998902223344', tut: 'tutor_1', tg: '987654322' },
     { id: 'std_03', ext: 'AKHU-2024-003', fn: 'Otabek', ln: 'Xalilov', gr: '210-22', pr: 'Sun\'iy intellekt', lvl: 'bak', cr: 2, gen: 'm', em: 'otabek@student.akhu.uz', ph: '+998903334455', tut: 'tutor_1', tg: '987654323' },

@@ -129,6 +129,9 @@
           <a href="/miniapp" target="_blank" class="btn btn-outline btn-sm">
             📱 Talaba Mini App ko'rinishi
           </a>
+          <button id="btn-login-modal" class="btn btn-outline btn-sm" onclick="openLoginModal()" style="border-color: #3B82F6; color: #2563EB; font-weight: 600;">
+            🔑 Kirish: <span id="topbar-user-name">Mansurbek (Superadmin)</span>
+          </button>
           <button id="btn-refresh-data" class="btn btn-primary btn-sm">
             🔄 Yangilash
           </button>
@@ -154,6 +157,58 @@
       </div>
       <div class="modal-footer" id="modal-footer">
         <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Tizimga Kirish (Login) -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>🔐</span> Tizimga Kirish
+        </h3>
+        <button class="btn btn-sm btn-outline" onclick="closeLoginModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="portal-login-form">
+          <div class="form-group mb-3">
+            <label class="form-label">Login / Foydalanuvchi nomi:</label>
+            <input type="text" id="login-username" class="form-control" placeholder="admin yoki superadmin yoki 1202082857" value="admin" required>
+          </div>
+          <div class="form-group mb-3">
+            <label class="form-label">Parol:</label>
+            <input type="password" id="login-password" class="form-control" placeholder="admin123" value="admin123" required>
+          </div>
+          <div id="login-error-msg" style="color: #EF4444; font-size: 13px; margin-bottom: 12px; display: none;"></div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 16px;">
+            Kirish (Kirishni Tasdiqlash)
+          </button>
+        </form>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 14px;">
+          <label class="form-label" style="font-size: 12px; color: var(--text-muted);">Tezkor rollar bilan kirish (Demo):</label>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('superadmin')" style="text-align: left; justify-content: flex-start;">
+              👑 <strong>Superadmin</strong> — Mansurbek Qazaqov (To'liq nazorat)
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('tutor_1')" style="text-align: left; justify-content: flex-start;">
+              👨‍🏫 <strong>Tyutor</strong> — Jasur Mahmudov (Ball kiritish)
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('dep_yb')" style="text-align: left; justify-content: flex-start;">
+              🏢 <strong>Yoshlar bo'limi</strong> (Arizalarni tasdiqlash)
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('prorektor')" style="text-align: left; justify-content: flex-start;">
+              ⚖️ <strong>Yoshlar bo'yicha Prorektor</strong> (PV tasdiq)
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('observer')" style="text-align: left; justify-content: flex-start;">
+              📊 <strong>Kuzatuvchi</strong> — Ijrochi direktor / Rektorat
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeLoginModal()">Yopish</button>
       </div>
     </div>
   </div>

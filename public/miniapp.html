@@ -165,11 +165,12 @@
     <div style="background: white; border-radius: 16px; padding: 18px; border: 1px solid #E2E8F0;">
       <h4 style="font-size: 14px; margin-bottom: 8px;">Talabani almashtirish (Demo):</h4>
       <select id="select-demo-student" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #CBD5E1; font-size: 13px;">
-        <option value="st_001">Ali Valiyev (210-22)</option>
-        <option value="st_002">Madina Karimova (210-22)</option>
-        <option value="st_003">Sardor Rahimov (211-22)</option>
-        <option value="st_004">Zilola Rustamova (211-22)</option>
-        <option value="st_005">Jasur Toirov (310-21)</option>
+        <option value="std_mansurbek" selected>Mansurbek Qazaqov (ADMIN-01 / Superadmin)</option>
+        <option value="std_01">Diyorbek Ismoilov (210-21)</option>
+        <option value="std_02">Malika Nazarova (210-21)</option>
+        <option value="std_03">Otabek Xalilov (210-22)</option>
+        <option value="std_07">Bekzod Rahimov (211-22)</option>
+        <option value="std_11">Umidbek Sultonov (M-101 / Magistr)</option>
       </select>
       <button onclick="switchDemoStudent()" style="width: 100%; margin-top: 10px; background: #2563EB; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer;">
         Profilni Yuklash
@@ -241,7 +242,7 @@
     async function authenticateMiniApp() {
       try {
         const initData = window.Telegram?.WebApp?.initData;
-        const testStudentId = localStorage.getItem('akhu_test_student_id') || 'st_001';
+        const testStudentId = localStorage.getItem('akhu_test_student_id') || 'std_mansurbek';
 
         const res = await fetch('/api/app/auth', {
           method: 'POST',

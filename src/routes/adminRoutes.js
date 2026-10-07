@@ -18,6 +18,95 @@ function authenticateSuperadmin(req, res, next) {
 }
 
 /**
+ * POST /api/admin/login
+ * Sodda login va parol orqali xodimlar va superadmin uchun kirish
+ */
+router.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username) return res.status(400).json({ error: 'Login kiritilishi shart' });
+
+  const u = String(username).toLowerCase().trim();
+  const p = String(password || '').toLowerCase().trim();
+
+  // 1. Superadmin (Mansurbek Qazaqov)
+  if (['admin', 'superadmin', '1202082857', 'mansurbek', 'superadmin@akhu.uz'].includes(u)) {
+    if (['admin', 'admin123', 'admin2026', 'sshtelnet27032004!', 'akhu2026!'].includes(p)) {
+      return res.json({
+        success: true,
+        user: {
+          id: 'superadmin',
+          full_name: 'Mansurbek Qazaqov (Superadmin)',
+          roles: ['superadmin'],
+          email: 'superadmin@akhu.uz'
+        }
+      });
+    } else {
+      return res.status(401).json({ error: 'Parol noto\'g\'ri' });
+    }
+  }
+
+  // 2. Tyutorlar
+  if (u === 'tutor1' || u === 'tutor_1') {
+    if (['tutor123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
+      return res.json({
+        success: true,
+        user: { id: 'tutor_1', full_name: 'Jasur Mahmudov (Tyutor 1)', roles: ['tutor'], email: 'tutor1@akhu.uz' }
+      });
+    }
+  }
+  if (u === 'tutor2' || u === 'tutor_2') {
+    if (['tutor123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
+      return res.json({
+        success: true,
+        user: { id: 'tutor_2', full_name: 'Aziza Qodirova (Tyutor 2)', roles: ['tutor'], email: 'tutor2@akhu.uz' }
+      });
+    }
+  }
+  if (u === 'tutor3' || u === 'tutor_3') {
+    if (['tutor123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
+      return res.json({
+        success: true,
+        user: { id: 'tutor_3', full_name: 'Bobur Alimov (Tyutor 3)', roles: ['tutor'], email: 'tutor3@akhu.uz' }
+      });
+    }
+  }
+
+  // 3. Prorektor
+  if (u === 'prorektor') {
+    if (['pro123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
+      return res.json({
+        success: true,
+        user: { id: 'prorektor', full_name: 'Prof. Alisher Vohidov (Yoshlar bo\'yicha prorektor)', roles: ['prorektor'], email: 'prorektor@akhu.uz' }
+      });
+    }
+  }
+
+  // 4. Bo'limlar
+  const depts = ['dep_yb', 'dep_mb', 'dep_ob', 'dep_ib', 'dep_sb', 'dep_pb'];
+  if (depts.includes(u)) {
+    if (['dep123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
+      const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(u);
+      return res.json({
+        success: true,
+        user: { id: u, full_name: user ? user.full_name : u, roles: [u], email: user ? user.email : `${u}@akhu.uz` }
+      });
+    }
+  }
+
+  // 5. Kuzatuvchi
+  if (u === 'observer') {
+    if (['observer123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
+      return res.json({
+        success: true,
+        user: { id: 'observer', full_name: 'Universitet Kuzatuv Kengashi / Rektorat', roles: ['observer'], email: 'observer@akhu.uz' }
+      });
+    }
+  }
+
+  return res.status(401).json({ error: 'Login yoki parol noto\'g\'ri' });
+});
+
+/**
  * GET /api/admin/catalog
  * S-01: Katalog bandlari va kategoriyalar
  */
