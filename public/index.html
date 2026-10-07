@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AKHU Talabalar — Boshqaruv va Kuzatuv Portali</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-badge">AK</div>
+        <div class="logo-text">
+          <h1>AKHU TALABALAR</h1>
+          <span>1-BOSQICH REYTING</span>
+        </div>
+      </div>
+
+      <!-- ROLE SWITCHER (SSO Demo) -->
+      <div class="role-switcher-box">
+        <div class="role-label">
+          <span>Faol Rol (SSO):</span>
+          <span id="role-tag" style="color: #60A5FA; font-weight: 700;">Kuzatuvchi</span>
+        </div>
+        <select id="role-selector" class="role-select">
+          <option value="observer">Kuzatuvchi (Ijrochi direktor / Rektorat)</option>
+          <option value="tutor_1">Tyutor 1 — Jasur Mahmudov (210-guruhlar)</option>
+          <option value="tutor_2">Tyutor 2 — Aziza Qodirova (211-guruhlar)</option>
+          <option value="tutor_3">Tyutor 3 — Bobur Alimov (310 & Magistr)</option>
+          <option value="dep_yb">Yoshlar bilan ishlash bo'limi</option>
+          <option value="dep_mb">Ma'naviyat va ma'rifat bo'limi</option>
+          <option value="dep_ob">O'quv bo'limi (Registrator & GPA)</option>
+          <option value="dep_ib">Ilmiy tadqiqotlar bo'limi</option>
+          <option value="dep_sb">Sanoat bilan hamkorlik bo'limi</option>
+          <option value="dep_pb">Matbuot xizmati (PR va Media)</option>
+          <option value="prorektor">Yoshlar bo'yicha Prorektor</option>
+          <option value="superadmin">Superadmin (IT markazi)</option>
+        </select>
+      </div>
+
+      <!-- NAVIGATION -->
+      <nav class="sidebar-nav">
+        <!-- Common / Observer -->
+        <div class="nav-section-title">KUZATUV</div>
+        <a class="nav-item active" data-page="observe-dashboard">
+          <span>📊</span> Umumiy Ko'rsatkichlar
+        </a>
+        <a class="nav-item" data-page="observe-rating">
+          <span>🏆</span> Talabalar Reytingi
+        </a>
+        <a class="nav-item" data-page="observe-students">
+          <span>👥</span> Talabalar Ro'yxati
+        </a>
+        <a class="nav-item" data-page="observe-events">
+          <span>📅</span> Tadbirlar & QR
+        </a>
+        <a class="nav-item" data-page="observe-catalog">
+          <span>📖</span> Ball Katalogi v1.0
+        </a>
+
+        <!-- Tutor Section -->
+        <div class="nav-section-title nav-role-section" data-for-role="tutor">TYUTOR KABINETI</div>
+        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-my-students">
+          <span>👨‍🎓</span> Mening Talabalarim
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-add-points">
+          <span>➕</span> Ball Kiritish
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-history">
+          <span>📝</span> Kiritgan Yozuvlarim
+        </a>
+
+        <!-- Department Approvals Section -->
+        <div class="nav-section-title nav-role-section" data-for-role="approver">TASDIQLASH</div>
+        <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-approvals">
+          <span>📥</span> Tasdiq Navbati <span class="badge" id="pending-badge" style="display:none;">0</span>
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-events">
+          <span>🎯</span> Tadbir Yaratish & QR
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="dep_ob" data-page="dept-gpa-import">
+          <span>📊</span> GPA & Davomat Import
+        </a>
+
+        <!-- Prorektor Section -->
+        <div class="nav-section-title nav-role-section" data-for-role="prorektor">PROREKTOR NAZORATI</div>
+        <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-queue">
+          <span>⚖️</span> 25+ va -30 Navbati
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-risks">
+          <span>⚠️</span> Xavf & Konsentratsiya
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-appeals">
+          <span>💬</span> E'tirozlar (Apellyatsiya)
+        </a>
+
+        <!-- Superadmin Section -->
+        <div class="nav-section-title nav-role-section" data-for-role="superadmin">SUPERADMIN</div>
+        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-catalog">
+          <span>⚙️</span> Katalog Sozlamasi
+        </a>
+        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-audit">
+          <span>📋</span> To'liq Audit Jurnali
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="/tv?token=akhu_tv_display_token_2026_xyz" target="_blank" class="btn btn-outline btn-sm" style="width: 100%; color: #38BDF8; border-color: rgba(56, 189, 248, 0.4);">
+          📺 Katta Ekran (TV)
+        </a>
+      </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <main class="main-wrapper">
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <div class="page-title">
+          <h2 id="current-page-title">Kuzatuv Paneli</h2>
+          <p id="current-page-desc">Universitet talabalari faolligi va ko'rsatkichlari monitoringi</p>
+        </div>
+
+        <div class="topbar-actions">
+          <a href="/miniapp" target="_blank" class="btn btn-outline btn-sm">
+            📱 Talaba Mini App ko'rinishi
+          </a>
+          <button id="btn-refresh-data" class="btn btn-primary btn-sm">
+            🔄 Yangilash
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTENT BODY -->
+      <div class="content-body" id="app-content-area">
+        <!-- Dinamik kontent app.js orqali yuklanadi -->
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: Ball kiritish / Tafsilotlar -->
+  <div class="modal-overlay" id="common-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Tafsilotlar</h3>
+        <button class="btn btn-sm btn-outline" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Modal kontenti -->
+      </div>
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

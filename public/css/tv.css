@@ -1,0 +1,294 @@
+/* ====================================================================
+   KATTA EKRAN (TV DISPLAY) - 16:9 FULLSCREEN TELEVIZOR DIZAYN TIZIMI
+   ==================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  cursor: none; /* TV ekranida sichqoncha kursorini yashirish */
+}
+
+body {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  background-color: #050B14;
+  color: #FFFFFF;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* TV HEADER */
+.tv-header {
+  height: 90px;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+}
+
+.tv-logo-area {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.tv-logo-box {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 800;
+  box-shadow: 0 0 25px rgba(37, 99, 235, 0.5);
+}
+
+.tv-title-box h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.tv-title-box span {
+  font-size: 13px;
+  color: #94A3B8;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.tv-time-area {
+  text-align: right;
+}
+
+.tv-clock {
+  font-size: 28px;
+  font-weight: 700;
+  color: #38BDF8;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-date {
+  font-size: 13px;
+  color: #94A3B8;
+}
+
+/* TV SLIDES CONTAINER */
+.tv-slides-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding: 40px;
+}
+
+.tv-slide {
+  position: absolute;
+  inset: 40px;
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.tv-slide.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.slide-header {
+  margin-bottom: 30px;
+}
+
+.slide-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38BDF8;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.slide-title {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+/* SLIDE 1: WEEKLY HEROES */
+.stars-hero-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 24px;
+  flex: 1;
+}
+
+.tv-hero-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.tv-hero-card.main-hero {
+  border-color: #F59E0B;
+  box-shadow: 0 0 40px rgba(245, 158, 11, 0.25);
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.8), rgba(15, 23, 42, 0.9));
+}
+
+.tv-hero-rank {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #F59E0B;
+  letter-spacing: 1px;
+}
+
+.tv-hero-name {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 12px 0 6px;
+}
+
+.tv-hero-group {
+  font-size: 18px;
+  color: #94A3B8;
+}
+
+.tv-hero-score {
+  font-size: 54px;
+  font-weight: 900;
+  color: #38BDF8;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tv-hero-score span {
+  font-size: 18px;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+/* SLIDE 4: TOP 10 LEADERBOARD */
+.leaderboard-tv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  flex: 1;
+}
+
+.leaderboard-col {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-col h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #38BDF8;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.leaderboard-row.gold {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.2), transparent);
+  border-left: 4px solid #F59E0B;
+}
+
+.leaderboard-rank {
+  width: 30px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.leaderboard-name {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  padding-left: 12px;
+}
+
+.leaderboard-points {
+  font-size: 20px;
+  font-weight: 800;
+  color: #38BDF8;
+}
+
+/* SLIDE 5: EVENT & LIVE QR */
+.event-qr-slide-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 40px;
+  align-items: center;
+  flex: 1;
+}
+
+.event-details-card {
+  background: rgba(15, 23, 42, 0.7);
+  padding: 40px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.event-qr-display-card {
+  background: white;
+  padding: 30px;
+  border-radius: 28px;
+  text-align: center;
+  color: #0F172A;
+  box-shadow: 0 0 50px rgba(56, 189, 248, 0.3);
+}
+
+.event-qr-img {
+  width: 280px;
+  height: 280px;
+  margin: 10px auto;
+  display: block;
+}
+
+/* PROGRESS BAR AT BOTTOM */
+.tv-progress-container {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+
+.tv-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #2563EB, #38BDF8);
+  width: 0%;
+  transition: width 0.1s linear;
+}

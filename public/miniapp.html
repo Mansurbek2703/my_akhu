@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AKHU Talabalar — Mini App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/miniapp.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <!-- HEADER -->
+  <header class="miniapp-header">
+    <div class="header-user-info">
+      <h3 id="student-name">Yuklanmoqda...</h3>
+      <span id="student-group">Al-Xorazmiy Universiteti</span>
+    </div>
+    <div class="avatar-circle" id="student-avatar">AK</div>
+  </header>
+
+  <!-- 1. ASOSIY TAB -->
+  <div class="tab-content active" id="tab-home">
+    <!-- HERO SCORE CARD -->
+    <div class="hero-score-card">
+      <div class="hero-main-stat">
+        <div>
+          <div class="label">Mavsumiy Ball</div>
+          <div class="value" id="score-season">0</div>
+        </div>
+        <div style="text-align: right;">
+          <span style="font-size: 11px; text-transform: uppercase; color: #93C5FD; font-weight: 700;">Guruh O'rni</span>
+          <div style="font-size: 26px; font-weight: 800; color: #FBBF24;" id="score-rank">#1</div>
+        </div>
+      </div>
+
+      <div class="hero-sub-stats">
+        <div class="hero-sub-item">
+          <div class="sub-label">Jami Ball</div>
+          <div class="sub-value" id="score-total">0</div>
+        </div>
+        <div class="hero-sub-item">
+          <div class="sub-label">Joriy Hafta</div>
+          <div class="sub-value" style="color: #34D399;" id="score-week">+0</div>
+        </div>
+        <div class="hero-sub-item">
+          <div class="sub-label">Tadbirlar</div>
+          <div class="sub-value" id="score-events">0 ta</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK ACTIONS -->
+    <div class="quick-actions-row">
+      <div class="action-card-btn" onclick="openQrScannerModal()">
+        <div class="action-icon" style="background: #EFF6FF; color: #2563EB;">📷</div>
+        <div>
+          <div>QR Check-in</div>
+          <small style="color: #64748B; font-size: 11px;">Tadbirda ball olish</small>
+        </div>
+      </div>
+
+      <div class="action-card-btn" onclick="switchTab('qr')">
+        <div class="action-icon" style="background: #FEF3C7; color: #D97706;">📱</div>
+        <div>
+          <div>Mening QR</div>
+          <small style="color: #64748B; font-size: 11px;">Skanerlash uchun</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOHALAR KESIMIDA BALLAR -->
+    <div class="section-title">
+      <span>Sohalar Bo'yicha Ballar</span>
+      <span style="font-size: 11px; color: #64748B;">Mavsum</span>
+    </div>
+    <div class="categories-horizontal" id="categories-grid">
+      <!-- Dinamik to'ldiriladi -->
+    </div>
+
+    <!-- SO'NGGI FAOLIYATLAR -->
+    <div class="section-title">
+      <span>So'nggi Yozuvlar</span>
+      <a href="#" onclick="switchTab('history'); return false;" style="font-size: 12px; color: #2563EB; text-decoration: none;">Barchasi →</a>
+    </div>
+    <div class="entries-list" id="recent-entries-list">
+      <div style="text-align: center; padding: 20px; color: #94A3B8; font-size: 13px;">Yuklanmoqda...</div>
+    </div>
+  </div>
+
+  <!-- 2. TARIX TAB -->
+  <div class="tab-content" id="tab-history">
+    <div class="section-title">
+      <span>Mening Ballarim Tarixi</span>
+    </div>
+    <div class="entries-list" id="full-history-list">
+      <!-- Dinamik ro'yxat -->
+    </div>
+  </div>
+
+  <!-- 3. TADBIRLAR TAB -->
+  <div class="tab-content" id="tab-events">
+    <div class="section-title">
+      <span>Universitet Tadbirlari</span>
+    </div>
+    <div id="events-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+      <!-- Dinamik tadbirlar -->
+    </div>
+  </div>
+
+  <!-- 4. MENING QR KODIM TAB -->
+  <div class="tab-content" id="tab-qr" style="text-align: center;">
+    <div class="section-title" style="justify-content: center;">
+      <span>Shaxsiy Talaba QR Kodi</span>
+    </div>
+    <p style="font-size: 13px; color: #64748B; margin-bottom: 20px;">
+      Tadbirlarga kirishda ushbu QR kodni tashkilotchiga ko'rsating. Dinamik xavfsizlik (HMAC) bilan himoyalangan.
+    </p>
+
+    <div style="background: white; padding: 20px; display: inline-block; border-radius: 20px; box-shadow: var(--shadow-soft); margin-bottom: 16px;">
+      <img id="student-qr-image" src="" alt="QR Kod" style="width: 220px; height: 220px; display: block; margin: 0 auto;">
+    </div>
+
+    <div>
+      <span class="badge" style="background: #EFF6FF; color: #2563EB; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+        ⏱️ QR kod har 5 daqiqada yangilanadi
+      </span>
+    </div>
+  </div>
+
+  <!-- 5. PROFIL TAB -->
+  <div class="tab-content" id="tab-profile">
+    <div class="section-title">
+      <span>Talaba Profili</span>
+    </div>
+    <div style="background: white; border-radius: 16px; padding: 18px; border: 1px solid #E2E8F0; margin-bottom: 16px; font-size: 14px;">
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9;">
+        <span style="color: #64748B;">Ism Familiya:</span>
+        <strong id="prof-name">-</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9;">
+        <span style="color: #64748B;">Guruh:</span>
+        <strong id="prof-group">-</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9;">
+        <span style="color: #64748B;">Yo'nalish:</span>
+        <strong id="prof-prog">-</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9;">
+        <span style="color: #64748B;">Bosqich / Kurs:</span>
+        <strong id="prof-course">-</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9;">
+        <span style="color: #64748B;">Tyutor:</span>
+        <strong id="prof-tutor">-</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+        <span style="color: #64748B;">Telegram Holati:</span>
+        <strong style="color: #10B981;">✅ Bog'langan</strong>
+      </div>
+    </div>
+
+    <!-- TEST TALABANI TANLASH (Demo & Review) -->
+    <div style="background: white; border-radius: 16px; padding: 18px; border: 1px solid #E2E8F0;">
+      <h4 style="font-size: 14px; margin-bottom: 8px;">Talabani almashtirish (Demo):</h4>
+      <select id="select-demo-student" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #CBD5E1; font-size: 13px;">
+        <option value="st_001">Ali Valiyev (210-22)</option>
+        <option value="st_002">Madina Karimova (210-22)</option>
+        <option value="st_003">Sardor Rahimov (211-22)</option>
+        <option value="st_004">Zilola Rustamova (211-22)</option>
+        <option value="st_005">Jasur Toirov (310-21)</option>
+      </select>
+      <button onclick="switchDemoStudent()" style="width: 100%; margin-top: 10px; background: #2563EB; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer;">
+        Profilni Yuklash
+      </button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAVIGATION -->
+  <nav class="bottom-nav">
+    <button class="nav-tab-btn active" onclick="switchTab('home')">
+      <span class="nav-icon">🏠</span>
+      <span>Asosiy</span>
+    </button>
+    <button class="nav-tab-btn" onclick="switchTab('history')">
+      <span class="nav-icon">📝</span>
+      <span>Tarix</span>
+    </button>
+    <button class="nav-tab-btn" onclick="switchTab('events')">
+      <span class="nav-icon">🎯</span>
+      <span>Tadbirlar</span>
+    </button>
+    <button class="nav-tab-btn" onclick="switchTab('qr')">
+      <span class="nav-icon">📱</span>
+      <span>QR Kod</span>
+    </button>
+    <button class="nav-tab-btn" onclick="switchTab('profile')">
+      <span class="nav-icon">👤</span>
+      <span>Profil</span>
+    </button>
+  </nav>
+
+  <!-- QR SCANNER MODAL -->
+  <div class="qr-modal" id="qr-scanner-modal">
+    <div style="text-align: center; color: white; margin-bottom: 20px;">
+      <h3 style="font-size: 18px; margin-bottom: 4px;">Tadbir QR Kodini Skanerlang</h3>
+      <p style="font-size: 12px; color: #94A3B8;">Kamerani tadbir ekrani yoki plakatiga qarating</p>
+    </div>
+
+    <div class="qr-scanner-box">
+      <div class="scanner-laser"></div>
+    </div>
+
+    <!-- Qo'lda kod kiritish (Fallback) -->
+    <div style="margin-top: 24px; width: 100%; max-width: 280px;">
+      <input type="text" id="manual-qr-payload" placeholder="QR kod matni yoki tadbir kodi..." style="width: 100%; padding: 10px; border-radius: 10px; border: none; font-size: 13px; margin-bottom: 8px; text-align: center;">
+      <button onclick="submitManualCheckin()" style="width: 100%; background: #38BDF8; color: #0F172A; font-weight: 700; border: none; padding: 10px; border-radius: 10px; cursor: pointer; margin-bottom: 8px;">
+        Tekshirish & Check-in
+      </button>
+      <button onclick="closeQrScannerModal()" style="width: 100%; background: transparent; color: white; border: 1px solid rgba(255,255,255,0.3); padding: 10px; border-radius: 10px; cursor: pointer;">
+        Yopish
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let currentAuthToken = localStorage.getItem('akhu_student_token') || null;
+    let studentData = null;
+
+    // Telegram WebApp initializatsiya
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await authenticateMiniApp();
+    });
+
+    async function authenticateMiniApp() {
+      try {
+        const initData = window.Telegram?.WebApp?.initData;
+        const testStudentId = localStorage.getItem('akhu_test_student_id') || 'st_001';
+
+        const res = await fetch('/api/app/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            initData: initData || undefined,
+            test_student_id: !initData ? testStudentId : undefined
+          })
+        });
+
+        const data = await res.json();
+        if (data.token) {
+          currentAuthToken = data.token;
+          localStorage.setItem('akhu_student_token', data.token);
+          await loadStudentDashboard();
+        } else if (data.need_phone) {
+          alert('Iltimos, Telegram botimizda telefon raqamingizni yuboring.');
+        }
+      } catch (err) {
+        console.error('Auth error:', err);
+      }
+    }
+
+    async function loadStudentDashboard() {
+      if (!currentAuthToken) return;
+      try {
+        const res = await fetch('/api/app/me', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        studentData = data;
+
+        // UI ni to'ldirish
+        const st = data.student;
+        const sc = data.score;
+
+        document.getElementById('student-name').textContent = `${st.first_name} ${st.last_name}`;
+        document.getElementById('student-group').textContent = `${st.group_code} • ${st.program_code}`;
+        document.getElementById('student-avatar').textContent = st.first_name[0] + st.last_name[0];
+
+        document.getElementById('score-season').textContent = sc.season;
+        document.getElementById('score-total').textContent = sc.total;
+        document.getElementById('score-week').textContent = `+${sc.week_cur}`;
+        document.getElementById('score-rank').textContent = `#${sc.rank_cohort}`;
+        document.getElementById('score-events').textContent = `${sc.events_count} ta`;
+
+        // Profil ma'lumotlari
+        document.getElementById('prof-name').textContent = `${st.first_name} ${st.last_name}`;
+        document.getElementById('prof-group').textContent = st.group_code;
+        document.getElementById('prof-prog').textContent = st.program_code;
+        document.getElementById('prof-course').textContent = `${st.course}-kurs (${st.level === 'bak' ? 'Bakalavriat' : 'Magistratura'})`;
+        document.getElementById('prof-tutor').textContent = st.tutor_name || 'Tyutor biriktirilmagan';
+
+        // Sohalar kartochkalari
+        const catContainer = document.getElementById('categories-grid');
+        catContainer.innerHTML = (data.categories || []).map(c => `
+          <div class="category-mini-card" style="border-left: 4px solid ${c.color};">
+            <span class="cat-name">${c.name}</span>
+            <span class="cat-pts">${c.points} ball</span>
+          </div>
+        `).join('');
+
+        // So'nggi yozuvlar
+        renderEntriesList(data.recent_entries || []);
+
+        // QR kodni yuklash
+        loadStudentQr();
+      } catch (e) {
+        console.error('Dashboard xatosi:', e);
+      }
+    }
+
+    function renderEntriesList(entries) {
+      const recentCont = document.getElementById('recent-entries-list');
+      const fullCont = document.getElementById('full-history-list');
+
+      if (!entries || entries.length === 0) {
+        recentCont.innerHTML = '<div style="text-align:center; padding:16px; color:#94A3B8; font-size:13px;">Hozircha yozuvlar yo\'q</div>';
+        fullCont.innerHTML = '<div style="text-align:center; padding:16px; color:#94A3B8; font-size:13px;">Hozircha yozuvlar yo\'q</div>';
+        return;
+      }
+
+      const listHtml = entries.map(e => `
+        <div class="entry-item-card">
+          <div class="entry-header">
+            <span class="entry-title">${e.item_name}</span>
+            <span class="entry-pts ${e.points >= 0 ? 'pts-pos' : 'pts-neg'}">
+              ${e.points >= 0 ? '+' : ''}${e.points} ball
+            </span>
+          </div>
+          <div class="entry-meta">
+            <span>📅 ${e.event_date} • ${e.source}</span>
+            <span style="font-weight:600; color: ${e.status === 'approved' ? '#10B981' : (e.status === 'rejected' ? '#EF4444' : '#F59E0B')};">
+              ${e.status === 'approved' ? 'Tasdiqlangan' : (e.status === 'rejected' ? 'Rad etilgan' : 'Kutilmoqda')}
+            </span>
+          </div>
+          ${e.reject_note ? `<div style="font-size:11px; color:#EF4444; background:#FEF2F2; padding:6px; border-radius:6px;">Sabab: ${e.reject_note}</div>` : ''}
+        </div>
+      `).join('');
+
+      recentCont.innerHTML = listHtml;
+      fullCont.innerHTML = listHtml;
+    }
+
+    async function loadStudentQr() {
+      try {
+        const res = await fetch('/api/app/qr', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const d = await res.json();
+        if (d.qr_data_url) {
+          document.getElementById('student-qr-image').src = d.qr_data_url;
+        }
+      } catch (e) {
+        console.error('QR yuklanmadi', e);
+      }
+    }
+
+    async function loadEventsTab() {
+      try {
+        const res = await fetch('/api/app/events', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        const cont = document.getElementById('events-list-container');
+        const events = data.events || [];
+
+        if (events.length === 0) {
+          cont.innerHTML = '<div style="text-align:center; padding:20px; color:#94A3B8;">Hozircha rejalashtirilgan tadbirlar yo\'q</div>';
+          return;
+        }
+
+        cont.innerHTML = events.map(ev => `
+          <div class="entry-item-card">
+            <div class="entry-header">
+              <span class="entry-title">${ev.title}</span>
+              <span class="badge" style="background:#EFF6FF; color:#2563EB; font-weight:700;">+${ev.points} ball</span>
+            </div>
+            <p style="font-size:12px; color:#64748B; margin: 4px 0;">
+              📍 ${ev.place} • 🕒 ${new Date(ev.starts_at).toLocaleString('uz-UZ')}
+            </p>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span style="font-size:11px; color:#94A3B8;">
+                ${ev.is_checked_in ? '✅ Ishtirok etdingiz' : (ev.is_registered ? '📝 Ro\'yxatdan o\'tgansiz' : 'Ochiq tadbir')}
+              </span>
+              ${!ev.is_checked_in && !ev.is_registered ? `
+                <button onclick="registerEvent('${ev.id}')" style="background:#2563EB; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;">
+                  Ro'yxatdan o'tish
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('Events tab error:', e);
+      }
+    }
+
+    async function registerEvent(eventId) {
+      try {
+        const res = await fetch(`/api/app/events/${eventId}/register`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        alert(data.message || 'Ro\'yxatdan o\'tildi!');
+        loadEventsTab();
+      } catch (e) {
+        alert('Xatolik: ' + e.message);
+      }
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
+
+      const targetTab = document.getElementById(`tab-${tabName}`);
+      if (targetTab) targetTab.classList.add('active');
+
+      const btnIndex = { home: 0, history: 1, events: 2, qr: 3, profile: 4 }[tabName];
+      if (btnIndex !== undefined) {
+        document.querySelectorAll('.nav-tab-btn')[btnIndex].classList.add('active');
+      }
+
+      if (tabName === 'events') loadEventsTab();
+      if (tabName === 'qr') loadStudentQr();
+    }
+
+    function openQrScannerModal() {
+      document.getElementById('qr-scanner-modal').style.display = 'flex';
+    }
+
+    function closeQrScannerModal() {
+      document.getElementById('qr-scanner-modal').style.display = 'none';
+    }
+
+    async function submitManualCheckin() {
+      const qrPayload = document.getElementById('manual-qr-payload').value.trim();
+      if (!qrPayload) return alert('Iltimos, QR kodni kiriting!');
+
+      try {
+        const res = await fetch('/api/app/checkin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentAuthToken}`
+          },
+          body: JSON.stringify({ qr_payload: qrPayload })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        alert(`🎉 ${data.message} (+${data.points} ball)`);
+        closeQrScannerModal();
+        await loadStudentDashboard();
+      } catch (e) {
+        alert(`❌ Check-in xatosi: ${e.message}`);
+      }
+    }
+
+    function switchDemoStudent() {
+      const selectedId = document.getElementById('select-demo-student').value;
+      localStorage.setItem('akhu_test_student_id', selectedId);
+      localStorage.removeItem('akhu_student_token');
+      location.reload();
+    }
+  </script>
+</body>
+</html>

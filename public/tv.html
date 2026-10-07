@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AKHU Talabalar — Jonli Reyting va Ko'rsatkichlar (TV)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/tv.css">
+</head>
+<body>
+  <!-- HEADER -->
+  <header class="tv-header">
+    <div class="tv-logo-area">
+      <div class="tv-logo-box">AK</div>
+      <div class="tv-title-box">
+        <h1>AL-XORAZMIY UNIVERSITETI</h1>
+        <span>TALABALAR FAOLIYATI VA REYTINGI TIZIMI</span>
+      </div>
+    </div>
+
+    <div class="tv-time-area">
+      <div class="tv-clock" id="tv-live-clock">12:00:00</div>
+      <div class="tv-date" id="tv-live-date">7-oktabr, 2026</div>
+    </div>
+  </header>
+
+  <!-- SLIDES VIEWPORT -->
+  <main class="tv-slides-viewport">
+    <!-- SLIDE 1: WEEKLY STARS -->
+    <div class="tv-slide active" id="slide-1">
+      <div class="slide-header">
+        <span class="slide-badge">⭐ Hafta Qahramonlari</span>
+        <h2 class="slide-title">Haftaning Yulduzlari (Weekly Stars)</h2>
+      </div>
+
+      <div class="stars-hero-grid">
+        <!-- 1. Hafta Qahramoni -->
+        <div class="tv-hero-card main-hero">
+          <div>
+            <span class="tv-hero-rank">🏆 HAFTA QAHRAMONI</span>
+            <h3 class="tv-hero-name" id="hero-name">Ali Valiyev</h3>
+            <div class="tv-hero-group" id="hero-group">210-22 guruh</div>
+          </div>
+          <div class="tv-hero-score">
+            <span id="hero-pts">+45</span>
+            <span>haftalik ball</span>
+          </div>
+        </div>
+
+        <!-- 2. Eng Faol Qiz -->
+        <div class="tv-hero-card" style="border-color: rgba(236, 72, 153, 0.4);">
+          <div>
+            <span class="tv-hero-rank" style="color: #EC4899;">🌸 ENG FAOL QIZ</span>
+            <h3 class="tv-hero-name" id="girl-name">Madina Karimova</h3>
+            <div class="tv-hero-group" id="girl-group">210-22 guruh</div>
+          </div>
+          <div class="tv-hero-score" style="color: #F472B6;">
+            <span id="girl-pts">+38</span>
+            <span>ball</span>
+          </div>
+        </div>
+
+        <!-- 3. Eng Faol Yigit -->
+        <div class="tv-hero-card" style="border-color: rgba(59, 130, 246, 0.4);">
+          <div>
+            <span class="tv-hero-rank" style="color: #60A5FA;">⚡ ENG FAOL YIGIT</span>
+            <h3 class="tv-hero-name" id="boy-name">Sardor Rahimov</h3>
+            <div class="tv-hero-group" id="boy-group">211-22 guruh</div>
+          </div>
+          <div class="tv-hero-score" style="color: #60A5FA;">
+            <span id="boy-pts">+32</span>
+            <span>ball</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: TOP TALABALAR REYTINGI -->
+    <div class="tv-slide" id="slide-2">
+      <div class="slide-header">
+        <span class="slide-badge">🏆 TOP TALABALAR</span>
+        <h2 class="slide-title">Bakalavriat va Magistratura Yetakchilari</h2>
+      </div>
+
+      <div class="leaderboard-tv-grid">
+        <!-- Bakalavriat -->
+        <div class="leaderboard-col">
+          <h3>🎓 Bakalavriat — Top 5</h3>
+          <div id="tv-top-bak-list">
+            <!-- Dinamik -->
+          </div>
+        </div>
+
+        <!-- Magistratura -->
+        <div class="leaderboard-col">
+          <h3>🔬 Magistratura — Top 5</h3>
+          <div id="tv-top-mag-list">
+            <!-- Dinamik -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: ENG YAQIN TADBIRLAR -->
+    <div class="tv-slide" id="slide-3">
+      <div class="slide-header">
+        <span class="slide-badge">📅 E'LONLAR & REJA</span>
+        <h2 class="slide-title">Eng Yaqin Universitet Tadbirlari</h2>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; flex: 1;" id="tv-events-grid">
+        <!-- Dinamik tadbirlar -->
+      </div>
+    </div>
+
+    <!-- SLIDE 4: SOHALAR VA UMUMIY KO'RSATKICHLAR -->
+    <div class="tv-slide" id="slide-4">
+      <div class="slide-header">
+        <span class="slide-badge">📊 STATISTIKA</span>
+        <h2 class="slide-title">Universitet Faolligi Ko'rsatkichlari</h2>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; flex: 1;">
+        <div class="leaderboard-col">
+          <h3>🌐 Sohalar Bo'yicha Yig'ilgan Ballar</h3>
+          <div id="tv-cat-stats" style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+            <!-- Dinamik -->
+          </div>
+        </div>
+
+        <div class="leaderboard-col" style="display: flex; flex-direction: column; justify-content: center; gap: 24px;">
+          <div style="background: rgba(255,255,255,0.03); padding: 24px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="color: #94A3B8; font-size: 14px; text-transform: uppercase;">Mavsumning Jami Ballari</div>
+            <div style="font-size: 54px; font-weight: 900; color: #38BDF8;" id="tv-total-points">0</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); padding: 24px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="color: #94A3B8; font-size: 14px; text-transform: uppercase;">Faol Talabalar Ulushi</div>
+            <div style="font-size: 54px; font-weight: 900; color: #34D399;" id="tv-active-ratio">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- PASTKI PROGRESS CHIZIG'I -->
+  <div style="height: 4px; background: rgba(255,255,255,0.1); width: 100vw; position: fixed; bottom: 0; left: 0;">
+    <div id="slide-progress" style="height: 100%; width: 0%; background: #38BDF8; transition: width 0.1s linear;"></div>
+  </div>
+
+  <script>
+    // Soat va sana
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('tv-live-clock').textContent = now.toLocaleTimeString('uz-UZ', { hour12: false });
+      const months = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+      document.getElementById('tv-live-date').textContent = `${now.getDate()}-${months[now.getMonth()]}, ${now.getFullYear()}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Slaydlar almashinuvi
+    const slides = document.querySelectorAll('.tv-slide');
+    let currentSlide = 0;
+    const SLIDE_DURATION = 12000; // 12 soniya
+    let slideTimer = null;
+    let progressInterval = null;
+
+    function showSlide(index) {
+      slides.forEach((s, idx) => {
+        if (idx === index) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+      resetProgress();
+    }
+
+    function nextSlide() {
+      currentSlide = (currentSlide + 1) % slides.length;
+      showSlide(currentSlide);
+    }
+
+    function resetProgress() {
+      clearInterval(progressInterval);
+      const progressBar = document.getElementById('slide-progress');
+      let start = Date.now();
+      progressBar.style.width = '0%';
+
+      progressInterval = setInterval(() => {
+        let elapsed = Date.now() - start;
+        let pct = Math.min(100, (elapsed / SLIDE_DURATION) * 100);
+        progressBar.style.width = pct + '%';
+        if (elapsed >= SLIDE_DURATION) {
+          clearInterval(progressInterval);
+          nextSlide();
+        }
+      }, 100);
+    }
+
+    // Ma'lumotlarni yuklash
+    async function loadTvData() {
+      try {
+        const res = await fetch('/api/observe/dashboard');
+        const data = await res.json();
+
+        // 1. Weekly Stars
+        const ws = data.weekly_stars || {};
+        if (ws.hero) {
+          document.getElementById('hero-name').textContent = ws.hero.student_name;
+          document.getElementById('hero-group').textContent = ws.hero.group_code;
+          document.getElementById('hero-pts').textContent = `+${ws.hero.week_points}`;
+        }
+        if (ws.girl) {
+          document.getElementById('girl-name').textContent = ws.girl.student_name;
+          document.getElementById('girl-group').textContent = ws.girl.group_code;
+          document.getElementById('girl-pts').textContent = `+${ws.girl.week_points}`;
+        }
+        if (ws.boy) {
+          document.getElementById('boy-name').textContent = ws.boy.student_name;
+          document.getElementById('boy-group').textContent = ws.boy.group_code;
+          document.getElementById('boy-pts').textContent = `+${ws.boy.week_points}`;
+        }
+
+        // 2. Top Bakalavr & Magistr
+        const bakList = document.getElementById('tv-top-bak-list');
+        bakList.innerHTML = (data.top_bak || []).slice(0, 5).map((s, idx) => `
+          <div class="leaderboard-row">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 20px; font-weight: 800; color: #F59E0B; width: 28px;">#${idx+1}</span>
+              <div>
+                <strong style="font-size: 17px;">${s.first_name} ${s.last_name}</strong>
+                <div style="font-size: 13px; color: #94A3B8;">${s.group_code}</div>
+              </div>
+            </div>
+            <strong style="font-size: 20px; color: #38BDF8;">${s.season} ball</strong>
+          </div>
+        `).join('');
+
+        const magList = document.getElementById('tv-top-mag-list');
+        magList.innerHTML = (data.top_mag || []).slice(0, 5).map((s, idx) => `
+          <div class="leaderboard-row">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 20px; font-weight: 800; color: #F59E0B; width: 28px;">#${idx+1}</span>
+              <div>
+                <strong style="font-size: 17px;">${s.first_name} ${s.last_name}</strong>
+                <div style="font-size: 13px; color: #94A3B8;">${s.group_code}</div>
+              </div>
+            </div>
+            <strong style="font-size: 20px; color: #38BDF8;">${s.season} ball</strong>
+          </div>
+        `).join('');
+
+        // 3. Tadbirlar
+        const evRes = await fetch('/api/events');
+        const evData = await evRes.json();
+        const evGrid = document.getElementById('tv-events-grid');
+        evGrid.innerHTML = (evData.events || []).slice(0, 3).map(e => `
+          <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <span class="badge" style="background: ${e.category_color}20; color: ${e.category_color}; border: 1px solid ${e.category_color}; margin-bottom: 12px; display: inline-block;">
+                ${e.category_name}
+              </span>
+              <h3 style="font-size: 22px; margin-bottom: 12px;">${e.title}</h3>
+              <p style="color: #94A3B8; font-size: 15px; margin-bottom: 6px;">📍 ${e.place}</p>
+              <p style="color: #94A3B8; font-size: 15px;">🕒 ${new Date(e.starts_at).toLocaleString('uz-UZ')}</p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-top: 16px;">
+              <span style="color: #38BDF8; font-size: 20px; font-weight: 800;">+${e.points} ball</span>
+              <span style="color: #94A3B8; font-size: 14px;">👥 ${e.checkins_count || 0} qatnashchi</span>
+            </div>
+          </div>
+        `).join('');
+
+        // 4. Statistika
+        document.getElementById('tv-total-points').textContent = data.metrics.total_season_points.toLocaleString();
+        document.getElementById('tv-active-ratio').textContent = `${data.metrics.active_ratio}%`;
+
+        const catStats = document.getElementById('tv-cat-stats');
+        catStats.innerHTML = (data.categories || []).map(c => `
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 16px; margin-bottom: 6px;">
+              <span style="color: ${c.color}; font-weight: 700;">● ${c.name}</span>
+              <strong>${c.total_points} ball</strong>
+            </div>
+            <div style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;">
+              <div style="height: 100%; width: ${Math.min(100, Math.round((c.total_points / (data.metrics.total_season_points || 1)) * 100))}%; background: ${c.color}; border-radius: 5px;"></div>
+            </div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        console.error('TV ma\'lumotlari xatosi:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadTvData();
+      setInterval(loadTvData, 30000); // Har 30 soniyada yangilash
+      showSlide(0);
+    });
+  </script>
+</body>
+</html>
