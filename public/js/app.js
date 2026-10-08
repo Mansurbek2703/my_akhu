@@ -3545,6 +3545,12 @@ async function showEditStudentModal(studentId) {
   openModal();
 
   try {
+    let tutors = [];
+    try {
+      const tutRes = await apiFetch('/api/admin/tutors');
+      tutors = tutRes.tutors || [];
+    } catch(e) {}
+
     const data = await apiFetch(`/api/admin/students/${studentId}`);
     const st = data.student;
 
@@ -3615,6 +3621,14 @@ async function showEditStudentModal(studentId) {
             <input type="email" id="edit-std-email" class="form-control" value="${st.email || ''}">
           </div>
         </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight: 600;">Biriktirilgan Tyutor (Mas'ul)</label>
+          <select id="edit-std-tutor" class="form-select">
+            <option value="">-- Tyutor biriktirilmagan --</option>
+            ${tutors.map(t => `<option value="${t.id}" ${String(st.tutor_id) === String(t.id) ? 'selected' : ''}>${t.full_name} (${(t.groups || []).join(', ') || t.id})</option>`).join('')}
+          </select>
+        </div>
       </form>
     `;
 
@@ -3641,13 +3655,14 @@ async function handleEditStudentSubmit(studentId) {
   const phone = document.getElementById('edit-std-phone')?.value.trim();
   const email = document.getElementById('edit-std-email')?.value.trim();
   const status = document.getElementById('edit-std-status')?.value;
+  const tutor_id = document.getElementById('edit-std-tutor')?.value || null;
 
   try {
     await apiFetch(`/api/admin/students/${studentId}`, {
       method: 'PUT',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
-        program_code, course, gender, phone, email, status
+        program_code, course, gender, phone, email, tutor_id, status
       })
     });
 
@@ -4197,8 +4212,9 @@ function resetStaffFilters() {
 
 async function loadStaffUsersList() {
   try {
-    const users = await apiFetch('/api/admin/users');
-    adminStaffState.users = users || [];
+    const res = await apiFetch('/api/admin/users');
+    const users = Array.isArray(res) ? res : (res.users || []);
+    adminStaffState.users = Array.isArray(users) ? users : [];
 
     // Metrikalar
     const total = adminStaffState.users.length;
@@ -4295,6 +4311,9 @@ function renderStaffTableRows() {
         </td>
         <td style="text-align: right;">
           <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+            <button class="btn-action" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" onclick="impersonateStaffUser('${u.id}')" title="Ushbu xodim nomidan tizimni tekshirish (Check / Kirish)">
+              ${icon('eye', 14)}
+            </button>
             <button class="btn-action btn-action-primary" onclick="showEditStaffModal('${u.id}')" title="Tahrirlash / Rollar">
               ${icon('edit', 14)}
             </button>
@@ -4595,3 +4614,100 @@ async function deleteStaffUser(userId, fullName) {
     alert(err.message);
   }
 }
+
+// ====================================================================
+// SUPERADMIN: XODIM SIFATIDA TIZIMNI TEKSHIRISH (IMPERSONATION)
+// ====================================================================
+function impersonateStaffUser(userId) {
+  const user = (adminStaffState.users || []).find(u => String(u.id) === String(userId));
+  if (!user) {
+    alert("Xodim topilmadi!");
+    return;
+  }
+
+  // Asl superadmin hisobini eslab qolish
+  if (!sessionStorage.getItem('akhu_original_admin')) {
+    sessionStorage.setItem('akhu_original_admin', JSON.stringify(AppState.user));
+  }
+
+  let roles = [];
+  try { roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles; } catch(e) { roles = [user.roles]; }
+
+  AppState.isLoggedIn = true;
+  AppState.user = {
+    id: user.id,
+    name: user.full_name,
+    full_name: user.full_name,
+    roles: roles || [],
+    email: user.email,
+    groups: user.tutor_groups || []
+  };
+  AppState.currentRole = roles[0] || 'staff';
+  AppState.isImpersonating = true;
+
+  updateAuthUI();
+  updateSidebarPermissions();
+  showImpersonationBanner(user.full_name, roles);
+
+  // Roliga mos asosiy kabinetga o'tish
+  if (roles.includes('tutor')) {
+    navigateTo('tutor-my-students');
+  } else if (roles.includes('prorektor')) {
+    navigateTo('prorektor-queue');
+  } else if (roles.includes('dep_ob')) {
+    navigateTo('dept-students-manage');
+  } else if (roles.some(r => r.startsWith('dep_'))) {
+    navigateTo('dept-approvals');
+  } else {
+    navigateTo('observe-dashboard');
+  }
+}
+
+function showImpersonationBanner(name, roles) {
+  let banner = document.getElementById('impersonation-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'impersonation-banner';
+    banner.style.cssText = "background: #FEF3C7; border-bottom: 2px solid #F59E0B; color: #92400E; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; position: sticky; top: 0; z-index: 999; box-shadow: 0 2px 4px rgba(0,0,0,0.05);";
+    const mainWrap = document.querySelector('.main-wrapper') || document.body;
+    mainWrap.insertBefore(banner, mainWrap.firstChild);
+  }
+
+  banner.innerHTML = `
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:16px;">👁️</span>
+      <span>TEKSHIRUV REJIMI: Siz <u>${name}</u> (${roles.join(', ')}) sifatida tizimni tekshirmoqdasiz!</span>
+    </div>
+    <button onclick="exitImpersonation()" style="background:#DC2626; color:white; border:none; padding:6px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+      🔙 Superadminga Qaytish
+    </button>
+  `;
+}
+
+function exitImpersonation() {
+  const orig = sessionStorage.getItem('akhu_original_admin');
+  if (orig) {
+    try {
+      const u = JSON.parse(orig);
+      AppState.user = u;
+      AppState.currentRole = 'superadmin';
+      AppState.isImpersonating = false;
+      sessionStorage.removeItem('akhu_original_admin');
+
+      const banner = document.getElementById('impersonation-banner');
+      if (banner) banner.remove();
+
+      updateAuthUI();
+      updateSidebarPermissions();
+      navigateTo('admin-users-manage');
+      alert("Superadmin profiliga muvaffaqiyatli qaytildi!");
+    } catch(e) {
+      location.reload();
+    }
+  } else {
+    location.reload();
+  }
+}
+
+window.impersonateStaffUser = impersonateStaffUser;
+window.exitImpersonation = exitImpersonation;

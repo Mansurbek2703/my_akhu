@@ -276,29 +276,29 @@
         studentData = data;
 
         // UI ni to'ldirish
-        const st = data.student;
-        const sc = data.score;
+        const st = data.student || {};
+        const sc = data.score || data.scores || {};
 
-        document.getElementById('student-name').textContent = `${st.first_name} ${st.last_name}`;
-        document.getElementById('student-group').textContent = `${st.group_code} • ${st.program_code}`;
-        document.getElementById('student-avatar').textContent = st.first_name[0] + st.last_name[0];
+        document.getElementById('student-name').textContent = `${st.first_name || ''} ${st.last_name || ''}`;
+        document.getElementById('student-group').textContent = `${st.group_code || ''} • ${st.program_code || ''}`;
+        document.getElementById('student-avatar').textContent = ((st.first_name || 'A')[0] + (st.last_name || 'K')[0]).toUpperCase();
 
-        document.getElementById('score-season').textContent = sc.season;
-        document.getElementById('score-total').textContent = sc.total;
-        document.getElementById('score-week').textContent = `+${sc.week_cur}`;
-        document.getElementById('score-rank').textContent = `#${sc.rank_cohort}`;
-        document.getElementById('score-events').textContent = `${sc.events_count} ta`;
+        document.getElementById('score-season').textContent = sc.season ?? 0;
+        document.getElementById('score-total').textContent = sc.total ?? 0;
+        document.getElementById('score-week').textContent = `+${sc.week_cur ?? 0}`;
+        document.getElementById('score-rank').textContent = `#${sc.rank_cohort || sc.rank || 1}`;
+        document.getElementById('score-events').textContent = `${sc.events_count ?? 0} ta`;
 
         // Profil ma'lumotlari
-        document.getElementById('prof-name').textContent = `${st.first_name} ${st.last_name}`;
-        document.getElementById('prof-group').textContent = st.group_code;
-        document.getElementById('prof-prog').textContent = st.program_code;
-        document.getElementById('prof-course').textContent = `${st.course}-kurs (${st.level === 'bak' ? 'Bakalavriat' : 'Magistratura'})`;
-        document.getElementById('prof-tutor').textContent = st.tutor_name || 'Tyutor biriktirilmagan';
+        document.getElementById('prof-name').textContent = `${st.first_name || ''} ${st.last_name || ''}`;
+        document.getElementById('prof-group').textContent = st.group_code || '-';
+        document.getElementById('prof-prog').textContent = st.program_code || '-';
+        document.getElementById('prof-course').textContent = `${st.course || 1}-kurs (${st.level === 'mag' ? 'Magistratura' : 'Bakalavriat'})`;
+        document.getElementById('prof-tutor').textContent = st.tutor_name || (st.tutor ? st.tutor.name : 'Tyutor biriktirilmagan');
 
         // Sohalar kartochkalari
         const catContainer = document.getElementById('categories-grid');
-        catContainer.innerHTML = (data.categories || []).map(c => `
+        catContainer.innerHTML = (sc.categories || data.categories || []).map(c => `
           <div class="category-mini-card" style="border-left: 4px solid ${c.color};">
             <span class="cat-name">${c.name}</span>
             <span class="cat-pts">${c.points} ball</span>
@@ -310,8 +310,28 @@
 
         // QR kodni yuklash
         loadStudentQr();
+        loadDemoStudentsDropdown(st.id);
       } catch (e) {
         console.error('Dashboard xatosi:', e);
+      }
+    }
+
+    async function loadDemoStudentsDropdown(currentId) {
+      try {
+        const sel = document.getElementById('select-demo-student');
+        if (!sel || sel.dataset.loaded) return;
+        const res = await fetch('/api/app/demo-students');
+        const d = await res.json();
+        if (d.students && d.students.length > 0) {
+          sel.innerHTML = d.students.map(s => `
+            <option value="${s.id}" ${s.id === currentId ? 'selected' : ''}>
+              ${s.first_name} ${s.last_name} (${s.external_id || s.group_code} • ${s.course}-kurs)
+            </option>
+          `).join('');
+          sel.dataset.loaded = "true";
+        }
+      } catch (err) {
+        console.error('Demo talabalar yuklanmadi:', err);
       }
     }
 
@@ -349,12 +369,14 @@
 
     async function loadStudentQr() {
       try {
-        const res = await fetch('/api/app/qr', {
+        const res = await fetch('/api/app/my-qr', {
           headers: { 'Authorization': `Bearer ${currentAuthToken}` }
         });
         const d = await res.json();
-        if (d.qr_data_url) {
-          document.getElementById('student-qr-image').src = d.qr_data_url;
+        const qrUrl = d.qr_data_url || d.dataUrl || d.qr_code;
+        if (qrUrl) {
+          const imgEl = document.getElementById('student-qr-image');
+          if (imgEl) imgEl.src = qrUrl;
         }
       } catch (e) {
         console.error('QR yuklanmadi', e);

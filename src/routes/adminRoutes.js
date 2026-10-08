@@ -257,6 +257,33 @@ router.get('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
 });
 
 /**
+ * GET /api/admin/tutors
+ * Faol tyutorlar va ularga biriktirilgan guruhlar ro'yxati
+ */
+router.get('/tutors', (req, res) => {
+  try {
+    const tutors = db.prepare(`
+      SELECT su.id, su.full_name, su.email, su.telegram_user_id
+      FROM staff_user su
+      WHERE su.roles LIKE '%tutor%' AND su.active = 1
+      ORDER BY su.full_name ASC
+    `).all();
+
+    const result = tutors.map(t => {
+      const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(t.id).map(g => g.group_code);
+      return {
+        ...t,
+        groups
+      };
+    });
+
+    res.json({ tutors: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/admin/students
  * Yangi talaba qo'shish (qo'lda kiritish)
  */

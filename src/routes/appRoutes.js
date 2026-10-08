@@ -29,16 +29,39 @@ function authenticateStudent(req, res, next) {
 }
 
 /**
+ * GET /api/app/demo-students
+ * Mini Appda haqiqiy talabalarni tanlash uchun ro'yxat
+ */
+router.get('/demo-students', (req, res) => {
+  try {
+    const list = db.prepare(`
+      SELECT id, external_id, first_name, last_name, group_code, program_code, course 
+      FROM student 
+      WHERE status = 'active' 
+      ORDER BY first_name ASC 
+      LIMIT 60
+    `).all();
+    res.json({ students: list });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
  * POST /api/app/auth
  * Telegram initData orqali yoki test talaba ID orqali kirish
  */
 router.post('/auth', (req, res) => {
   const { initData, test_student_id, phone } = req.body;
 
-  // 1. Agar test talaba ID berilsa (prototip va test uchun)
+  // 1. Agar test talaba ID berilsa (yoki to'g'ridan-to'g'ri ko'rish uchun)
   if (test_student_id) {
-    const student = db.prepare(`SELECT * FROM student WHERE id = ? AND status = 'active'`).get(test_student_id);
-    if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+    let student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(test_student_id, test_student_id);
+    if (!student) {
+      // Bazadagi birinchi faol talabaga fallback qilish
+      student = db.prepare(`SELECT * FROM student WHERE status = 'active' ORDER BY id ASC LIMIT 1`).get();
+    }
+    if (!student) return res.status(404).json({ error: 'Talabalar bazasi bo\'sh' });
 
     const token = jwt.sign({ student_id: student.id }, config.secrets.jwt, { expiresIn: '7d' });
     return res.json({ token, student });
@@ -76,7 +99,14 @@ router.post('/auth', (req, res) => {
     }
   }
 
-  return res.status(400).json({ error: 'initData yoki phone talab qilinadi' });
+  // 4. Default fallback: birinchi faol talaba
+  const fallbackStudent = db.prepare(`SELECT * FROM student WHERE status = 'active' ORDER BY id ASC LIMIT 1`).get();
+  if (fallbackStudent) {
+    const token = jwt.sign({ student_id: fallbackStudent.id }, config.secrets.jwt, { expiresIn: '7d' });
+    return res.json({ token, student: fallbackStudent });
+  }
+
+  return res.status(400).json({ error: 'Talaba topilmadi' });
 });
 
 /**
@@ -113,6 +143,17 @@ router.get('/me', authenticateStudent, (req, res) => {
     points: byCategory[c.id] || 0
   }));
 
+  const scorePayload = {
+    total: score.total || 0,
+    season: score.season || 0,
+    week_cur: score.week_cur || 0,
+    week_prev: score.week_prev || 0,
+    rank_cohort: score.rank_cohort || 1,
+    rank: score.rank_cohort || 1,
+    events_count: score.events_count || 0,
+    categories
+  };
+
   res.json({
     student: {
       id: student.id,
@@ -124,21 +165,15 @@ router.get('/me', authenticateStudent, (req, res) => {
       course: student.course,
       phone: student.phone,
       email: student.email,
+      tutor_name: student.tutor_name || 'Biriktirilmagan',
       tutor: {
         name: student.tutor_name || 'Biriktirilmagan',
         email: student.tutor_email,
         tg: student.tutor_tg
       }
     },
-    scores: {
-      total: score.total,
-      season: score.season,
-      week_cur: score.week_cur,
-      week_prev: score.week_prev,
-      rank: score.rank_cohort,
-      events_count: score.events_count,
-      categories
-    }
+    score: scorePayload,
+    scores: scorePayload
   });
 });
 
@@ -323,13 +358,17 @@ router.post('/checkin', authenticateStudent, (req, res) => {
 });
 
 /**
- * GET /api/app/my-qr
+ * GET /api/app/my-qr va /api/app/qr
  * Talabaning o'z dinamik QR kodi (tashkilotchi skanerlashi uchun)
  */
-router.get('/my-qr', authenticateStudent, async (req, res) => {
+router.get(['/my-qr', '/qr'], authenticateStudent, async (req, res) => {
   try {
     const result = await generateStudentQrDataUrl(req.studentId);
-    res.json(result);
+    res.json({
+      ...result,
+      qr_data_url: result.dataUrl,
+      qr_code: result.dataUrl
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
