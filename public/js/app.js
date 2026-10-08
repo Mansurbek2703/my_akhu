@@ -172,6 +172,8 @@ function updateAuthUI() {
   const sideLoginBtn = document.getElementById('btn-sidebar-login');
   const loggedBox = document.getElementById('auth-logged-box');
   const topbarUser = document.getElementById('topbar-user-name');
+  const topbarAvatarImg = document.getElementById('topbar-avatar-img');
+  const topbarAvatarFallback = document.getElementById('topbar-avatar-fallback');
   const roleTag = document.getElementById('role-tag');
   const authUserDisplay = document.getElementById('auth-user-display');
 
@@ -179,7 +181,21 @@ function updateAuthUI() {
     if (loginBtn) loginBtn.style.display = 'none';
     if (sideLoginBtn) sideLoginBtn.style.display = 'none';
     if (loggedBox) loggedBox.style.display = 'inline-flex';
-    if (topbarUser) topbarUser.textContent = AppState.user.full_name || AppState.user.name || AppState.user.id;
+    const fullName = AppState.user.full_name || AppState.user.name || AppState.user.id;
+    if (topbarUser) topbarUser.textContent = fullName;
+
+    const initials = (fullName || '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    if (AppState.user.photo_url && topbarAvatarImg) {
+      topbarAvatarImg.src = AppState.user.photo_url;
+      topbarAvatarImg.style.display = 'block';
+      if (topbarAvatarFallback) topbarAvatarFallback.style.display = 'none';
+    } else {
+      if (topbarAvatarImg) topbarAvatarImg.style.display = 'none';
+      if (topbarAvatarFallback) {
+        topbarAvatarFallback.style.display = 'flex';
+        topbarAvatarFallback.textContent = initials || '👤';
+      }
+    }
 
     const mainRole = (AppState.user.roles || [])[0] || 'staff';
     const meta = ROLE_META[mainRole] || { label: mainRole, color: '#3B82F6', bg: '#EFF6FF' };
@@ -191,7 +207,7 @@ function updateAuthUI() {
       roleTag.style.borderColor = meta.color + '40';
     }
     if (authUserDisplay) {
-      authUserDisplay.textContent = AppState.user.full_name || AppState.user.name || AppState.user.id;
+      authUserDisplay.textContent = fullName;
     }
   } else {
     if (loginBtn) loginBtn.style.display = 'inline-flex';
@@ -288,6 +304,8 @@ function initLoginForm() {
         full_name: data.user.full_name,
         roles: data.user.roles || [],
         email: data.user.email,
+        phone: data.user.phone || '',
+        photo_url: data.user.photo_url || '',
         groups: data.user.groups || []
       };
       AppState.currentRole = (data.user.roles || [])[0] || 'staff';
@@ -305,7 +323,7 @@ function initLoginForm() {
       } else if (AppState.user.roles.includes('prorektor')) {
         navigateTo('prorektor-queue');
       } else if (AppState.user.roles.includes('dep_ob')) {
-        navigateTo('dept-students-manage');
+        navigateTo('admin-students-manage');
       } else if (AppState.user.roles.some(r => r.startsWith('dep_'))) {
         navigateTo('dept-approvals');
       } else {
@@ -331,11 +349,15 @@ function updateSidebarPermissions() {
     let visible = false;
 
     if (AppState.isLoggedIn) {
-      if (userRoles.includes('superadmin')) {
-        visible = true; // Superadmin hamma bo'limlarni ko'radi
+      if (forRole === 'staff') {
+        visible = true; // Barcha xodimlar shaxsiy profilini ko'radi
+      } else if (userRoles.includes('superadmin')) {
+        visible = true; // Superadmin barcha bo'limlarni ko'radi
       } else if (forRole === 'tutor' && userRoles.includes('tutor')) {
         visible = true;
       } else if (forRole === 'approver' && (userRoles.some(r => r.startsWith('dep_')) || userRoles.includes('prorektor'))) {
+        visible = true;
+      } else if (forRole === 'students' && (userRoles.includes('dep_ob') || userRoles.includes('superadmin'))) {
         visible = true;
       } else if (forRole === 'dep_ob' && userRoles.includes('dep_ob')) {
         visible = true;
@@ -373,6 +395,108 @@ async function checkPendingBadge() {
 }
 
 // 2. NAVIGATSIYA VA ROUTING
+const PAGE_SECTION_MAP = {
+  'observe-dashboard': 'observe-dashboard',
+  'observe-rating': 'observe-dashboard',
+  'observe-catalog': 'observe-dashboard',
+  'observe-students': 'observe-dashboard',
+
+  'admin-students-manage': 'admin-students-manage',
+  'dept-students-manage': 'admin-students-manage',
+  'dept-gpa-import': 'admin-students-manage',
+
+  'dept-events': 'dept-events',
+  'observe-events': 'dept-events',
+
+  'dept-approvals': 'dept-approvals',
+  'prorektor-queue': 'dept-approvals',
+  'prorektor-risks': 'dept-approvals',
+  'prorektor-appeals': 'dept-approvals',
+
+  'tutor-my-students': 'tutor-my-students',
+  'tutor-add-points': 'tutor-my-students',
+  'tutor-history': 'tutor-my-students',
+
+  'admin-users-manage': 'admin-users-manage',
+  'admin-catalog': 'admin-users-manage',
+  'admin-audit': 'admin-users-manage',
+
+  'staff-my-profile': 'staff-my-profile'
+};
+
+function renderModuleSubNav(pageName) {
+  const sectionKey = PAGE_SECTION_MAP[pageName] || pageName;
+  let tabs = [];
+  let extraActions = '';
+
+  if (sectionKey === 'observe-dashboard') {
+    tabs = [
+      { id: 'observe-dashboard', label: '📊 Asosiy Ko\'rsatkichlar' },
+      { id: 'observe-rating', label: '🏆 Talabalar Reytingi' },
+      { id: 'observe-catalog', label: '📖 Ball Katalogi v1.0' }
+    ];
+  } else if (sectionKey === 'admin-students-manage') {
+    tabs = [
+      { id: 'admin-students-manage', label: '📋 Talabalar Ro\'yxati & Profil' },
+      { id: 'dept-gpa-import', label: '📈 GPA & Davomat Import' }
+    ];
+  } else if (sectionKey === 'dept-events') {
+    tabs = [
+      { id: 'dept-events', label: '📅 Barcha Tadbirlar' }
+    ];
+    if (AppState.isLoggedIn) {
+      extraActions = `
+        <div class="module-nav-actions">
+          <button class="btn btn-primary btn-sm" onclick="openCreateEventModal()" style="display:inline-flex; align-items:center; gap:6px;">
+            ${icon('calendar', 14)} <span>+ Yangi Tadbir Qo'shish</span>
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="showStudentCheckinModal()" style="display:inline-flex; align-items:center; gap:6px; border-color:#3B82F6; color:#2563EB; background:#EFF6FF;">
+            ${icon('qrCode', 14)} <span>📷 Talaba QR Skanerlash & Check-in</span>
+          </button>
+        </div>
+      `;
+    }
+  } else if (sectionKey === 'dept-approvals') {
+    tabs = [
+      { id: 'dept-approvals', label: '⏳ Tasdiq Navbati' },
+      { id: 'prorektor-queue', label: '🛡️ Prorektor 25+ / -30' },
+      { id: 'prorektor-risks', label: '⚠️ Xavf & Konsentratsiya' },
+      { id: 'prorektor-appeals', label: '📑 E\'tirozlar (Apellyatsiya)' }
+    ];
+  } else if (sectionKey === 'tutor-my-students') {
+    tabs = [
+      { id: 'tutor-my-students', label: '👥 Mening Talabalarim' },
+      { id: 'tutor-add-points', label: '➕ Ball Kiritish' },
+      { id: 'tutor-history', label: '📜 Kiritgan Yozuvlarim' }
+    ];
+  } else if (sectionKey === 'admin-users-manage') {
+    tabs = [
+      { id: 'admin-users-manage', label: '👥 Xodimlar & Rollar' },
+      { id: 'admin-catalog', label: '⚙️ Katalog Sozlamalari' },
+      { id: 'admin-audit', label: '📝 To\'liq Audit Jurnali' }
+    ];
+  } else if (sectionKey === 'staff-my-profile') {
+    tabs = [
+      { id: 'staff-my-profile', label: '👤 Shaxsiy Profil & Rasm' }
+    ];
+  }
+
+  if (tabs.length <= 1 && !extraActions) return '';
+
+  return `
+    <div class="module-subnav-bar">
+      <div class="module-nav-pills">
+        ${tabs.map(t => `
+          <button class="module-nav-pill ${t.id === pageName ? 'active' : ''}" onclick="navigateTo('${t.id}')">
+            ${t.label}
+          </button>
+        `).join('')}
+      </div>
+      ${extraActions}
+    </div>
+  `;
+}
+
 function initNavigation() {
   document.querySelectorAll('.sidebar-nav a.nav-item').forEach(link => {
     link.addEventListener('click', (e) => {
@@ -385,7 +509,7 @@ function initNavigation() {
 
 function navigateTo(pageName) {
   // Himoya: Xodimlar bo'limiga kirish uchun tizimga kirish talab qilinadi
-  if (!AppState.isLoggedIn && !pageName.startsWith('observe-')) {
+  if (!AppState.isLoggedIn && !pageName.startsWith('observe-') && pageName !== 'dept-events') {
     openLoginModal();
     const errBox = document.getElementById('login-error-msg');
     if (errBox) {
@@ -403,8 +527,9 @@ function navigateTo(pageName) {
     }
   } catch (e) {}
 
+  const parentNav = PAGE_SECTION_MAP[pageName] || pageName;
   document.querySelectorAll('.sidebar-nav a.nav-item').forEach(link => {
-    if (link.getAttribute('data-page') === pageName) {
+    if (link.getAttribute('data-page') === parentNav) {
       link.classList.add('active');
     } else {
       link.classList.remove('active');
@@ -415,106 +540,109 @@ function navigateTo(pageName) {
   const pageDesc = document.getElementById('current-page-desc');
   const contentArea = document.getElementById('app-content-area');
 
-  contentArea.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Ma\'lumotlar yuklanmoqda...</p></div>';
+  const subNavHtml = renderModuleSubNav(pageName);
+  contentArea.innerHTML = subNavHtml + '<div id="module-page-container"><div class="loading-state"><div class="spinner"></div><p>Ma\'lumotlar yuklanmoqda...</p></div></div>';
+  const targetContainer = document.getElementById('module-page-container');
 
   switch (pageName) {
     case 'observe-dashboard':
       pageTitle.textContent = 'Kuzatuv Paneli';
       pageDesc.textContent = 'Universitet talabalari faolligi va reyting ko\'rsatkichlari';
-      renderObserveDashboard(contentArea);
+      renderObserveDashboard(targetContainer);
       break;
     case 'observe-rating':
       pageTitle.textContent = 'Talabalar Reytingi';
       pageDesc.textContent = 'Mavsumiy va umumiy o\'rinlar jadvali, filtrlar';
-      renderObserveRating(contentArea);
+      renderObserveRating(targetContainer);
       break;
     case 'observe-students':
       pageTitle.textContent = 'Talabalar Katalogi';
       pageDesc.textContent = 'Universitetdagi barcha faol talabalar va shaxsiy profillar';
-      renderObserveStudents(contentArea);
+      renderObserveStudents(targetContainer);
       break;
     case 'observe-events':
+    case 'dept-events':
       pageTitle.textContent = 'Tadbirlar & QR Kodlar';
       pageDesc.textContent = 'Universitet miqyosidagi tadbirlar, ishtirokchilar va check-in';
-      renderObserveEvents(contentArea);
+      renderDeptEvents(targetContainer);
       break;
     case 'observe-catalog':
       pageTitle.textContent = 'Ball Katalogi v1.0';
       pageDesc.textContent = 'Ball berish qoidalari, sohalar, shkala va limitlar';
-      renderObserveCatalog(contentArea);
+      renderObserveCatalog(targetContainer);
       break;
     case 'tutor-my-students':
       pageTitle.textContent = 'Mening Talabalarim';
       pageDesc.textContent = 'Tyutor guruhlaridagi talabalar faolligi va passivlik monitoringi';
-      renderTutorStudents(contentArea);
+      renderTutorStudents(targetContainer);
       break;
     case 'tutor-add-points':
       pageTitle.textContent = 'Ball Kiritish';
       pageDesc.textContent = 'Talabalarga dalil asosida ball kiritish (R-01, R-02, R-04)';
-      renderTutorAddPoints(contentArea);
+      renderTutorAddPoints(targetContainer);
       break;
     case 'tutor-history':
       pageTitle.textContent = 'Kiritgan Yozuvlarim';
       pageDesc.textContent = 'Holatlar (kutilmoqda, tasdiqlandi, rad etildi) va qayta topshirish';
-      renderTutorHistory(contentArea);
+      renderTutorHistory(targetContainer);
       break;
     case 'dept-approvals':
       pageTitle.textContent = 'Tasdiq Navbati (Approval Queue)';
       pageDesc.textContent = 'Bo\'lim arizalarini tekshirish, tasdiqlash yoki rad etish (B-01)';
-      renderDeptApprovals(contentArea);
-      break;
-    case 'dept-events':
-      pageTitle.textContent = 'Tadbir Yaratish & QR';
-      pageDesc.textContent = 'Yangi tadbir e\'lon qilish va Check-in QR kodini chop etish (B-04)';
-      renderDeptEvents(contentArea);
+      renderDeptApprovals(targetContainer);
       break;
     case 'dept-students-manage':
       pageTitle.textContent = 'Talabalar Ro\'yxati & Import (Registrator)';
       pageDesc.textContent = 'Talabalarni ro\'yxatga olish, Excel import, yangi talaba qo\'shish va tahrirlash';
-      renderStudentsManagement(contentArea, 'Registrator');
+      renderStudentsManagement(targetContainer, 'Registrator');
       break;
     case 'dept-gpa-import':
       pageTitle.textContent = 'GPA & Davomat Import';
       pageDesc.textContent = 'Semestr yakuni bo\'yicha avtomatik ballar importi (O\'quv bo\'limi)';
-      renderGpaImport(contentArea);
+      renderGpaImport(targetContainer);
       break;
     case 'admin-students-manage':
       pageTitle.textContent = 'Talabalar Boshqaruvi & Import (Superadmin)';
       pageDesc.textContent = 'Barcha talabalar bazasi, ommaviy Excel import, yangi talaba qo\'shish va tahrirlash';
-      renderStudentsManagement(contentArea, 'Superadmin');
+      renderStudentsManagement(targetContainer, 'Superadmin');
       break;
     case 'admin-users-manage':
       pageTitle.textContent = 'Xodimlar & Rollar Boshqaruvi (Superadmin Full Access)';
       pageDesc.textContent = 'Xodimlarni ro\'yxatdan o\'tkazish, ixtiyoriy rollarni biriktirish yoki olib tashlash';
-      renderStaffUsersManagement(contentArea);
+      renderStaffUsersManagement(targetContainer);
       break;
     case 'prorektor-queue':
       pageTitle.textContent = 'Prorektor Nazorati — 2-bosqich Tasdiq (PV)';
       pageDesc.textContent = '25+ ballik yutuqlar va -30 jarimalar bo\'yicha yakuniy qaror';
-      renderProrektorQueue(contentArea);
+      renderProrektorQueue(targetContainer);
       break;
     case 'prorektor-risks':
       pageTitle.textContent = 'Xavf & Konsentratsiya Indikatorlari';
       pageDesc.textContent = 'Tyutor konsentratsiyasi (>40%) va talaba bir manba (>70%) tahlili';
-      renderProrektorRisks(contentArea);
+      renderProrektorRisks(targetContainer);
       break;
     case 'prorektor-appeals':
       pageTitle.textContent = 'E\'tirozlar & Apellyatsiyalar';
       pageDesc.textContent = 'Talabalarning rad etilgan yozuvlar bo\'yicha shikoyatlari';
-      renderProrektorAppeals(contentArea);
+      renderProrektorAppeals(targetContainer);
       break;
     case 'admin-catalog':
       pageTitle.textContent = 'Katalog Sozlamalari (Superadmin)';
       pageDesc.textContent = 'Katalog bandlarini o\'zgartirish va versiyalash (S-01, AT-21)';
-      renderAdminCatalog(contentArea);
+      renderAdminCatalog(targetContainer);
       break;
     case 'admin-audit':
       pageTitle.textContent = 'Tizim Audit Jurnali (X-05)';
       pageDesc.textContent = 'O\'zgarmas harakatlar tarixi: kim, qachon, nima qildi va IP manzili';
-      renderAdminAudit(contentArea);
+      renderAdminAudit(targetContainer);
+      break;
+    case 'staff-my-profile':
+      pageTitle.textContent = 'Mening Shaxsiy Profilim';
+      pageDesc.textContent = 'Xodim ma\'lumotlari, fotosurat va hisob xavfsizligi';
+      renderStaffProfile(targetContainer);
       break;
     default:
-      contentArea.innerHTML = `<div class="card"><p>Sahifa topilmadi: ${pageName}</p></div>`;
+      targetContainer.innerHTML = `<div class="card"><p>Sahifa topilmadi: ${pageName}</p></div>`;
   }
 }
 
@@ -1838,110 +1966,727 @@ async function submitReject(id) {
 // -------------------------------------------------------------
 // SAHIFA: TADBIR YARATISH (B-04)
 // -------------------------------------------------------------
+// SAHIFA: TADBIRLAR VA QR BOSHQARUVI (2 XIL USULDA QR CHECK-IN)
+// -------------------------------------------------------------
 async function renderDeptEvents(container) {
   try {
-    const catRes = await apiFetch('/api/observe/catalog');
-    const categories = catRes.categories || [];
+    const data = await apiFetch('/api/events');
+    const events = data.events || [];
+
+    const isStaffOrAdmin = AppState.isLoggedIn && (
+      AppState.user.roles.includes('superadmin') ||
+      AppState.user.roles.includes('prorektor') ||
+      AppState.user.roles.some(r => r.startsWith('dep_'))
+    );
 
     let html = `
-      <div class="card" style="max-width: 700px; margin: 0 auto;">
-        <div class="card-header">
-          <h3>Yangi Tadbir Yaratish & QR Chiqarish</h3>
-        </div>
-        <div class="card-body">
-          <form id="dept-create-event-form">
-            <div class="form-group mb-3">
-              <label class="form-label">Tadbir Nomi:</label>
-              <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'Startap Tanlovi 2026'" required>
+      <div class="admin-hero-card" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div class="admin-hero-title">
+              <span style="color: #60A5FA;">${icon('calendar', 22)}</span>
+              <span>Universitet Tadbirlari & QR Check-in Tizimi</span>
             </div>
-
-            <div class="grid grid-2 mb-3">
-              <div class="form-group">
-                <label class="form-label">Boshlanish vaqti:</label>
-                <input type="datetime-local" id="ev-starts-at" class="form-control" required>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Tugash vaqti:</label>
-                <input type="datetime-local" id="ev-ends-at" class="form-control" required>
-              </div>
+            <p class="admin-hero-desc">
+              Tadbirlarni e'lon qilish, umumiy Tadbir QR kodlarini chiqarish (talaba skanerlaydi) yoki talabalarning shaxsiy QR kodlarini skanerlash (xodim qabul qiladi).
+            </p>
+          </div>
+          ${isStaffOrAdmin ? `
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="openCreateEventModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('calendar', 15)} <span>+ Yangi Tadbir Yaratish</span>
+              </button>
+              <button class="btn btn-outline" onclick="showStudentCheckinModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF;">
+                ${icon('qrCode', 15)} <span>📷 Talaba QR Skanerlash / Qabul Qilish</span>
+              </button>
             </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label">O'tkazilish joyi (Bino / Zal):</label>
-              <input type="text" id="ev-place" class="form-control" placeholder="Bosh bino, 204-auditoriya" required>
-            </div>
-
-            <div class="grid grid-2 mb-3">
-              <div class="form-group">
-                <label class="form-label">Soha / Kategoriya:</label>
-                <select id="ev-cat-id" class="form-control" required>
-                  ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Miqyos / Daraja (Ball avtomatik):</label>
-                <select id="ev-level" class="form-control" required>
-                  <option value="klub">Klub miqyosida (3 ball)</option>
-                  <option value="universitet" selected>Universitet miqyosida (5 ball)</option>
-                  <option value="viloyat">Viloyat miqyosida (8 ball)</option>
-                  <option value="respublika">Respublika miqyosida (15 ball)</option>
-                  <option value="xalqaro">Xalqaro miqyosda (25 ball)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="grid grid-2 mb-4">
-              <div class="form-group">
-                <label class="form-label">Maksimal sig'im (o'rinlar):</label>
-                <input type="number" id="ev-capacity" class="form-control" placeholder="Cheksiz bo'lsa bo'sh qoldiring">
-              </div>
-              <div class="form-group" style="display: flex; align-items: center; padding-top: 24px;">
-                <label style="cursor: pointer; font-size: 13px;">
-                  <input type="checkbox" id="ev-req-reg"> Oldindan ro'yxatdan o'tish majburiy
-                </label>
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width: 100%;">
-              ${icon('calendar', 15)} Tadbirni E'lon Qilish va QR Kod Yaratish
-            </button>
-          </form>
+          ` : ''}
         </div>
       </div>
     `;
+
+    if (events.length === 0) {
+      html += `
+        <div class="card" style="text-align: center; padding: 48px 24px; border-radius: var(--radius-xl);">
+          <div style="font-size: 40px; margin-bottom: 12px; color: #3B82F6;">${icon('calendar', 42)}</div>
+          <h3 style="margin-bottom: 8px;">Hozircha tizimda e'lon qilingan tadbirlar mavjud emas</h3>
+          <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 20px; font-size: 13.5px; line-height: 1.5;">
+            Universitet talabalari uchun yangi ilmiy, madaniy, sport yoki ijtimoiy tadbir e'lon qiling va talabalar uchun QR kodlarini yarating.
+          </p>
+          ${isStaffOrAdmin ? `
+            <div style="display: flex; justify-content: center; gap: 10px;">
+              <button class="btn btn-primary" onclick="openCreateEventModal()">
+                ${icon('calendar', 15)} + Yangi Tadbir Yaratish
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="grid grid-2">
+          ${events.map(ev => {
+            const startsFormatted = new Date(ev.starts_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const canManage = isStaffOrAdmin && (AppState.user.roles.includes('superadmin') || ev.created_by === AppState.user.id || ev.organizer_unit === AppState.user.id);
+            return `
+              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);">
+                <div>
+                  <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
+                    <div>
+                      <span class="badge" style="background: ${ev.category_color}20; color: ${ev.category_color}; border: 1px solid ${ev.category_color}40; font-weight: 600;">
+                        ${ev.category_name}
+                      </span>
+                      <h3 style="margin-top: 8px; font-size: 16px; font-weight: 700; color: var(--text-main); line-height: 1.35;">${ev.title}</h3>
+                    </div>
+                    <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px;">+${ev.points} ball</span>
+                  </div>
+                  <div class="card-body" style="padding: 14px 18px;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                      ${icon('mapPin', 14)} <span><strong>O'tkazilish joyi:</strong> ${ev.place}</span>
+                    </p>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                      ${icon('clock', 14)} <span><strong>Vaqti:</strong> ${startsFormatted}</span>
+                    </p>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                      ${icon('building', 14)} <span><strong>Tashkilotchi:</strong> ${ev.organizer_unit}</span>
+                    </p>
+                    <div style="background: #F8FAFC; border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+                      <span style="color: var(--text-secondary);">Qabul qilingan talabalar:</span>
+                      <span style="font-weight: 700; color: #1E293B;">${ev.checkins_count || 0} nafar ${ev.capacity ? `/ ${ev.capacity} ta o'rin` : ''}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card-footer" style="background: #FAFAFA; border-top: 1px solid var(--border-light); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button class="btn btn-outline btn-sm" onclick="showEventQrModal('${ev.id}')" title="1-Usul: Tadbir QR kodini monitorga chiqarish (talaba scan qiladi)" style="display: inline-flex; align-items: center; gap: 5px;">
+                      ${icon('qrCode', 13)} <span>Tadbir QR (Talaba scan)</span>
+                    </button>
+                    ${isStaffOrAdmin ? `
+                      <button class="btn btn-primary btn-sm" onclick="showStudentCheckinModal('${ev.id}')" title="2-Usul: Talaba QR kodini yoki ID raqamini skanerlab ball berish" style="display: inline-flex; align-items: center; gap: 5px;">
+                        ${icon('checkCircle', 13)} <span>Qabul Qilish (Check-in)</span>
+                      </button>
+                    ` : ''}
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-outline btn-sm" onclick="showEventParticipantsModal('${ev.id}')" title="Ishtirokchilar ro'yxati">
+                      ${icon('users', 13)}
+                    </button>
+                    ${canManage ? `
+                      <button class="btn btn-outline btn-sm text-danger" onclick="deleteEvent('${ev.id}')" title="Tadbirni o'chirish" style="border-color: #FECACA;">
+                        ${icon('trash', 13)}
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
     container.innerHTML = html;
-
-    document.getElementById('dept-create-event-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        const payload = {
-          title: document.getElementById('ev-title').value,
-          starts_at: new Date(document.getElementById('ev-starts-at').value).toISOString(),
-          ends_at: new Date(document.getElementById('ev-ends-at').value).toISOString(),
-          place: document.getElementById('ev-place').value,
-          organizer_unit: AppState.user.id,
-          category_id: document.getElementById('ev-cat-id').value,
-          level: document.getElementById('ev-level').value,
-          capacity: document.getElementById('ev-capacity').value || null,
-          requires_registration: document.getElementById('ev-req-reg').checked
-        };
-
-        const res = await apiFetch('/api/events', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-
-        alert(` Tadbir e'lon qilindi! Ball: ${res.points}`);
-        showEventQrModal(res.event_id);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
   } catch (err) {
     container.innerHTML = `<div class="card"><p class="text-danger">${err.message}</p></div>`;
   }
 }
 
+// Yangi Tadbir Yaratish Modali
+async function openCreateEventModal() {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('calendar', 18)} Yangi Tadbir Yaratish</span>`;
+
+  let categories = [];
+  try {
+    const catRes = await apiFetch('/api/observe/catalog');
+    categories = catRes.categories || [];
+  } catch (e) {
+    categories = [];
+  }
+
+  modalBody.innerHTML = `
+    <form id="dept-create-event-form">
+      <div class="form-group mb-3">
+        <label class="form-label">Tadbir Nomi *</label>
+        <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026'" required>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Boshlanish vaqti *</label>
+          <input type="datetime-local" id="ev-starts-at" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tugash vaqti *</label>
+          <input type="datetime-local" id="ev-ends-at" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">O'tkazilish joyi (Bino / Zal) *</label>
+        <input type="text" id="ev-place" class="form-control" placeholder="Masalan: Bosh bino, Aktlar zali" required>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Soha / Kategoriya *</label>
+          <select id="ev-cat-id" class="form-control" required>
+            ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Miqyos / Daraja (Ball avtomatik) *</label>
+          <select id="ev-level" class="form-control" required>
+            <option value="klub">Klub miqyosida (+3 ball)</option>
+            <option value="universitet" selected>Universitet miqyosida (+5 ball)</option>
+            <option value="viloyat">Viloyat miqyosida (+8 ball)</option>
+            <option value="respublika">Respublika miqyosida (+15 ball)</option>
+            <option value="xalqaro">Xalqaro miqyosda (+25 ball)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Maksimal sig'im (o'rinlar soni)</label>
+          <input type="number" id="ev-capacity" class="form-control" placeholder="Cheksiz bo'lsa bo'sh qoldiring">
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; padding-top: 24px;">
+          <label style="cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="ev-req-reg"> Oldindan ro'yxatdan o'tish majburiy
+          </label>
+        </div>
+      </div>
+    </form>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+    <button class="btn btn-primary" onclick="submitCreateEvent()" style="display: inline-flex; align-items: center; gap: 6px;">
+      ${icon('check', 14)} E'lon Qilish va QR Yaratish
+    </button>
+  `;
+
+  openModal();
+}
+
+async function submitCreateEvent() {
+  const title = document.getElementById('ev-title')?.value.trim();
+  const starts_at_val = document.getElementById('ev-starts-at')?.value;
+  const ends_at_val = document.getElementById('ev-ends-at')?.value;
+  const place = document.getElementById('ev-place')?.value.trim();
+  const category_id = document.getElementById('ev-cat-id')?.value;
+  const level = document.getElementById('ev-level')?.value;
+  const capacity = document.getElementById('ev-capacity')?.value;
+  const req_reg = document.getElementById('ev-req-reg')?.checked;
+
+  if (!title || !starts_at_val || !ends_at_val || !place || !category_id || !level) {
+    alert("Iltimos, barcha majburiy maydonlarni to'ldiring!");
+    return;
+  }
+
+  try {
+    const payload = {
+      title,
+      starts_at: new Date(starts_at_val).toISOString(),
+      ends_at: new Date(ends_at_val).toISOString(),
+      place,
+      organizer_unit: AppState.user.id || 'dep_yb',
+      category_id,
+      level,
+      capacity: capacity ? Number(capacity) : null,
+      requires_registration: Boolean(req_reg)
+    };
+
+    const res = await apiFetch('/api/events', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    closeModal();
+    alert(`Tadbir muvaffaqiyatli e'lon qilindi (+${res.points} ball)!`);
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+    showEventQrModal(res.event_id);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// 2-USUL: Xodim Talabaning QR Kodini yoki ID sini skanerlab qabul qilishi
+async function showStudentCheckinModal(preselectedEventId = '') {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('qrCode', 18)} 2-USUL: Talabani Qabul Qilish (Check-in & Ball Berish)</span>`;
+
+  let events = [];
+  try {
+    const res = await apiFetch('/api/events');
+    events = res.events || [];
+  } catch (e) {
+    events = [];
+  }
+
+  if (events.length === 0) {
+    modalBody.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: var(--text-muted);">
+        <p>Hozircha tizimda faol tadbirlar mavjud emas. Avval tadbir e'lon qiling.</p>
+      </div>
+    `;
+    modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+    openModal();
+    return;
+  }
+
+  modalBody.innerHTML = `
+    <div style="margin-bottom: 16px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: #1E40AF; line-height: 1.45;">
+      💡 <strong>2-xil usulda qabul qilish mumkin:</strong><br>
+      1) Talabaning Telegram Mini App dagi shaxsiy QR kodini skanerlang (yoki nusxalab tashlang)<br>
+      2) Talabaning ID raqami, Pasport yoki Telefon raqamini kiriting.
+    </div>
+
+    <div class="form-group mb-3">
+      <label class="form-label" style="font-weight: 600;">Qaysi tadbirga qabul qilinmoqda? *</label>
+      <select id="checkin-event-id" class="form-control" style="font-weight: 600;" onchange="loadEventRecentCheckins(this.value)">
+        ${events.map(ev => `
+          <option value="${ev.id}" ${ev.id === preselectedEventId ? 'selected' : ''}>
+            ${ev.title} (+${ev.points} ball) — ${ev.place}
+          </option>
+        `).join('')}
+      </select>
+    </div>
+
+    <form id="checkin-student-form" onsubmit="handleStudentCheckinSubmit(event)">
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight: 600;">Talaba QR kodi / ID raqami / Telefon *</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="checkin-query-input" class="form-control" placeholder="STU:... yoki talaba ID, telefon" required autofocus autocomplete="off" style="font-size: 14px; font-family: monospace;">
+          <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+            ${icon('checkCircle', 15)} <span>Qabul Qilish</span>
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <div id="checkin-result-alert" style="display: none; margin-bottom: 16px;"></div>
+
+    <div style="border-top: 1px solid var(--border-light); padding-top: 14px; margin-top: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span style="font-weight: 700; font-size: 12.5px; color: var(--text-main);">Ushbu tadbirga qabul qilingan talabalar:</span>
+        <span id="checkin-count-badge" class="badge badge-primary">0 nafar</span>
+      </div>
+      <div id="checkin-recent-table-box" style="max-height: 180px; overflow-y: auto; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border-light); padding: 8px;">
+        <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 12px;">Ishtirokchilar ro'yxati yuklanmoqda...</div>
+      </div>
+    </div>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+  `;
+
+  openModal();
+  const chosenId = document.getElementById('checkin-event-id')?.value;
+  if (chosenId) loadEventRecentCheckins(chosenId);
+
+  setTimeout(() => {
+    document.getElementById('checkin-query-input')?.focus();
+  }, 100);
+}
+
+async function loadEventRecentCheckins(eventId) {
+  const box = document.getElementById('checkin-recent-table-box');
+  const badge = document.getElementById('checkin-count-badge');
+  if (!box || !eventId) return;
+
+  try {
+    const res = await apiFetch(`/api/events/${eventId}/participants`);
+    const list = res.participants || [];
+    if (badge) badge.textContent = `${list.length} nafar`;
+
+    if (list.length === 0) {
+      box.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 12px;">Hozircha hech kim qabul qilinmagan</div>`;
+      return;
+    }
+
+    box.innerHTML = `
+      <table class="table" style="font-size: 12px; margin: 0;">
+        <thead>
+          <tr>
+            <th style="padding: 6px 8px;">Talaba</th>
+            <th style="padding: 6px 8px;">Guruh</th>
+            <th style="padding: 6px 8px;">Check-in Vaqti</th>
+            <th style="padding: 6px 8px; text-align: right;">Ball</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.slice(0, 15).map(p => `
+            <tr>
+              <td style="padding: 6px 8px; font-weight: 600;">${p.student_name || p.full_name}</td>
+              <td style="padding: 6px 8px;"><span class="badge badge-group">${p.group_code}</span></td>
+              <td style="padding: 6px 8px; color: var(--text-muted);">${new Date(p.checked_in_at || p.created_at).toLocaleTimeString('uz-UZ')}</td>
+              <td style="padding: 6px 8px; text-align: right;"><span class="badge" style="background:#ECFDF5; color:#059669; font-weight:700;">+${p.points || 5}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    box.innerHTML = `<div style="color: var(--danger); font-size: 12px; padding: 8px;">Xatolik: ${e.message}</div>`;
+  }
+}
+
+async function handleStudentCheckinSubmit(event) {
+  event.preventDefault();
+  const eventId = document.getElementById('checkin-event-id')?.value;
+  const inputEl = document.getElementById('checkin-query-input');
+  const alertBox = document.getElementById('checkin-result-alert');
+  const query = inputEl ? inputEl.value.trim() : '';
+
+  if (!eventId || !query) return;
+
+  try {
+    if (alertBox) alertBox.style.display = 'none';
+
+    const res = await apiFetch(`/api/events/${eventId}/checkin-student`, {
+      method: 'POST',
+      body: JSON.stringify({
+        qr_payload: query,
+        student_query: query
+      })
+    });
+
+    if (alertBox) {
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#ECFDF5';
+      alertBox.style.border = '1px solid #6EE7B7';
+      alertBox.style.color = '#065F46';
+      alertBox.style.borderRadius = '8px';
+      alertBox.style.padding = '12px 16px';
+      alertBox.innerHTML = `
+        <div style="font-weight: 700; font-size: 13.5px;">✅ Muvaffaqiyatli qabul qilindi!</div>
+        <div style="font-size: 12.5px; margin-top: 2px;">
+          <strong>${res.student.first_name} ${res.student.last_name}</strong> (${res.student.group_code}) talabaga <strong>+${res.points} ball</strong> berildi!
+        </div>
+      `;
+    }
+
+    inputEl.value = '';
+    inputEl.focus();
+    loadEventRecentCheckins(eventId);
+    // Asosiy sahifani yangilash
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    if (alertBox) {
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#FEF2F2';
+      alertBox.style.border = '1px solid #FCA5A5';
+      alertBox.style.color = '#991B1B';
+      alertBox.style.borderRadius = '8px';
+      alertBox.style.padding = '12px 16px';
+      alertBox.innerHTML = `<strong>Xatolik:</strong> ${err.message}`;
+    }
+    inputEl.select();
+  }
+}
+
+// Tadbir Ishtirokchilari Modali
+async function showEventParticipantsModal(eventId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.textContent = 'Tadbir Ishtirokchilari Ro\'yxati';
+  modalBody.innerHTML = '<div class="spinner"></div>';
+  modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
+  openModal();
+
+  try {
+    const res = await apiFetch(`/api/events/${eventId}/participants`);
+    const list = res.participants || [];
+
+    if (list.length === 0) {
+      modalBody.innerHTML = `<div style="text-align: center; padding: 30px; color: var(--text-muted);"><p>Hozircha hech qanday talaba ushbu tadbirga qabul qilinmagan.</p></div>`;
+      return;
+    }
+
+    modalBody.innerHTML = `
+      <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);">
+        Jami qabul qilingan talabalar soni: <strong>${list.length} nafar</strong>
+      </div>
+      <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Talaba F.I.Sh</th>
+              <th>Guruh</th>
+              <th>Check-in Vaqti</th>
+              <th>Ball</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map((p, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td style="font-weight: 600;">${p.student_name || p.full_name}</td>
+                <td><span class="badge badge-group">${p.group_code}</span></td>
+                <td style="color: var(--text-muted); font-size: 12px;">${new Date(p.checked_in_at || p.created_at).toLocaleString('uz-UZ')}</td>
+                <td><span class="badge" style="background:#ECFDF5; color:#059669; font-weight: 700;">+${p.points || 5}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    modalBody.innerHTML = `<p class="text-danger">${e.message}</p>`;
+  }
+}
+
+// Tadbirni O'chirish
+async function deleteEvent(eventId) {
+  if (!confirm("Haqiqatan ham ushbu tadbirni o'chirmoqchimisiz? Barcha ro'yxatdan o'tganlar va check-in ma'lumotlari o'chiriladi.")) {
+    return;
+  }
+  try {
+    const res = await apiFetch(`/api/events/${eventId}`, { method: 'DELETE' });
+    alert(res.message || "Tadbir muvaffaqiyatli o'chirildi!");
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    alert(`Xatolik: ${err.message}`);
+  }
+}
+
+// -------------------------------------------------------------
+// SAHIFA: XODIMNING SHAXSIY PROFILI (staff-my-profile)
+// -------------------------------------------------------------
+async function renderStaffProfile(container) {
+  try {
+    const res = await apiFetch('/api/admin/profile/me');
+    const user = res.user;
+
+    const fullName = user.full_name || user.name || user.id;
+    const initials = (fullName || '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    const roles = user.roles || [];
+    const groups = user.groups || [];
+
+    const roleBadges = roles.map(r => {
+      const meta = ROLE_META[r] || { label: r, color: '#3B82F6', bg: '#EFF6FF' };
+      return `<span class="badge" style="background:${meta.bg}; color:${meta.color}; border:1px solid ${meta.color}40; font-weight:600; padding:4px 10px;">${meta.label}</span>`;
+    }).join(' ') || '<span class="text-muted">Rol biriktirilmagan</span>';
+
+    const groupBadges = groups.map(g => `<span class="badge badge-group">${g}</span>`).join(' ') || '<span style="color:#94A3B8; font-size:12px;">Guruhlar yo\'q</span>';
+
+    container.innerHTML = `
+      <div class="staff-profile-card">
+        <!-- Hero Header -->
+        <div class="staff-profile-header">
+          <div class="staff-profile-avatar-wrap" id="profile-avatar-wrap">
+            ${user.photo_url ? `
+              <img src="${user.photo_url}" class="staff-profile-avatar-img" id="profile-hero-img" alt="Foto">
+            ` : `
+              <span class="staff-profile-avatar-fallback" id="profile-hero-fallback">${initials || '👤'}</span>
+            `}
+          </div>
+          <div>
+            <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 6px;">${fullName}</h2>
+            <div style="font-size: 13px; opacity: 0.9; margin-bottom: 10px;">
+              <span>@${user.username || user.id}</span> &nbsp;|&nbsp; <span>${user.email || 'Email kiritilmagan'}</span>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              ${roleBadges}
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Body -->
+        <div style="padding: 28px;">
+          <form id="staff-profile-edit-form" onsubmit="handleStaffProfileSave(event)">
+            <!-- 1. Foto yuklash qismi -->
+            <div style="margin-bottom: 24px;">
+              <label class="form-label" style="font-weight: 700; font-size: 14px; margin-bottom: 8px; display: block;">
+                📷 Profil Fotosurati (Rasm Yuklash)
+              </label>
+              <div class="photo-uploader-box">
+                <img id="profile-preview-thumb" src="${user.photo_url || ''}" class="photo-preview-thumb" style="${user.photo_url ? '' : 'display:none;'}" alt="Preview">
+                <div style="flex: 1;">
+                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                    <input type="file" id="staff-profile-file-input" accept="image/*" style="display: none;" onchange="handleStaffProfilePhotoUpload(this)">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('staff-profile-file-input').click()" style="display: inline-flex; align-items: center; gap: 6px; background: white;">
+                      ${icon('upload', 14)} <span>Kompyuterdan Rasm Yuklash</span>
+                    </button>
+                    <span style="font-size: 11.5px; color: var(--text-muted);">(JPG, PNG formatlarda)</span>
+                  </div>
+                  <div>
+                    <input type="url" id="staff-profile-photo-url" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://...)" oninput="updateProfilePhotoPreview(this.value)">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Shaxsiy ma'lumotlar -->
+            <div class="grid grid-2 mb-3">
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">F.I.Sh (To'liq Ism Sharif) *</label>
+                <input type="text" id="staff-profile-fullname" class="form-control" value="${user.full_name || ''}" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Email Manzili *</label>
+                <input type="email" id="staff-profile-email" class="form-control" value="${user.email || ''}">
+              </div>
+            </div>
+
+            <div class="grid grid-2 mb-3">
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Telefon Raqami</label>
+                <input type="text" id="staff-profile-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Telegram User ID (Xabarnomalar uchun)</label>
+                <input type="text" id="staff-profile-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="masalan: 1202082857">
+              </div>
+            </div>
+
+            <!-- 3. Parol o'zgartirish -->
+            <div class="form-group mb-4" style="background: #F8FAFC; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 14px;">
+              <label class="form-label" style="font-weight: 600; margin-bottom: 4px;">Yangi Parol O'rnatish</label>
+              <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">Agar parolni o'zgartirishni istamasangiz, ushbu maydonni bo'sh qoldiring:</p>
+              <input type="password" id="staff-profile-password" class="form-control" placeholder="Yangi parol (kamida 6 ta belgi)" style="max-width: 400px;">
+            </div>
+
+            <!-- 4. Biriktirilgan Rollar va Guruhlar (Faqat ko'rish uchun) -->
+            <div class="grid grid-2 mb-4" style="background: #F1F5F9; border-radius: var(--radius-md); padding: 14px;">
+              <div>
+                <label style="font-size: 11.5px; color: #64748B; font-weight: 700; text-transform: uppercase;">Biriktirilgan Rollar:</label>
+                <div style="margin-top: 6px;">${roleBadges}</div>
+              </div>
+              <div>
+                <label style="font-size: 11.5px; color: #64748B; font-weight: 700; text-transform: uppercase;">Tyutor Guruhlari:</label>
+                <div style="margin-top: 6px;">${groupBadges}</div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+                ${icon('check', 15)} <span>O'zgarishlarni Saqlash</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div class="card"><p class="text-danger">${err.message}</p></div>`;
+  }
+}
+
+function updateProfilePhotoPreview(url) {
+  const thumb = document.getElementById('profile-preview-thumb');
+  if (!thumb) return;
+  if (url && url.trim()) {
+    thumb.src = url.trim();
+    thumb.style.display = 'block';
+  } else {
+    thumb.style.display = 'none';
+  }
+}
+
+async function handleStaffProfilePhotoUpload(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: {
+        'x-user-id': AppState.user.id
+      },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Faylni yuklashda xatolik yuz berdi');
+
+    const urlInput = document.getElementById('staff-profile-photo-url');
+    if (urlInput) {
+      urlInput.value = data.url;
+      updateProfilePhotoPreview(data.url);
+    }
+    alert('Rasm muvaffaqiyatli yuklandi!');
+  } catch (err) {
+    alert(`Xatolik: ${err.message}`);
+  }
+}
+
+async function handleStaffProfileSave(event) {
+  event.preventDefault();
+
+  const full_name = document.getElementById('staff-profile-fullname')?.value.trim();
+  const email = document.getElementById('staff-profile-email')?.value.trim();
+  const phone = document.getElementById('staff-profile-phone')?.value.trim();
+  const telegram_user_id = document.getElementById('staff-profile-tgid')?.value.trim();
+  const photo_url = document.getElementById('staff-profile-photo-url')?.value.trim();
+  const password = document.getElementById('staff-profile-password')?.value;
+
+  if (!full_name) {
+    alert("F.I.Sh kiritilishi shart!");
+    return;
+  }
+
+  try {
+    const payload = {
+      full_name,
+      email,
+      phone,
+      telegram_user_id: telegram_user_id || null,
+      photo_url: photo_url || null
+    };
+    if (password && String(password).trim().length > 0) {
+      payload.password = String(password).trim();
+    }
+
+    const res = await apiFetch('/api/admin/profile/me', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    // AppState ni yangilash
+    AppState.user.full_name = full_name;
+    AppState.user.name = full_name;
+    AppState.user.email = email;
+    AppState.user.phone = phone;
+    AppState.user.photo_url = photo_url;
+    localStorage.setItem('akhu_auth_user', JSON.stringify(AppState.user));
+
+    updateAuthUI();
+    alert("Profil ma'lumotlaringiz va rasmingiz muvaffaqiyatli saqlandi!");
+    renderStaffProfile(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    alert(`Xatolik: ${err.message}`);
+  }
+}
+
+window.openCreateEventModal = openCreateEventModal;
+window.submitCreateEvent = submitCreateEvent;
+window.showStudentCheckinModal = showStudentCheckinModal;
+window.handleStudentCheckinSubmit = handleStudentCheckinSubmit;
+window.loadEventRecentCheckins = loadEventRecentCheckins;
+window.showEventParticipantsModal = showEventParticipantsModal;
+window.deleteEvent = deleteEvent;
+window.handleStaffProfilePhotoUpload = handleStaffProfilePhotoUpload;
+window.updateProfilePhotoPreview = updateProfilePhotoPreview;
+window.handleStaffProfileSave = handleStaffProfileSave;
+
+// -------------------------------------------------------------
+// SAHIFA: GPA & DAVOMAT IMPORT (REGISTRATOR)
 // -------------------------------------------------------------
 // SAHIFA: GPA & DAVOMAT IMPORT (REGISTRATOR)
 // -------------------------------------------------------------
@@ -4320,7 +5065,11 @@ function renderStaffTableRows() {
       <tr>
         <td>
           <div class="table-student-name">
-            <span class="avatar-badge">${initials || 'X'}</span>
+            ${u.photo_url ? `
+              <img src="${u.photo_url}" class="avatar-badge" style="object-fit:cover; border-radius:50%; width:32px; height:32px;" onerror="this.outerHTML='<span class=\\'avatar-badge\\'>${initials || 'X'}</span>'">
+            ` : `
+              <span class="avatar-badge">${initials || 'X'}</span>
+            `}
             <div>
               <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${u.full_name}</div>
               <div class="table-sub-text">@${u.username || u.id}</div>
@@ -4390,6 +5139,23 @@ async function showCreateStaffModal() {
 
   modalBody.innerHTML = `
     <form id="create-staff-form">
+      <!-- Foto qismi -->
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight: 600;">Xodim Fotosurati (Profil Rasmi)</label>
+        <div class="photo-uploader-box">
+          <img id="create-staff-photo-preview" src="" class="photo-preview-thumb" style="display:none;" alt="Foto">
+          <div style="flex: 1;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+              <input type="file" id="create-staff-file-input" accept="image/*" style="display:none;" onchange="handleAdminStaffPhotoUpload(this, 'new-staff-photourl', 'create-staff-photo-preview')">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('create-staff-file-input').click()" style="display: inline-flex; align-items: center; gap: 5px; background: white;">
+                ${icon('upload', 13)} <span>Kompyuterdan Rasm Tanlash</span>
+              </button>
+            </div>
+            <input type="url" id="new-staff-photourl" class="form-control" placeholder="Yoki rasm havolasi (https://...)" oninput="updateAdminStaffPhotoPreview(this.value, 'create-staff-photo-preview')">
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-2 mb-3">
         <div class="form-group">
           <label class="form-label">Foydalanuvchi Nomi (Login) *</label>
@@ -4459,6 +5225,7 @@ async function handleCreateStaffSubmit() {
   const full_name = document.getElementById('new-staff-fullname')?.value.trim();
   const email = document.getElementById('new-staff-email')?.value.trim();
   const phone = document.getElementById('new-staff-phone')?.value.trim();
+  const photo_url = document.getElementById('new-staff-photourl')?.value.trim();
 
   const roles = Array.from(document.querySelectorAll(`input[name="new-staff-roles-checkbox"]:checked`))
     .map(cb => cb.value)
@@ -4481,7 +5248,7 @@ async function handleCreateStaffSubmit() {
     await apiFetch('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify({
-        username, password, full_name, email, phone, roles, tutor_groups, groups: tutor_groups
+        username, password, full_name, email, phone, photo_url: photo_url || null, roles, tutor_groups, groups: tutor_groups
       })
     });
 
@@ -4493,7 +5260,7 @@ async function handleCreateStaffSubmit() {
   }
 }
 
-// XODIMNI TAHRIRLASH
+// XODIMNI TAHRIRLASH (SUPERADMIN HAMMA MA'LUMOTLARNI VA RASMNI TAHRIRLAY OLADI)
 async function showEditStaffModal(userId) {
   const user = adminStaffState.users.find(u => String(u.id) === String(userId));
   if (!user) return;
@@ -4529,6 +5296,23 @@ async function showEditStaffModal(userId) {
 
   modalBody.innerHTML = `
     <form id="edit-staff-form">
+      <!-- Fotosurat yuklash / tahrirlash -->
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight: 600;">Xodim Fotosurati (Profil Rasmi)</label>
+        <div class="photo-uploader-box">
+          <img id="edit-staff-photo-preview" src="${user.photo_url || ''}" class="photo-preview-thumb" style="${user.photo_url ? '' : 'display:none;'}" alt="Foto">
+          <div style="flex: 1;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+              <input type="file" id="edit-staff-file-input" accept="image/*" style="display:none;" onchange="handleAdminStaffPhotoUpload(this, 'edit-staff-photourl', 'edit-staff-photo-preview')">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('edit-staff-file-input').click()" style="display: inline-flex; align-items: center; gap: 5px; background: white;">
+                ${icon('upload', 13)} <span>Kompyuterdan Rasm Yuklash</span>
+              </button>
+            </div>
+            <input type="url" id="edit-staff-photourl" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://...)" oninput="updateAdminStaffPhotoPreview(this.value, 'edit-staff-photo-preview')">
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-2 mb-3">
         <div class="form-group">
           <label class="form-label">F.I.Sh (To'liq ismi) *</label>
@@ -4608,11 +5392,50 @@ async function showEditStaffModal(userId) {
   openModal();
 }
 
+async function handleAdminStaffPhotoUpload(fileInput, targetUrlId, previewId) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'x-user-id': AppState.user.id },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Faylni yuklashda xatolik yuz berdi');
+
+    const urlInput = document.getElementById(targetUrlId);
+    if (urlInput) {
+      urlInput.value = data.url;
+      updateAdminStaffPhotoPreview(data.url, previewId);
+    }
+    alert('Rasm muvaffaqiyatli yuklandi!');
+  } catch (err) {
+    alert(`Xatolik: ${err.message}`);
+  }
+}
+
+function updateAdminStaffPhotoPreview(url, previewId) {
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  if (url && url.trim()) {
+    preview.src = url.trim();
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
 async function handleEditStaffSubmit(userId) {
   const full_name = document.getElementById('edit-staff-fullname')?.value.trim();
   const password = document.getElementById('edit-staff-password')?.value;
   const email = document.getElementById('edit-staff-email')?.value.trim();
   const phone = document.getElementById('edit-staff-phone')?.value.trim();
+  const photo_url = document.getElementById('edit-staff-photourl')?.value.trim();
   const telegram_user_id = document.getElementById('edit-staff-tgid')?.value.trim();
   const is_active = document.getElementById('edit-staff-active')?.checked ? 1 : 0;
 
@@ -4638,6 +5461,7 @@ async function handleEditStaffSubmit(userId) {
       full_name,
       email,
       phone,
+      photo_url: photo_url || null,
       telegram_user_id: telegram_user_id || null,
       active: is_active,
       is_active: is_active === 1,
@@ -4655,7 +5479,7 @@ async function handleEditStaffSubmit(userId) {
     });
 
     closeModal();
-    alert("Xodim ma'lumotlari va rollari muvaffaqiyatli yangilandi!");
+    alert("Xodim ma'lumotlari, fotosurati va rollari muvaffaqiyatli yangilandi!");
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);

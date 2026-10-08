@@ -819,6 +819,7 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       full_name,
       email,
       phone,
+      photo_url,
       roles = [],
       groups = [],
       tutor_groups = [],
@@ -836,6 +837,7 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
     const userId = (id || username) ? String(id || username).trim() : 'staff_' + crypto.randomBytes(5).toString('hex');
     const userEmail = email ? String(email).trim() : `${userId}@akhu.uz`;
     const userPhone = phone ? String(phone).trim() : null;
+    const userPhoto = photo_url ? String(photo_url).trim() : null;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id || null);
     const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : (active !== undefined ? (active ? 1 : 0) : 1);
     const targetGroups = groups.length > 0 ? groups : tutor_groups;
@@ -855,13 +857,14 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       // 1. staff_user jadvaliga yozish
       db.prepare(`
         INSERT INTO staff_user (
-          id, full_name, email, phone, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+          id, full_name, email, phone, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
       `).run(
         userId,
         full_name,
         userEmail,
         userPhone,
+        userPhoto,
         `sso_${userId}`,
         JSON.stringify(cleanRoles),
         activeVal,
@@ -896,6 +899,101 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
 });
 
 /**
+ * GET /api/admin/profile/me
+ * Joriy xodim o'z profilini olishi
+ */
+router.get('/profile/me', (req, res) => {
+  const staffId = req.headers['x-user-id'] || 'superadmin';
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staffId);
+  if (!user) return res.status(404).json({ error: 'Xodim hisobi topilmadi' });
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
+  const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(user.id).map(g => g.group_code);
+
+  res.json({
+    user: {
+      ...user,
+      password_hash: undefined,
+      roles: roles.filter(r => r && r !== 'undefined'),
+      groups
+    }
+  });
+});
+
+/**
+ * PUT /api/admin/profile/me
+ * Joriy xodim o'z profilini yangilashi (F.I.Sh, email, phone, photo_url, telegram_user_id, parol)
+ */
+router.put('/profile/me', (req, res) => {
+  try {
+    const staffId = req.headers['x-user-id'];
+    if (!staffId) return res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan' });
+
+    const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staffId);
+    if (!user) return res.status(404).json({ error: 'Xodim hisobi topilmadi' });
+
+    const { full_name, email, phone, photo_url, telegram_user_id, password } = req.body;
+
+    const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
+    const newEmail = email !== undefined ? String(email).trim() : user.email;
+    const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
+    const newPhotoUrl = photo_url !== undefined ? String(photo_url).trim() : user.photo_url;
+    const newTgId = telegram_user_id !== undefined ? String(telegram_user_id).trim() : user.telegram_user_id;
+
+    let passHash = user.password_hash;
+    if (password && String(password).trim().length > 0) {
+      passHash = bcrypt.hashSync(String(password).trim(), 8);
+    }
+
+    db.prepare(`
+      UPDATE staff_user
+      SET full_name = ?,
+        email = ?,
+        phone = ?,
+        photo_url = ?,
+        telegram_user_id = ?,
+        password_hash = ?
+      WHERE id = ?
+    `).run(
+      newFullName,
+      newEmail,
+      newPhone,
+      newPhotoUrl,
+      newTgId,
+      passHash,
+      staffId
+    );
+
+    logAudit({
+      actor_id: staffId,
+      actor_role: 'staff',
+      action: 'UPDATE_OWN_PROFILE',
+      object_type: 'staff_user',
+      object_id: staffId,
+      after: { full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    const updated = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staffId);
+    let roles = [];
+    try { roles = JSON.parse(updated.roles); } catch(e) { roles = [updated.roles]; }
+
+    res.json({
+      success: true,
+      message: 'Profil muvaffaqiyatli yangilandi',
+      user: {
+        ...updated,
+        password_hash: undefined,
+        roles: roles.filter(r => r && r !== 'undefined')
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * PUT /api/admin/users/:id
  * Xodim ma'lumotlarini, rollarini va guruhlarini tahrirlash (Superadmin Full Access)
  */
@@ -908,6 +1006,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       full_name,
       email,
       phone,
+      photo_url,
       roles,
       groups,
       tutor_groups,
@@ -921,6 +1020,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
     const newEmail = email !== undefined ? String(email).trim() : user.email;
     const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
+    const newPhotoUrl = photo_url !== undefined ? String(photo_url).trim() : user.photo_url;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
@@ -944,6 +1044,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         SET full_name = ?,
           email = ?,
           phone = ?,
+          photo_url = ?,
           roles = ?,
           telegram_user_id = ?,
           active = ?,
@@ -953,6 +1054,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         newFullName,
         newEmail,
         newPhone,
+        newPhotoUrl,
         updatedRoles,
         tgId,
         activeVal,
@@ -976,7 +1078,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         object_type: 'staff_user',
         object_id: req.params.id,
         before: { full_name: user.full_name, roles: user.roles, active: user.active },
-        after: { full_name: newFullName, email: newEmail, phone: newPhone, roles: updatedRoles, active: activeVal, groups: targetGroups },
+        after: { full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups },
         ip: req.ip || '127.0.0.1'
       });
     })();

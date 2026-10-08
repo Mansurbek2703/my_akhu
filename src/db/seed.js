@@ -251,63 +251,8 @@ function seedDatabase() {
   // 7. NAMUNAVIY TALABALAR - Haqiqiy talabalar Excel orqali import qilinadi (mock o'chirildi)
 
   // 8. TADBIRLAR (event)
-  const insertEvent = db.prepare(`
-    INSERT OR REPLACE INTO event (
-      id, title, starts_at, ends_at, place, organizer_unit, category_id, level, points, capacity, requires_registration, status, qr_secret, created_by, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  // 8. TADBIR VA CHECK-IN (Haqiqiy tadbirlar bo'lim xodimlari tomonidan yaratiladi)
 
-  const today = new Date().toISOString().split('T')[0];
-  const events = [
-    {
-      id: 'ev_01',
-      title: 'Al-Xorazmiy avlodlari: IT Karyera forumi 2026',
-      starts_at: `${today}T10:00:00`,
-      ends_at: `${today}T16:00:00`,
-      place: 'Universitet Bosh binosi, Aktlar zali',
-      organizer_unit: 'dep_yb',
-      category_id: '1',
-      level: 'universitet',
-      points: 5,
-      capacity: 250,
-      requires_registration: 1,
-      qr_secret: 'event_qr_secret_ev_01_akhu'
-    },
-    {
-      id: 'ev_02',
-      title: 'Zakovat intellektual o\'yini: Kuzgi chempionat 1-tur',
-      starts_at: `${today}T15:30:00`,
-      ends_at: `${today}T18:00:00`,
-      place: 'Kutubxona Katta o\'quv zali',
-      organizer_unit: 'dep_mb',
-      category_id: '6',
-      level: 'universitet',
-      points: 5,
-      capacity: 100,
-      requires_registration: 0,
-      qr_secret: 'event_qr_secret_ev_02_zakovat'
-    },
-    {
-      id: 'ev_03',
-      title: 'AKHU AI Hackathon 2026: Sun\'iy intellekt amaliyoti',
-      starts_at: '2026-10-15T09:00:00',
-      ends_at: '2026-10-16T18:00:00',
-      place: 'IT Park inkubatsiya markazi',
-      organizer_unit: 'dep_sb',
-      category_id: '4',
-      level: 'respublika',
-      points: 15,
-      capacity: 60,
-      requires_registration: 1,
-      qr_secret: 'event_qr_secret_ev_03_hackathon'
-    }
-  ];
-
-  for (const ev of events) {
-    insertEvent.run(
-      ev.id, ev.title, ev.starts_at, ev.ends_at, ev.place, ev.organizer_unit, ev.category_id, ev.level, ev.points, ev.capacity, ev.requires_registration, 'published', ev.qr_secret, 'dep_yb', now
-    );
-  }
 
   // 9. BALL YOZUVLARI - Haqiqiy talabalar uchun arizalar va ballar tizim orqali kiritiladi (mock o'chirildi)
 

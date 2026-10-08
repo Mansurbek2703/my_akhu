@@ -35,6 +35,12 @@ for (const x of fmc) {
 const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;
 console.log('SERVER BAZASIDAGI TALABALAR SONI (XAVFSIZ SAQLANMOQDA):', count);
 
+// Mock tadbirlarni tozalash (talabalarga mutlaqo tegilmaydi!)
+db.prepare('DELETE FROM checkin').run();
+db.prepare('DELETE FROM event_registration').run();
+db.prepare('DELETE FROM event').run();
+console.log('MOCK TADBIRLAR TOZALANDI (0 ta tadbir qoldi)');
+
 const bcrypt = require('bcryptjs');
 const superHash = bcrypt.hashSync('akhu2026!', 8);
 db.prepare('UPDATE staff_user SET password_hash = ? WHERE id = ?').run(superHash, 'superadmin');

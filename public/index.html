@@ -38,91 +38,48 @@
 
       <!-- NAVIGATION -->
       <nav class="sidebar-nav">
-        <!-- Common / Observer -->
-        <div class="nav-section-title">KUZATUV VA MONITORING</div>
-        <a class="nav-item active" data-page="observe-dashboard">
+        <div class="nav-section-title">ASOSIY MENYU</div>
+
+        <!-- 1. Umumiy Monitoring -->
+        <a class="nav-item active" data-page="observe-dashboard" title="Umumiy Monitoring">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-          Umumiy Ko'rsatkichlar
+          Umumiy Monitoring
         </a>
-        <a class="nav-item" data-page="observe-rating">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-          Talabalar Reytingi
+
+        <!-- 2. Talabalar Boshqaruvi -->
+        <a class="nav-item nav-role-section" data-for-role="students" data-page="admin-students-manage" title="Talabalar Boshqaruvi">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Talabalar Boshqaruvi
         </a>
-        <a class="nav-item" data-page="observe-events">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+
+        <!-- 3. Tadbirlar & QR -->
+        <a class="nav-item" data-page="dept-events" title="Tadbirlar & QR">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="13" r="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
           Tadbirlar & QR
         </a>
-        <a class="nav-item" data-page="observe-catalog">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 2v20"/></svg>
-          Ball Katalogi v1.0
-        </a>
 
-        <!-- Tutor Section -->
-        <div class="nav-section-title nav-role-section" data-for-role="tutor">TYUTOR KABINETI</div>
-        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-my-students">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Mening Talabalarim
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-add-points">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Ball Kiritish
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-history">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          Kiritgan Yozuvlarim
-        </a>
-
-        <!-- Department Approvals Section -->
-        <div class="nav-section-title nav-role-section" data-for-role="approver">TASDIQLASH VA IJRO</div>
-        <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-approvals">
+        <!-- 4. Tasdiqlash & Nazorat -->
+        <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-approvals" title="Tasdiqlash & Ijro">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          Tasdiq Navbati <span class="badge" id="pending-badge" style="display:none;">0</span>
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-events">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="13" r="3"/></svg>
-          Tadbir Yaratish & QR
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="dep_ob" data-page="dept-students-manage">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-          Talabalar Ro'yxati & Import
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="dep_ob" data-page="dept-gpa-import">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          GPA & Davomat Import
+          Tasdiqlash & Ijro <span class="badge" id="pending-badge" style="display:none;">0</span>
         </a>
 
-        <!-- Prorektor Section -->
-        <div class="nav-section-title nav-role-section" data-for-role="prorektor">PROREKTOR NAZORATI</div>
-        <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-queue">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          25+ va -30 Navbati (PV)
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-risks">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          Xavf & Konsentratsiya
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-appeals">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          E'tirozlar (Apellyatsiya)
+        <!-- 5. Tyutor Kabineti -->
+        <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-my-students" title="Tyutor Kabineti">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+          Tyutor Kabineti
         </a>
 
-        <!-- Superadmin Section -->
-        <div class="nav-section-title nav-role-section" data-for-role="superadmin">TIZIM BOSHQARUVI</div>
-        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-students-manage">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Talabalar Boshqaruvi & Import
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-users-manage">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          Xodimlar & Rollar Boshqaruvi
-        </a>
-        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-catalog">
+        <!-- 6. Tizim & Boshqaruv (Superadmin) -->
+        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-users-manage" title="Tizim & Rollar Boshqaruvi">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          Katalog Sozlamalari
+          Tizim Sozlamalari
         </a>
-        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-audit">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-          To'liq Audit Jurnali
+
+        <!-- 7. Mening Profilim -->
+        <a class="nav-item nav-role-section" data-for-role="staff" data-page="staff-my-profile" title="Mening Profilim">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Mening Profilim
         </a>
       </nav>
 
@@ -160,9 +117,11 @@
               <span>Hodimlar Kirishi</span>
             </button>
             <div id="auth-logged-box" style="display: none; align-items: center; gap: 8px;">
-              <span id="topbar-user-badge" class="badge" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; font-weight: 600; padding: 6px 12px; font-size: 12px;">
-                👤 <span id="topbar-user-name">Mansurbek Qazaqov</span>
-              </span>
+              <div id="topbar-user-badge" onclick="navigateTo('staff-my-profile')" style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 30px; padding: 4px 14px 4px 6px;" title="Mening Profilimga o'tish">
+                <img id="topbar-avatar-img" src="" alt="Avatar" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: none;">
+                <span id="topbar-avatar-fallback" style="width: 26px; height: 26px; border-radius: 50%; background: #3B82F6; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">👤</span>
+                <span id="topbar-user-name" style="font-weight: 600; font-size: 12.5px; color: #1D4ED8;">Mansurbek Qazaqov</span>
+              </div>
               <button class="btn btn-outline btn-sm text-danger" onclick="logoutStaffUser()" title="Tizimdan chiqish" style="border-color: #FECACA; color: #DC2626;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 Chiqish

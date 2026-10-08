@@ -34,6 +34,9 @@ function initSchema() {
       if (!cols.includes('phone')) {
         db.exec('ALTER TABLE staff_user ADD COLUMN phone TEXT;');
       }
+      if (!cols.includes('photo_url')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN photo_url TEXT;');
+      }
     } catch (e) {}
 
     // Migration: ensure photo_url exists on student
