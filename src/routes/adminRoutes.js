@@ -220,9 +220,9 @@ router.get('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
   if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
 
   const entries = db.prepare(`
-    SELECT pe.*, ci.title as catalog_title, su.full_name as creator_name
+    SELECT pe.*, ci.name as catalog_title, su.full_name as creator_name
     FROM point_entry pe
-    LEFT JOIN catalog_item ci ON pe.catalog_item_id = ci.id
+    LEFT JOIN catalog_item ci ON pe.item_id = ci.id
     LEFT JOIN staff_user su ON pe.created_by = su.id
     WHERE pe.student_id = ?
     ORDER BY pe.created_at DESC
