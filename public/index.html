@@ -25,26 +25,15 @@
         </div>
       </div>
 
-      <!-- ROLE SWITCHER (SSO Profil) -->
-      <div class="role-switcher-box">
-        <div class="role-label">
-          <span>Faol Profil:</span>
-          <span id="role-tag" style="color: #60A5FA; font-weight: 700;">Kuzatuvchi</span>
+      <!-- FOYDALANUVCHI STATUSI (Kuzatuv yoki Xodim) -->
+      <div class="role-switcher-box" id="auth-status-box">
+        <div class="role-label" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Rejim:</span>
+          <span id="role-tag" style="color: #60A5FA; font-weight: 700; font-size: 11px; background: rgba(96, 165, 250, 0.1); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(96, 165, 250, 0.2);">Ommaviy Kuzatuv</span>
         </div>
-        <select id="role-selector" class="role-select">
-          <option value="observer">Kuzatuvchi (Rektorat & Kengash)</option>
-          <option value="tutor_1">Tyutor 1 — Jasur Mahmudov (FMC01, FMC02, FMC03)</option>
-          <option value="tutor_2">Tyutor 2 — Aziza Qodirova (FMC04, FMC05)</option>
-          <option value="tutor_3">Tyutor 3 — Bobur Alimov (Magistratura)</option>
-          <option value="dep_yb">Yoshlar bilan ishlash bo'limi</option>
-          <option value="dep_mb">Ma'naviyat va ma'rifat bo'limi</option>
-          <option value="dep_ob">O'quv bo'limi (Registrator & GPA)</option>
-          <option value="dep_ib">Ilmiy tadqiqotlar bo'limi</option>
-          <option value="dep_sb">Sanoat bilan hamkorlik bo'limi</option>
-          <option value="dep_pb">Matbuot xizmati (PR va Media)</option>
-          <option value="prorektor">Yoshlar bo'yicha Prorektor</option>
-          <option value="superadmin">Superadmin (IT Markazi)</option>
-        </select>
+        <div id="auth-user-display" style="margin-top: 6px; font-size: 12.5px; font-weight: 600; color: #F8FAFC;">
+          Ochiq Monitoring
+        </div>
       </div>
 
       <!-- NAVIGATION -->
@@ -163,11 +152,25 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             Talaba Mini App
           </a>
-          <button id="btn-login-modal" class="btn btn-outline btn-sm" onclick="openLoginModal()" style="border-color: #CBD5E1;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-            <span id="topbar-user-name">Kirish: Mansurbek (Superadmin)</span>
-          </button>
-          <button id="btn-refresh-data" class="btn btn-primary btn-sm">
+          
+          <!-- Xodim Kirish / Profil qismi -->
+          <div id="auth-action-area" style="display: inline-flex; align-items: center; gap: 8px;">
+            <button id="btn-login-modal" class="btn btn-primary btn-sm" onclick="openLoginModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+              <span>Hodimlar Kirishi</span>
+            </button>
+            <div id="auth-logged-box" style="display: none; align-items: center; gap: 8px;">
+              <span id="topbar-user-badge" class="badge" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; font-weight: 600; padding: 6px 12px; font-size: 12px;">
+                👤 <span id="topbar-user-name">Mansurbek Qazaqov</span>
+              </span>
+              <button class="btn btn-outline btn-sm text-danger" onclick="logoutStaffUser()" title="Tizimdan chiqish" style="border-color: #FECACA; color: #DC2626;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Chiqish
+              </button>
+            </div>
+          </div>
+
+          <button id="btn-refresh-data" class="btn btn-outline btn-sm">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Yangilash
           </button>
@@ -201,11 +204,11 @@
 
   <!-- MODAL: Tizimga Kirish (Login) -->
   <div class="modal-overlay" id="login-modal">
-    <div class="modal-content" style="max-width: 440px;">
+    <div class="modal-content" style="max-width: 420px;">
       <div class="modal-header">
         <h3>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          Tizimga Kirish
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Hodimlar uchun Tizimga Kirish
         </h3>
         <button class="btn btn-sm btn-outline btn-icon-only" onclick="closeLoginModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -214,47 +217,27 @@
       <div class="modal-body">
         <form id="portal-login-form">
           <div class="form-group mb-3">
-            <label class="form-label">Login yoki ID raqam:</label>
-            <input type="text" id="login-username" class="form-control" placeholder="admin yoki superadmin" value="admin" required>
+            <label class="form-label" style="font-weight: 600;">Login yoki Foydalanuvchi Nomi *</label>
+            <input type="text" id="login-username" class="form-control" placeholder="superadmin yoki xodim logini" required autofocus>
           </div>
           <div class="form-group mb-3">
-            <label class="form-label">Parol:</label>
-            <input type="password" id="login-password" class="form-control" placeholder="••••••••" value="admin123" required>
+            <label class="form-label" style="font-weight: 600;">Parol *</label>
+            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
           </div>
-          <div id="login-error-msg" style="color: var(--danger); font-size: 12px; margin-bottom: 12px; display: none;"></div>
-          <button type="submit" class="btn btn-primary w-100 mb-3">
-            Kirishni Tasdiqlash
+          <div id="login-error-msg" style="color: var(--danger); font-size: 12px; margin-bottom: 12px; display: none; background: #FEF2F2; padding: 8px 12px; border-radius: 6px; border: 1px solid #FCA5A5;"></div>
+          <button type="submit" class="btn btn-primary w-100" style="padding: 10px; font-weight: 600;">
+            Tizimga Kirish
           </button>
         </form>
 
-        <div style="border-top: 1px solid var(--border-subtle); padding-top: 14px;">
-          <label class="form-label" style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Tezkor tanlov (Demo Rollar):</label>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('superadmin')" style="text-align: left; justify-content: space-between;">
-              <span><strong>Superadmin</strong> — Mansurbek Qazaqov</span>
-              <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:10px;">Barcha Huquqlar</span>
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('tutor_1')" style="text-align: left; justify-content: space-between;">
-              <span><strong>Tyutor</strong> — Jasur Mahmudov (FMC01-03)</span>
-              <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10px;">Tyutorlik</span>
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('dep_yb')" style="text-align: left; justify-content: space-between;">
-              <span><strong>Yoshlar bo'limi</strong> — Sardorbek Ergashev</span>
-              <span class="badge" style="background:#ECFDF5; color:#059669; font-size:10px;">Tasdiqlovchi</span>
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('prorektor')" style="text-align: left; justify-content: space-between;">
-              <span><strong>Prorektor</strong> — Prof. Alisher Vohidov</span>
-              <span class="badge" style="background:#F5F3FF; color:#7C3AED; font-size:10px;">PV Tasdiq</span>
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('observer')" style="text-align: left; justify-content: space-between;">
-              <span><strong>Kuzatuvchi</strong> — Rektorat Kengashi</span>
-              <span class="badge" style="background:#F8FAFC; color:#64748B; font-size:10px;">Monitoring</span>
-            </button>
-          </div>
+        <div style="margin-top: 16px; padding: 12px; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border-light); font-size: 11.5px; color: var(--text-secondary); line-height: 1.5;">
+          🔒 <strong>Superadmin uchun kirish:</strong><br>
+          Login: <code style="color: #2563EB; font-weight: 600;">superadmin</code><br>
+          Parol: <code style="color: #2563EB; font-weight: 600;">akhu2026!</code>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeLoginModal()">Yopish</button>
+        <button class="btn btn-outline w-100" onclick="closeLoginModal()">Bekor Qilish</button>
       </div>
     </div>
   </div>

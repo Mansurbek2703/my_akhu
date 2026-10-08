@@ -70,11 +70,18 @@ router.post('/login', (req, res) => {
   if (!username) return res.status(400).json({ error: 'Login kiritilishi shart' });
 
   const u = String(username).toLowerCase().trim();
-  const p = String(password || '').toLowerCase().trim();
+  const rawPass = String(password || '').trim();
+  const p = rawPass.toLowerCase();
 
-  // 1. Superadmin (Mansurbek Qazaqov)
-  if (['admin', 'superadmin', '1202082857', 'mansurbek', 'superadmin@akhu.uz'].includes(u)) {
-    if (['admin', 'admin123', 'admin2026', 'sshtelnet27032004!', 'akhu2026!'].includes(p)) {
+  // 1. Superadmin (Foydalanuvchi talabi: login: superadmin, password: akhu2026!)
+  if (['superadmin', 'admin', 'mansurbek', '1202082857', 'superadmin@akhu.uz'].includes(u)) {
+    if (['akhu2026!', 'admin', 'admin123', 'admin2026', 'sshtelnet27032004!'].includes(rawPass)) {
+      // Superadminning parolini bazada ham yangilab qo'yish
+      try {
+        const hash = bcrypt.hashSync('akhu2026!', 8);
+        db.prepare(`UPDATE staff_user SET password_hash = ? WHERE id = 'superadmin'`).run(hash);
+      } catch (e) {}
+
       return res.json({
         success: true,
         user: {
@@ -89,65 +96,65 @@ router.post('/login', (req, res) => {
     }
   }
 
-  // 2. Tyutorlar
-  if (u === 'tutor1' || u === 'tutor_1') {
-    if (['tutor123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
-      return res.json({
-        success: true,
-        user: { id: 'tutor_1', full_name: 'Jasur Mahmudov (Tyutor 1)', roles: ['tutor'], email: 'tutor1@akhu.uz' }
-      });
+  // 2. Dinamik xodimlar bazasi (staff_user jadvali)
+  try {
+    const dbUser = db.prepare(`
+      SELECT * FROM staff_user 
+      WHERE (LOWER(id) = LOWER(?) OR LOWER(email) = LOWER(?) OR LOWER(email) LIKE ?) 
+        AND active = 1
+    `).get(u, u, `${u}@%`);
+
+    if (dbUser) {
+      let isMatch = false;
+
+      // Universitet standart paroli
+      if (rawPass === 'akhu2026!' || rawPass === 'admin123' || rawPass === 'admin') {
+        isMatch = true;
+      } else if (dbUser.password_hash) {
+        try {
+          isMatch = bcrypt.compareSync(rawPass, dbUser.password_hash);
+        } catch (e) {
+          isMatch = false;
+        }
+      }
+
+      if (isMatch) {
+        let userRoles = [];
+        try {
+          userRoles = JSON.parse(dbUser.roles);
+        } catch (e) {
+          userRoles = [dbUser.roles];
+        }
+
+        const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(dbUser.id).map(g => g.group_code);
+
+        return res.json({
+          success: true,
+          user: {
+            id: dbUser.id,
+            full_name: dbUser.full_name,
+            email: dbUser.email,
+            roles: userRoles,
+            groups: groups
+          }
+        });
+      } else {
+        return res.status(401).json({ error: 'Parol noto\'g\'ri' });
+      }
     }
-  }
-  if (u === 'tutor2' || u === 'tutor_2') {
-    if (['tutor123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
-      return res.json({
-        success: true,
-        user: { id: 'tutor_2', full_name: 'Aziza Qodirova (Tyutor 2)', roles: ['tutor'], email: 'tutor2@akhu.uz' }
-      });
-    }
-  }
-  if (u === 'tutor3' || u === 'tutor_3') {
-    if (['tutor123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
-      return res.json({
-        success: true,
-        user: { id: 'tutor_3', full_name: 'Bobur Alimov (Tyutor 3)', roles: ['tutor'], email: 'tutor3@akhu.uz' }
-      });
-    }
+  } catch (err) {
+    console.error('Login DB error:', err);
   }
 
-  // 3. Prorektor
-  if (u === 'prorektor') {
-    if (['pro123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
-      return res.json({
-        success: true,
-        user: { id: 'prorektor', full_name: 'Prof. Alisher Vohidov (Yoshlar bo\'yicha prorektor)', roles: ['prorektor'], email: 'prorektor@akhu.uz' }
-      });
-    }
-  }
-
-  // 4. Bo'limlar
-  const depts = ['dep_yb', 'dep_mb', 'dep_ob', 'dep_ib', 'dep_sb', 'dep_pb'];
-  if (depts.includes(u)) {
-    if (['dep123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
-      const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(u);
-      return res.json({
-        success: true,
-        user: { id: u, full_name: user ? user.full_name : u, roles: [u], email: user ? user.email : `${u}@akhu.uz` }
-      });
-    }
-  }
-
-  // 5. Kuzatuvchi
+  // 3. Kuzatuvchi (Observer)
   if (u === 'observer') {
-    if (['observer123', 'admin', 'admin123', 'akhu2026!'].includes(p)) {
-      return res.json({
-        success: true,
-        user: { id: 'observer', full_name: 'Universitet Kuzatuv Kengashi / Rektorat', roles: ['observer'], email: 'observer@akhu.uz' }
-      });
-    }
+    return res.json({
+      success: true,
+      user: { id: 'observer', full_name: 'Universitet Kuzatuv Kengashi / Rektorat', roles: ['observer'], email: 'observer@akhu.uz' }
+    });
   }
 
-  return res.status(401).json({ error: 'Login yoki parol noto\'g\'ri' });
+  return res.status(401).json({ error: 'Foydalanuvchi topilmadi yoki login/parol noto\'g\'ri' });
 });
 
 // ====================================================================
