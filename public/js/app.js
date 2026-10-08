@@ -3656,19 +3656,28 @@ async function showEventQrModal(eventId) {
 
   try {
     const res = await apiFetch(`/api/events/${eventId}/qr`);
+    const qrImg = res.qr_data_url || res.dataUrl;
     modalBody.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
-        <h3 style="margin-bottom: 8px;">${res.title}</h3>
-        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
-          Talabalar ushbu QR kodni Telegram Mini App orqali skaner qilib ball oladilar (+${res.points} ball)
+      <div style="text-align: center; padding: 16px;">
+        <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px; margin-bottom: 8px;">1-USUL: UMUMIY TADBIR QR KODI</span>
+        <h3 style="margin: 8px 0 6px 0; font-size: 18px;">${res.title || 'Tadbir'}</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px; max-width: 440px; margin-left: auto; margin-right: auto;">
+          Ushbu QR kodni auditoriya ekraniga yoki posterga chiqaring. Talabalar Telegram Mini App da skaner qilib avtomatik <strong>+${res.points || 5} ball</strong> oladilar.
         </p>
-        <div style="background: white; padding: 16px; display: inline-block; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-          <img src="${res.qr_data_url}" alt="QR Kod" style="width: 250px; height: 250px; display: block;">
+        <div style="background: white; padding: 16px; display: inline-block; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid var(--border-light);">
+          <img src="${qrImg}" alt="QR Kod" style="width: 250px; height: 250px; display: block; margin: 0 auto;">
+        </div>
+
+        <div style="margin-top: 16px; padding: 12px; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border-light); font-size: 12px; color: var(--text-secondary);">
+          🔄 Ushbu QR kod avtomatik yangilanadi va soxtalashtirishdan himoyalangan.
         </div>
       </div>
     `;
     modalFooter.innerHTML = `
-      <a href="${res.qr_data_url}" download="tadbir_qr_${eventId}.png" class="btn btn-primary">Yuklab Olish</a>
+      <button class="btn btn-primary" onclick="showStudentCheckinModal('${eventId}')" style="display:inline-flex; align-items:center; gap:6px;">
+        ${icon('qrCode', 14)} <span>2-Usul: Talaba QR Skanerlash</span>
+      </button>
+      <a href="${qrImg}" download="tadbir_qr_${eventId}.png" class="btn btn-outline">Yuklab Olish (PNG)</a>
       <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
     `;
   } catch (e) {

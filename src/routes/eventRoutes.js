@@ -108,8 +108,17 @@ router.post('/', (req, res) => {
  */
 router.get('/:id/qr', async (req, res) => {
   try {
+    const event = db.prepare('SELECT title, points FROM event WHERE id = ?').get(req.params.id);
+    if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
     const data = await generateEventQrDataUrl(req.params.id);
-    res.json(data);
+    res.json({
+      title: event.title,
+      points: event.points,
+      qr_data_url: data.dataUrl,
+      dataUrl: data.dataUrl,
+      payload: data.payload,
+      ttl: data.ttl
+    });
   } catch (e) {
     res.status(404).json({ error: e.message });
   }
