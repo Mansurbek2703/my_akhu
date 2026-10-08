@@ -729,6 +729,10 @@ body {
   padding: 16px;
 }
 
+.modal-overlay.active {
+  display: flex !important;
+}
+
 .modal-content {
   background: #FFFFFF;
   border-radius: var(--radius-xl);

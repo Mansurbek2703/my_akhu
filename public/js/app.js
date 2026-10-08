@@ -126,6 +126,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   navigateTo(AppState.currentPage);
 
+  // Hodimlar kirishi tugmasi (to'g'ridan-to'g'ri tinglovchi)
+  const loginBtn = document.getElementById('btn-login-modal');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openLoginModal();
+    });
+  }
+  const sideLoginBtn = document.getElementById('btn-sidebar-login');
+  if (sideLoginBtn) {
+    sideLoginBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openLoginModal();
+    });
+  }
+
   // Refresh tugmasi
   const refreshBtn = document.getElementById('btn-refresh-data');
   if (refreshBtn) {
@@ -138,6 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // FOYDALANUVCHI STATUSI VA INTERFEYSINI YANGILASH
 function updateAuthUI() {
   const loginBtn = document.getElementById('btn-login-modal');
+  const sideLoginBtn = document.getElementById('btn-sidebar-login');
   const loggedBox = document.getElementById('auth-logged-box');
   const topbarUser = document.getElementById('topbar-user-name');
   const roleTag = document.getElementById('role-tag');
@@ -145,6 +162,7 @@ function updateAuthUI() {
 
   if (AppState.isLoggedIn) {
     if (loginBtn) loginBtn.style.display = 'none';
+    if (sideLoginBtn) sideLoginBtn.style.display = 'none';
     if (loggedBox) loggedBox.style.display = 'inline-flex';
     if (topbarUser) topbarUser.textContent = AppState.user.full_name || AppState.user.name || AppState.user.id;
 
@@ -162,6 +180,7 @@ function updateAuthUI() {
     }
   } else {
     if (loginBtn) loginBtn.style.display = 'inline-flex';
+    if (sideLoginBtn) sideLoginBtn.style.display = 'flex';
     if (loggedBox) loggedBox.style.display = 'none';
 
     if (roleTag) {
@@ -198,13 +217,27 @@ function openLoginModal() {
   const modal = document.getElementById('login-modal');
   const errBox = document.getElementById('login-error-msg');
   if (errBox) errBox.style.display = 'none';
-  if (modal) modal.classList.add('active');
+  if (modal) {
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      const uInput = document.getElementById('login-username');
+      if (uInput) uInput.focus();
+    }, 50);
+  }
 }
 
 function closeLoginModal() {
   const modal = document.getElementById('login-modal');
-  if (modal) modal.classList.remove('active');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
 }
+
+window.openLoginModal = openLoginModal;
+window.closeLoginModal = closeLoginModal;
+window.logoutStaffUser = logoutStaffUser;
 
 function initLoginForm() {
   const form = document.getElementById('portal-login-form');
@@ -2749,7 +2782,11 @@ function initModals() {
 }
 
 function openModal() {
-  document.getElementById('common-modal').classList.add('active');
+  const m = document.getElementById('common-modal');
+  if (m) {
+    m.classList.add('active');
+    m.style.display = 'flex';
+  }
 }
 
 function closeModal() {
@@ -2757,8 +2794,15 @@ function closeModal() {
     window.removeEventListener('paste', currentModalPasteHandler);
     currentModalPasteHandler = null;
   }
-  document.getElementById('common-modal').classList.remove('active');
+  const m = document.getElementById('common-modal');
+  if (m) {
+    m.classList.remove('active');
+    m.style.display = 'none';
+  }
 }
+
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 // Talaba profil modalini ochish
 async function showStudentModal(studentId) {
