@@ -25,14 +25,22 @@ function initSchema() {
   const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   db.exec(schemaSql);
 
-  // Migration: ensure telegram_user_id exists on staff_user
-  try {
-    const cols = db.pragma('table_info(staff_user)').map(c => c.name);
-    if (!cols.includes('telegram_user_id')) {
-      db.exec('ALTER TABLE staff_user ADD COLUMN telegram_user_id TEXT;');
-    }
-  } catch (e) {}
-}
+    // Migration: ensure telegram_user_id exists on staff_user
+    try {
+      const cols = db.pragma('table_info(staff_user)').map(c => c.name);
+      if (!cols.includes('telegram_user_id')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN telegram_user_id TEXT;');
+      }
+    } catch (e) {}
+
+    // Migration: ensure photo_url exists on student
+    try {
+      const cols = db.pragma('table_info(student)').map(c => c.name);
+      if (!cols.includes('photo_url')) {
+        db.exec('ALTER TABLE student ADD COLUMN photo_url TEXT;');
+      }
+    } catch (e) {}
+  }
 
 module.exports = {
   db,

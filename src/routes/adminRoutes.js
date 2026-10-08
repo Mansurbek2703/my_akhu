@@ -248,7 +248,8 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       gender = 'm',
       email,
       phone,
-      tutor_id
+      tutor_id,
+      photo_url
     } = req.body;
 
     if (!external_id || !first_name || !last_name || !group_code) {
@@ -276,8 +277,8 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
     db.prepare(`
       INSERT INTO student (
         id, external_id, first_name, last_name, group_code, program_code,
-        level, course, gender, email, phone, tutor_id, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        level, course, gender, email, phone, tutor_id, photo_url, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
     `).run(
       studentId,
       String(external_id),
@@ -291,6 +292,7 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       email || null,
       phone || null,
       finalTutorId,
+      photo_url || null,
       now,
       now
     );
@@ -308,7 +310,7 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       action: 'CREATE_STUDENT',
       object_type: 'student',
       object_id: studentId,
-      after: { external_id, first_name, last_name, group_code },
+      after: { external_id, first_name, last_name, group_code, photo_url },
       ip: req.ip || '127.0.0.1'
     });
 
@@ -339,6 +341,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       email,
       phone,
       tutor_id,
+      photo_url,
       status
     } = req.body;
 
@@ -368,6 +371,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
           email = ?,
           phone = ?,
           tutor_id = ?,
+          photo_url = COALESCE(?, photo_url),
           status = COALESCE(?, status),
           updated_at = ?
       WHERE id = ?
@@ -383,6 +387,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       email !== undefined ? email : student.email,
       phone !== undefined ? phone : student.phone,
       finalTutorId,
+      photo_url !== undefined ? photo_url : student.photo_url,
       status !== undefined ? status : student.status,
       now,
       req.params.id
@@ -424,6 +429,81 @@ router.post('/students/:id/status', authenticateSuperadminOrRegistrator, (req, r
     res.json({ success: true, message: `Talaba holati "${status}" ga o'zgartirildi` });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/students/:id/photo
+ * Talabaga rasm yuklash (Fayl tanlash, Drag & Drop yoki Clipboard Paste orqali)
+ */
+router.post('/students/:id/photo', authenticateSuperadminOrRegistrator, upload.single('photo'), (req, res) => {
+  try {
+    const student = db.prepare('SELECT * FROM student WHERE id = ?').get(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    let photoUrl = null;
+
+    if (req.file) {
+      photoUrl = `/api/files/${req.file.filename}`;
+    } else if (req.body && (req.body.image_base64 || req.body.photo_base64)) {
+      const rawBase64 = req.body.image_base64 || req.body.photo_base64;
+      const matches = rawBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      let ext = '.png';
+      let buffer;
+
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        if (mime === 'image/jpeg') ext = '.jpg';
+        else if (mime === 'image/webp') ext = '.webp';
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        buffer = Buffer.from(rawBase64, 'base64');
+      }
+
+      const filename = `avatar_${student.id}_${Date.now()}${ext}`;
+      const savePath = path.join(uploadDir, filename);
+      fs.writeFileSync(savePath, buffer);
+      photoUrl = `/api/files/${filename}`;
+    } else if (req.body && req.body.photo_url) {
+      photoUrl = req.body.photo_url;
+    } else {
+      return res.status(400).json({ error: 'Rasm fayli yoki base64 ma\'lumoti yuborilmadi' });
+    }
+
+    const now = new Date().toISOString();
+    db.prepare('UPDATE student SET photo_url = ?, updated_at = ? WHERE id = ?').run(photoUrl, now, student.id);
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: req.staffUser.roles[0],
+      action: 'UPDATE_STUDENT_PHOTO',
+      object_type: 'student',
+      object_id: student.id,
+      after: { photo_url: photoUrl },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: 'Rasm muvaffaqiyatli saqlandi', photo_url: photoUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/students/:id/photo
+ * Talaba rasmini o'chirish
+ */
+router.delete('/students/:id/photo', authenticateSuperadminOrRegistrator, (req, res) => {
+  try {
+    const student = db.prepare('SELECT * FROM student WHERE id = ?').get(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    const now = new Date().toISOString();
+    db.prepare('UPDATE student SET photo_url = NULL, updated_at = ? WHERE id = ?').run(now, student.id);
+
+    res.json({ success: true, message: 'Talaba rasmi o\'chirildi' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

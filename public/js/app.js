@@ -2003,6 +2003,10 @@ function openModal() {
 }
 
 function closeModal() {
+  if (typeof currentModalPasteHandler === 'function') {
+    window.removeEventListener('paste', currentModalPasteHandler);
+    currentModalPasteHandler = null;
+  }
   document.getElementById('common-modal').classList.remove('active');
 }
 
@@ -2022,8 +2026,22 @@ async function showStudentModal(studentId) {
     const st = data.student;
     const history = data.history || [];
 
+    const isFemale = st.gender === 'female' || st.gender === 'f';
+    const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+    const avatarHtml = st.photo_url
+      ? `<img src="${st.photo_url}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="${st.first_name}">`
+      : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 60px; height: 60px; font-size: 22px;">${initials}</span>`;
+
     modalTitle.textContent = `${st.first_name} ${st.last_name} (${st.group_code})`;
     modalBody.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-light);">
+        ${avatarHtml}
+        <div>
+          <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">${st.first_name} ${st.last_name}</h4>
+          <span class="badge badge-group">${st.external_id}</span>
+          <span class="badge badge-course">${st.course}-kurs • ${st.group_code}</span>
+        </div>
+      </div>
       <div class="grid grid-2 mb-3">
         <div>
           <p><strong>Guruh:</strong> ${st.group_code}</p>
@@ -2035,7 +2053,7 @@ async function showStudentModal(studentId) {
           <p><strong>Mavsum Balli:</strong> <strong style="color: #2563EB; font-size: 18px;">${st.season || 0}</strong></p>
           <p><strong>Jami Ball:</strong> <strong>${st.total || 0}</strong></p>
           <p><strong>Reytingdagi O'rni:</strong> <span class="badge badge-primary">#${st.rank_cohort || 1}</span></p>
-          <p><strong>Telegram:</strong> ${st.telegram_user_id ? ' Bog\'langan' : ' Bog\'lanmagan'}</p>
+          <p><strong>Telegram:</strong> ${st.telegram_user_id ? '<span class="text-success">Ulangan</span>' : '<span class="text-muted">Ulanmagan</span>'}</p>
         </div>
       </div>
 
@@ -2517,15 +2535,18 @@ async function loadAdminStudentsList() {
       const isFemale = st.gender === 'female' || st.gender === 'f';
       const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
       const isActive = st.status === 'active';
+      const photoHtml = st.photo_url
+        ? `<img src="${st.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1px solid #CBD5E1; width: 34px; height: 34px; border-radius: 50%;" alt="${st.first_name}">`
+        : `<span class="avatar-badge ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>`;
 
       return `
-        <tr>
+        <tr class="student-table-row" onclick="showStudentDetailsModal('${st.id}')" style="cursor: pointer;" title="Profilni ko'rish uchun bosing">
           <td>
             <span class="badge badge-group" style="letter-spacing: 0.5px;">${st.external_id || '-'}</span>
           </td>
           <td>
             <div class="table-student-name">
-              <span class="avatar-badge ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>
+              ${photoHtml}
               <div>
                 <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${st.first_name} ${st.last_name}</div>
                 <div class="table-sub-text">${st.email || 'Email biriktirilmagan'}</div>
@@ -2562,7 +2583,7 @@ async function loadAdminStudentsList() {
           <td>
             <span style="font-size: 12px; color: var(--text-secondary);">${st.tutor_name || '<em style="color:#94A3B8;">Biriktirilmagan</em>'}</span>
           </td>
-          <td style="text-align: right;">
+          <td style="text-align: right;" onclick="event.stopPropagation()">
             <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
               <button class="btn-action btn-action-primary" onclick="showEditStudentModal('${st.id}')" title="Tahrirlash">
                 ${icon('edit', 14)}
@@ -2654,9 +2675,15 @@ function showCreateStudentModal() {
         </div>
       </div>
 
-      <div class="form-group mb-2">
-        <label class="form-label">Email Manzili (Ixtiyoriy)</label>
-        <input type="email" id="new-std-email" class="form-control" placeholder="student@akhu.uz">
+      <div class="grid grid-2 mb-2">
+        <div class="form-group">
+          <label class="form-label">Email Manzili (Ixtiyoriy)</label>
+          <input type="email" id="new-std-email" class="form-control" placeholder="student@akhu.uz">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Talaba Rasmi (Ixtiyoriy)</label>
+          <input type="file" id="new-std-photo" accept="image/*" class="form-control" style="padding: 5px;">
+        </div>
       </div>
     </form>
   `;
@@ -2688,13 +2715,24 @@ async function handleCreateStudentSubmit() {
   }
 
   try {
-    await apiFetch('/api/admin/students', {
+    const res = await apiFetch('/api/admin/students', {
       method: 'POST',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
         program_code, course, gender, phone, email
       })
     });
+
+    const photoInput = document.getElementById('new-std-photo');
+    if (photoInput && photoInput.files && photoInput.files.length > 0 && res.student_id) {
+      const formData = new FormData();
+      formData.append('photo', photoInput.files[0]);
+      await fetch(`/api/admin/students/${res.student_id}/photo`, {
+        method: 'POST',
+        headers: { 'x-user-id': AppState.user.id },
+        body: formData
+      });
+    }
 
     closeModal();
     alert('Talaba muvaffaqiyatli saqlandi!');
@@ -2884,15 +2922,30 @@ async function handleClearAllStudents() {
   }
 }
 
-// TALABA BATAFSIL PROFILINI KO'RISH
+// TALABA BATAFSIL PROFILINI KO'RISH VA RASM BOSHQARUVI
+let currentActiveStudentModalId = null;
+let currentModalPasteHandler = null;
+
 async function showStudentDetailsModal(studentId) {
+  currentActiveStudentModalId = studentId;
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('user', 18)} Talaba Profili</span>`;
+  // Avvalgi paste hodisasini tozalash
+  if (currentModalPasteHandler) {
+    window.removeEventListener('paste', currentModalPasteHandler);
+    currentModalPasteHandler = null;
+  }
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('user', 18)} Talaba Profili & Rasm Boshqaruvi</span>`;
   modalBody.innerHTML = `<div style="text-align:center; padding:30px;"><div class="spinner"></div><p style="margin-top:8px;">Yuklanmoqda...</p></div>`;
-  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeStudentModalCleanly()">Yopish</button>
+    <button class="btn btn-primary" onclick="showEditStudentModal('${studentId}')" style="display:inline-flex; align-items:center; gap:6px;">
+      ${icon('edit', 14)} Tahrirlash
+    </button>
+  `;
   openModal();
 
   try {
@@ -2903,11 +2956,18 @@ async function showStudentDetailsModal(studentId) {
     const isFemale = st.gender === 'female' || st.gender === 'f';
     const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
 
+    const avatarHtml = st.photo_url
+      ? `<img id="detail-modal-avatar-img" src="${st.photo_url}" style="width: 76px; height: 76px; border-radius: 50%; object-fit: cover; border: 3px solid #2563EB; box-shadow: 0 4px 12px rgba(37,99,235,0.2);" alt="${st.first_name}">`
+      : `<span id="detail-modal-avatar-placeholder" class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 76px; height: 76px; font-size: 26px; border: 3px solid #DBEAFE;">${initials}</span>`;
+
     modalBody.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-light); margin-bottom: 16px;">
-        <span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 52px; height: 52px; font-size: 18px;">${initials}</span>
-        <div>
-          <h3 style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">${st.first_name} ${st.last_name}</h3>
+      <!-- TALABA BOSHLANG'ICH BLOKI VA AVATAR -->
+      <div style="display: flex; align-items: center; gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-light); margin-bottom: 16px;">
+        <div id="detail-avatar-container" style="flex-shrink: 0;">
+          ${avatarHtml}
+        </div>
+        <div style="flex: 1;">
+          <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 5px;">${st.first_name} ${st.last_name}</h3>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <span class="badge badge-group">${st.external_id}</span>
             <span class="badge badge-course">${st.course}-kurs • ${st.group_code}</span>
@@ -2916,7 +2976,36 @@ async function showStudentDetailsModal(studentId) {
         </div>
       </div>
 
-      <div class="grid grid-2 mb-3" style="font-size: 13px;">
+      <!-- RASM YUKLASH VA CTRL+V PASTE BLOKI -->
+      <div class="card mb-3" style="background: #F8FAFC; border: 1px solid #DBEAFE; padding: 14px 16px; border-radius: var(--radius-md);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 13px; font-weight: 700; color: #1E3A8A; display: flex; align-items: center; gap: 6px;">
+            ${icon('upload', 15)} Talaba Rasmini Biriktirish (Fayl yuklash yoki nusxalab tashlash)
+          </span>
+          <div id="photo-remove-btn-container">
+            ${st.photo_url ? `
+              <button class="btn btn-outline btn-sm" onclick="handleDeleteStudentPhoto('${st.id}')" style="color: #DC2626; border-color: #FECACA; font-size: 11.5px; padding: 3px 8px;">
+                ${icon('trash', 12)} Rasmni O'chirish
+              </button>
+            ` : ''}
+          </div>
+        </div>
+        
+        <div id="student-photo-dropzone" class="upload-dropzone" style="padding: 16px 12px; background: #FFFFFF; border: 2px dashed #93C5FD; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s ease;">
+          <div style="color: #2563EB; margin-bottom: 4px;">${icon('upload', 22)}</div>
+          <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main);">
+            Faylni tanlang, sudrab tashlang yoki <span style="color: #2563EB; background: #EFF6FF; padding: 1px 6px; border-radius: 4px; border: 1px solid #BFDBFE;">Ctrl+V</span> bilan rasmni joylashtiring
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            JPG, PNG yoki WebP formatidagi rasm (maksimal 10MB)
+          </div>
+          <input type="file" id="modal-photo-file-input" accept="image/*" style="display: none;">
+        </div>
+        <div id="photo-upload-status" style="margin-top: 8px; display: none;"></div>
+      </div>
+
+      <!-- TALABA ASOSIY MA'LUMOTLARI -->
+      <div class="grid grid-2 mb-3" style="font-size: 13px; background: white; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
         <div>
           <p style="margin-bottom: 6px;"><strong>Yo'nalishi:</strong> ${st.program_code || '-'}</p>
           <p style="margin-bottom: 6px;"><strong>Tyutor:</strong> ${st.tutor_name || 'Biriktirilmagan'}</p>
@@ -2929,10 +3018,11 @@ async function showStudentDetailsModal(studentId) {
         </div>
       </div>
 
+      <!-- BALLAR TARIXI -->
       <h4 style="font-size: 14px; font-weight: 700; margin: 16px 0 10px; color: var(--text-main);">
         Ballar va Faollik Tarixi (${entries.length} ta yozuv)
       </h4>
-      <div style="max-height: 240px; overflow-y: auto;">
+      <div style="max-height: 200px; overflow-y: auto;">
         ${entries.length === 0 ? '<p style="color:var(--text-muted); font-size:12px;">Hozircha ball yozuvlari mavjud emas.</p>' : `
           <table class="data-table" style="font-size: 12px;">
             <thead>
@@ -2952,8 +3042,141 @@ async function showStudentDetailsModal(studentId) {
         `}
       </div>
     `;
+
+    // Dropzone hodisalari
+    const dropzone = document.getElementById('student-photo-dropzone');
+    const fileInput = document.getElementById('modal-photo-file-input');
+
+    if (dropzone && fileInput) {
+      dropzone.addEventListener('click', () => fileInput.click());
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          uploadStudentPhotoFile(studentId, e.dataTransfer.files[0]);
+        }
+      });
+
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files && fileInput.files.length > 0) {
+          uploadStudentPhotoFile(studentId, fileInput.files[0]);
+        }
+      });
+    }
+
+    // Clipboard Paste (Ctrl+V) hodisasi
+    currentModalPasteHandler = (e) => {
+      const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            uploadStudentPhotoFile(studentId, file);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', currentModalPasteHandler);
+
   } catch (err) {
     modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+  }
+}
+
+function closeStudentModalCleanly() {
+  if (currentModalPasteHandler) {
+    window.removeEventListener('paste', currentModalPasteHandler);
+    currentModalPasteHandler = null;
+  }
+  closeModal();
+}
+
+async function uploadStudentPhotoFile(studentId, file) {
+  const statusEl = document.getElementById('photo-upload-status');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:#2563EB;"><div class="spinner"></div> Rasm yuklanmoqda...</div>`;
+  }
+
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  try {
+    const res = await fetch(`/api/admin/students/${studentId}/photo`, {
+      method: 'POST',
+      headers: {
+        'x-user-id': AppState.user.id
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Rasm yuklashda xatolik yuz berdi');
+
+    if (statusEl) {
+      statusEl.innerHTML = `<div style="color:#059669; font-weight:600;">${icon('checkCircle', 14)} Rasm muvaffaqiyatli saqlandi!</div>`;
+    }
+
+    // Avatar rasmini darhol yangilash
+    const container = document.getElementById('detail-avatar-container');
+    if (container && data.photo_url) {
+      container.innerHTML = `<img id="detail-modal-avatar-img" src="${data.photo_url}?t=${Date.now()}" style="width: 76px; height: 76px; border-radius: 50%; object-fit: cover; border: 3px solid #2563EB; box-shadow: 0 4px 12px rgba(37,99,235,0.2);" alt="Talaba">`;
+    }
+
+    // O'chirish tugmasini ko'rsatish
+    const removeBtnCont = document.getElementById('photo-remove-btn-container');
+    if (removeBtnCont) {
+      removeBtnCont.innerHTML = `
+        <button class="btn btn-outline btn-sm" onclick="handleDeleteStudentPhoto('${studentId}')" style="color: #DC2626; border-color: #FECACA; font-size: 11.5px; padding: 3px 8px;">
+          ${icon('trash', 12)} Rasmni O'chirish
+        </button>
+      `;
+    }
+
+    // Ro'yxatdagi jadvalni yangilash
+    await loadAdminStudentsList();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<div style="color:#DC2626; font-weight:600;">Xatolik: ${err.message}</div>`;
+    }
+  }
+}
+
+async function handleDeleteStudentPhoto(studentId) {
+  if (!confirm("Talaba rasmini o'chirishni xohlaysizmi?")) return;
+
+  try {
+    await apiFetch(`/api/admin/students/${studentId}/photo`, {
+      method: 'DELETE'
+    });
+
+    // Avatarni dastlabki holatga qaytarish
+    const container = document.getElementById('detail-avatar-container');
+    if (container) {
+      container.innerHTML = `<span class="avatar-badge" style="width: 76px; height: 76px; font-size: 26px; border: 3px solid #DBEAFE;">ST</span>`;
+    }
+
+    const removeBtnCont = document.getElementById('photo-remove-btn-container');
+    if (removeBtnCont) removeBtnCont.innerHTML = '';
+
+    const statusEl = document.getElementById('photo-upload-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = `<div style="color:#64748B;">Rasm o'chirildi.</div>`;
+    }
+
+    await loadAdminStudentsList();
+  } catch (err) {
+    alert(err.message);
   }
 }
 

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS student (
     phone TEXT,
     tutor_id TEXT,
     telegram_user_id TEXT UNIQUE,
+    photo_url TEXT,
     photo_consent INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'left')),
     created_at TEXT NOT NULL,
