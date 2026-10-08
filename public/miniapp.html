@@ -323,36 +323,71 @@
       }
     }
 
+    function formatEntryDate(rawDate, eventDate) {
+      if (rawDate) {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+      }
+      return eventDate || '-';
+    }
+
     function renderEntriesList(entries) {
       const recentCont = document.getElementById('recent-entries-list');
       const fullCont = document.getElementById('full-history-list');
 
       if (!entries || entries.length === 0) {
-        recentCont.innerHTML = '<div style="text-align:center; padding:16px; color:#94A3B8; font-size:13px;">Hozircha yozuvlar yo\'q</div>';
-        fullCont.innerHTML = '<div style="text-align:center; padding:16px; color:#94A3B8; font-size:13px;">Hozircha yozuvlar yo\'q</div>';
+        const emptyHtml = '<div style="text-align:center; padding:20px; color:#94A3B8; font-size:13px;">Hozircha yozuvlar yo\'q</div>';
+        if (recentCont) recentCont.innerHTML = emptyHtml;
+        if (fullCont) fullCont.innerHTML = emptyHtml;
         return;
       }
 
-      const listHtml = entries.map(e => `
-        <div class="entry-item-card">
-          <div class="entry-header">
-            <span class="entry-title">${e.item_name}</span>
-            <span class="entry-pts ${e.points >= 0 ? 'pts-pos' : 'pts-neg'}">
-              ${e.points >= 0 ? '+' : ''}${e.points} ball
-            </span>
-          </div>
-          <div class="entry-meta">
-            <span>📅 ${e.event_date} • ${e.source}</span>
-            <span style="font-weight:600; color: ${e.status === 'approved' ? '#10B981' : (e.status === 'rejected' ? '#EF4444' : '#F59E0B')};">
-              ${e.status === 'approved' ? 'Tasdiqlangan' : (e.status === 'rejected' ? 'Rad etilgan' : 'Kutilmoqda')}
-            </span>
-          </div>
-          ${e.reject_note ? `<div style="font-size:11px; color:#EF4444; background:#FEF2F2; padding:6px; border-radius:6px;">Sabab: ${e.reject_note}</div>` : ''}
-        </div>
-      `).join('');
+      const listHtml = entries.map(e => {
+        const title = e.note || e.item_name || 'Faollik bali';
+        const dateStr = formatEntryDate(e.created_at, e.event_date);
+        let srcLabel = '⚡ Avtomatik';
+        if (e.source === 'qr') srcLabel = '📷 QR Check-in';
+        else if (e.source === 'tutor' || e.source === 'manual') srcLabel = '👤 Tyutor';
 
-      recentCont.innerHTML = listHtml;
-      fullCont.innerHTML = listHtml;
+        return `
+          <div class="entry-item-card">
+            <div class="entry-header">
+              <span class="entry-title">${title}</span>
+              <span class="entry-pts ${e.points >= 0 ? 'pts-pos' : 'pts-neg'}">
+                ${e.points >= 0 ? '+' : ''}${e.points} ball
+              </span>
+            </div>
+            <div class="entry-meta">
+              <span>📅 ${dateStr} • ${srcLabel}</span>
+              <span style="font-weight:600; color: ${e.status === 'approved' ? '#10B981' : (e.status === 'rejected' ? '#EF4444' : '#F59E0B')};">
+                ${e.status === 'approved' ? 'Tasdiqlangan' : (e.status === 'rejected' ? 'Rad etilgan' : 'Kutilmoqda')}
+              </span>
+            </div>
+            ${e.reject_note ? `<div style="font-size:11px; color:#EF4444; background:#FEF2F2; padding:6px; border-radius:6px; margin-top:4px;">Sabab: ${e.reject_note}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      if (recentCont) recentCont.innerHTML = listHtml;
+      if (fullCont) fullCont.innerHTML = listHtml;
+    }
+
+    async function loadHistoryTab() {
+      const fullCont = document.getElementById('full-history-list');
+      if (!currentAuthToken) return;
+      try {
+        fullCont.innerHTML = '<div style="text-align:center; padding:20px; color:#94A3B8; font-size:13px;">Yuklanmoqda...</div>';
+        const res = await fetch('/api/app/entries?days=90', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        const list = data.entries || [];
+        renderEntriesList(list);
+      } catch (err) {
+        if (fullCont) fullCont.innerHTML = `<div style="text-align:center; padding:20px; color:#EF4444; font-size:13px;">Yuklashda xatolik: ${err.message}</div>`;
+      }
     }
 
     async function loadStudentQr() {
@@ -437,8 +472,10 @@
         document.querySelectorAll('.nav-tab-btn')[btnIndex].classList.add('active');
       }
 
+      if (tabName === 'history') loadHistoryTab();
       if (tabName === 'events') loadEventsTab();
       if (tabName === 'qr') loadStudentQr();
+      if (tabName === 'home') loadStudentDashboard();
     }
 
     let miniAppQrScanner = null;

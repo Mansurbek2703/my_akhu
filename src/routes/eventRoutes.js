@@ -45,7 +45,8 @@ router.post('/', (req, res) => {
       category_id,
       level,
       capacity,
-      requires_registration
+      requires_registration,
+      qr_refresh_seconds
     } = req.body;
 
     if (!title || !starts_at || !ends_at || !place || !category_id || !level) {
@@ -59,11 +60,15 @@ router.post('/', (req, res) => {
     const now = new Date().toISOString();
     const createdBy = req.headers['x-user-id'] || organizer_unit || 'dep_yb';
 
+    // QR yangilanish vaqti (5 dan 120 soniyagacha, standart 30 soniya)
+    const rawRefresh = Number(qr_refresh_seconds);
+    const qrRefresh = (!isNaN(rawRefresh) && rawRefresh >= 5 && rawRefresh <= 120) ? rawRefresh : 30;
+
     db.prepare(`
       INSERT INTO event (
         id, title, starts_at, ends_at, place, organizer_unit, category_id,
-        level, points, capacity, requires_registration, status, qr_secret, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)
+        level, points, capacity, requires_registration, status, qr_secret, qr_refresh_seconds, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)
     `).run(
       eventId,
       title,
@@ -77,6 +82,7 @@ router.post('/', (req, res) => {
       capacity ? Number(capacity) : null,
       requires_registration ? 1 : 0,
       qrSecret,
+      qrRefresh,
       createdBy,
       now
     );
@@ -87,7 +93,7 @@ router.post('/', (req, res) => {
       action: 'CREATE_EVENT',
       object_type: 'event',
       object_id: eventId,
-      after: { title, level, points },
+      after: { title, level, points, qr_refresh_seconds: qrRefresh },
       ip: req.ip || '127.0.0.1'
     });
 
@@ -95,7 +101,8 @@ router.post('/', (req, res) => {
       success: true,
       event_id: eventId,
       points,
-      message: `Tadbir yaratildi (${points} ball)`
+      qr_refresh_seconds: qrRefresh,
+      message: `Tadbir yaratildi (${points} ball, QR yangilanish: ${qrRefresh} soniya)`
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -104,23 +111,48 @@ router.post('/', (req, res) => {
 
 /**
  * GET /api/events/:id/qr
- * Q-01: Jonli tadbir QR kodi (har 60 soniyada yangilanadi)
+ * Q-01: Jonli tadbir QR kodi (dinamik 5-120 soniyada yangilanadi)
  */
 router.get('/:id/qr', async (req, res) => {
   try {
-    const event = db.prepare('SELECT title, points FROM event WHERE id = ?').get(req.params.id);
+    const event = db.prepare('SELECT title, points, qr_refresh_seconds FROM event WHERE id = ?').get(req.params.id);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
     const data = await generateEventQrDataUrl(req.params.id);
+    const ttl = data.ttl || event.qr_refresh_seconds || 30;
     res.json({
       title: event.title,
       points: event.points,
+      qr_refresh_seconds: ttl,
+      ttl: ttl,
       qr_data_url: data.dataUrl,
       dataUrl: data.dataUrl,
-      payload: data.payload,
-      ttl: data.ttl
+      payload: data.payload
     });
   } catch (e) {
     res.status(404).json({ error: e.message });
+  }
+});
+
+/**
+ * PUT /api/events/:id/qr-interval
+ * Tadbir QR kodining yangilanish vaqtini o'zgartirish (5s - 120s)
+ */
+router.put('/:id/qr-interval', (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { qr_refresh_seconds } = req.body;
+    const rawVal = Number(qr_refresh_seconds);
+    if (isNaN(rawVal) || rawVal < 5 || rawVal > 120) {
+      return res.status(400).json({ error: "Yangilanish vaqti 5 soniyadan 120 soniyagacha bo'lishi kerak!" });
+    }
+    db.prepare(`UPDATE event SET qr_refresh_seconds = ? WHERE id = ?`).run(rawVal, eventId);
+    res.json({
+      success: true,
+      qr_refresh_seconds: rawVal,
+      message: `QR yangilanish vaqti ${rawVal} soniyaga o'zgartirildi`
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -142,9 +174,13 @@ router.get('/:id/participants', (req, res) => {
   `).all(eventId);
 
   const directCheckins = db.prepare(`
-    SELECT chk.*, st.first_name, st.last_name, st.group_code, st.phone
+    SELECT chk.*, chk.at as checked_in_at, st.first_name, st.last_name,
+           TRIM(st.first_name || ' ' || COALESCE(st.last_name, '')) as student_name,
+           TRIM(st.first_name || ' ' || COALESCE(st.last_name, '')) as full_name,
+           st.group_code, st.phone, COALESCE(ev.points, 5) as points
     FROM checkin chk
     JOIN student st ON chk.student_id = st.id
+    LEFT JOIN event ev ON chk.event_id = ev.id
     WHERE chk.event_id = ?
     ORDER BY chk.at DESC
   `).all(eventId);

@@ -5,7 +5,7 @@ const { db } = require('../db/database');
 const config = require('../config');
 const { verifyTelegramInitData, linkStudentTelegramAccount } = require('../services/telegramService');
 const { checkinEventQr, generateStudentQrDataUrl, registerForEvent } = require('../services/qrService');
-const { submitAppeal } = require('../services/pointService');
+const { submitAppeal, awardWelcomeBonus } = require('../services/pointService');
 const { getRatingList } = require('../services/ratingService');
 
 // Auth middleware for Student Mini App
@@ -64,6 +64,7 @@ router.post('/auth', (req, res) => {
     if (!student) return res.status(404).json({ error: 'Talabalar bazasi bo\'sh' });
 
     const token = jwt.sign({ student_id: student.id }, config.secrets.jwt, { expiresIn: '7d' });
+    awardWelcomeBonus(student.id);
     return res.json({ token, student });
   }
 
@@ -77,6 +78,7 @@ router.post('/auth', (req, res) => {
     const student = db.prepare(`SELECT * FROM student WHERE telegram_user_id = ? AND status = 'active'`).get(String(tgUser.id));
     if (student) {
       const token = jwt.sign({ student_id: student.id }, config.secrets.jwt, { expiresIn: '7d' });
+      awardWelcomeBonus(student.id);
       return res.json({ token, student });
     } else {
       // Talaba raqamini Registrator bilan bog'lash talab qilinadi (M-01)
@@ -93,6 +95,7 @@ router.post('/auth', (req, res) => {
     const result = linkStudentTelegramAccount(req.body.telegram_user_id || '999999', phone);
     if (result.success) {
       const token = jwt.sign({ student_id: result.student.id }, config.secrets.jwt, { expiresIn: '7d' });
+      awardWelcomeBonus(result.student.id);
       return res.json({ token, student: result.student, message: result.message });
     } else {
       return res.status(400).json({ error: result.message });
@@ -103,6 +106,7 @@ router.post('/auth', (req, res) => {
   const fallbackStudent = db.prepare(`SELECT * FROM student WHERE status = 'active' ORDER BY id ASC LIMIT 1`).get();
   if (fallbackStudent) {
     const token = jwt.sign({ student_id: fallbackStudent.id }, config.secrets.jwt, { expiresIn: '7d' });
+    awardWelcomeBonus(fallbackStudent.id);
     return res.json({ token, student: fallbackStudent });
   }
 
@@ -114,6 +118,9 @@ router.post('/auth', (req, res) => {
  * Talabaning shaxsiy ma'lumotlari, ballari, o'rni, sohalar, tyutor
  */
 router.get('/me', authenticateStudent, (req, res) => {
+  // Talabaning ilk kirish bonusi (+5 ball) mavjudligini ta'minlash
+  awardWelcomeBonus(req.studentId);
+
   const student = db.prepare(`
     SELECT st.*, su.full_name as tutor_name, su.email as tutor_email, su.telegram_user_id as tutor_tg
     FROM student st
@@ -133,7 +140,7 @@ router.get('/me', authenticateStudent, (req, res) => {
     events_count: 0
   };
 
-  const byCategory = typeof score.by_category === 'string' ? JSON.parse(score.by_category) : score.by_category;
+  const byCategory = typeof score.by_category === 'string' ? JSON.parse(score.by_category) : (score.by_category || {});
 
   // Kategoriyalar ro'yxatini nomlari va ranglari bilan qo'shish
   const categories = db.prepare(`SELECT * FROM catalog_category ORDER BY sort ASC`).all().map(c => ({
@@ -154,6 +161,21 @@ router.get('/me', authenticateStudent, (req, res) => {
     categories
   };
 
+  // Oxirgi ball yozuvlari (Tarix va Dashboard uchun)
+  const recentEntries = db.prepare(`
+    SELECT pe.*, COALESCE(pe.note, ci.name, 'Faollik bali') as item_name,
+           COALESCE(cc.name, 'Umumiy') as category_name, COALESCE(cc.color, '#3B82F6') as category_color,
+           su_c.full_name as creator_name, su_a.full_name as approver_name
+    FROM point_entry pe
+    LEFT JOIN catalog_item ci ON pe.item_id = ci.id
+    LEFT JOIN catalog_category cc ON pe.category_id = cc.id
+    LEFT JOIN staff_user su_c ON pe.created_by = su_c.id
+    LEFT JOIN staff_user su_a ON pe.approved_by = su_a.id
+    WHERE pe.student_id = ?
+    ORDER BY pe.created_at DESC
+    LIMIT 30
+  `).all(req.studentId);
+
   res.json({
     student: {
       id: student.id,
@@ -173,27 +195,31 @@ router.get('/me', authenticateStudent, (req, res) => {
       }
     },
     score: scorePayload,
-    scores: scorePayload
+    scores: scorePayload,
+    categories,
+    recent_entries: recentEntries,
+    entries: recentEntries
   });
 });
 
 /**
- * GET /api/app/entries?days=30
- * Oxirgi 30 kunlik ball yozuvlari
+ * GET /api/app/entries?days=90
+ * Ball yozuvlari tarixi
  */
 router.get('/entries', authenticateStudent, (req, res) => {
-  const days = Number(req.query.days) || 30;
+  const days = Number(req.query.days) || 90;
   const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const entries = db.prepare(`
-    SELECT pe.*, ci.name as item_name, cc.name as category_name, cc.color as category_color,
+    SELECT pe.*, COALESCE(pe.note, ci.name, 'Faollik bali') as item_name,
+           COALESCE(cc.name, 'Umumiy') as category_name, COALESCE(cc.color, '#3B82F6') as category_color,
            su_c.full_name as creator_name, su_a.full_name as approver_name
     FROM point_entry pe
-    JOIN catalog_item ci ON pe.item_id = ci.id
-    JOIN catalog_category cc ON pe.category_id = cc.id
+    LEFT JOIN catalog_item ci ON pe.item_id = ci.id
+    LEFT JOIN catalog_category cc ON pe.category_id = cc.id
     LEFT JOIN staff_user su_c ON pe.created_by = su_c.id
     LEFT JOIN staff_user su_a ON pe.approved_by = su_a.id
-    WHERE pe.student_id = ? AND pe.created_at >= ?
+    WHERE pe.student_id = ? AND (pe.created_at >= ? OR pe.created_at IS NULL)
     ORDER BY pe.created_at DESC
   `).all(req.studentId, sinceIso);
 

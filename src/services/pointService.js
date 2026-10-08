@@ -586,6 +586,62 @@ function decideAppeal(appeal_id, decider_user, { accept, decision_note }, ip = '
   return { status: newStatus, message: accept ? 'E\'tiroz qanoatlantirildi, ball yozildi' : 'E\'tiroz rad etildi' };
 }
 
+/**
+ * Tizimga birinchi marta kirish yoki ro'yxatdan o'tish uchun +5 ballik xush kelibsiz bonusi
+ */
+function awardWelcomeBonus(studentId) {
+  if (!studentId) return { success: false };
+  try {
+    const existing = db.prepare(`
+      SELECT id FROM point_entry
+      WHERE student_id = ? AND (item_id = 'i0' OR note LIKE '%ilk kirish bonusi%' OR note LIKE '%birinchi kirish bonusi%')
+    `).get(studentId);
+
+    if (existing) {
+      return { success: false, already_awarded: true };
+    }
+
+    const currentSeason = db.prepare(`SELECT * FROM season WHERE is_current = 1 LIMIT 1`).get() || { id: '2026-2027' };
+    const pointEntryId = 'pe_' + crypto.randomBytes(6).toString('hex');
+    const nowIso = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO point_entry (
+        id, student_id, item_id, item_version, category_id, base_points, points,
+        note, event_date, source, created_by, created_at, status, approver_role,
+        approved_by, approved_at, season_id
+      ) VALUES (?, ?, 'i0', 1, '1', 5, 5, 'Tizimga ilk kirish bonusi', ?, 'system', 'system', ?, 'approved', 'system', 'system', ?, ?)
+    `).run(
+      pointEntryId,
+      studentId,
+      nowIso.split('T')[0],
+      nowIso,
+      nowIso,
+      currentSeason.id
+    );
+
+    db.prepare(`
+      INSERT INTO point_entry_history (entry_id, from_status, to_status, by_user, at, reason)
+      VALUES (?, NULL, 'approved', 'system', ?, 'Bot orqali tizimga birinchi kirish bonusi (+5 ball)')
+    `).run(pointEntryId, nowIso);
+
+    logAudit({
+      actor_id: studentId,
+      actor_role: 'system',
+      action: 'WELCOME_BONUS_AWARDED',
+      object_type: 'student',
+      object_id: studentId,
+      after: { points: 5, entry_id: pointEntryId }
+    });
+
+    recalculateStudentScores();
+    return { success: true, points: 5, entry_id: pointEntryId };
+  } catch (err) {
+    console.error('Welcome bonus error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   createPointEntries,
   approveEntry,
@@ -596,5 +652,6 @@ module.exports = {
   submitAppeal,
   decideAppeal,
   logAudit,
-  validatePointValue
+  validatePointValue,
+  awardWelcomeBonus
 };

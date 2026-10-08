@@ -774,6 +774,31 @@ router.get('/roles-list', authenticateSuperadmin, (req, res) => {
 });
 
 /**
+ * GET /api/admin/groups-list
+ * Tizimdagi barcha mavjud guruhlar ro'yxati (talabalar va tyutor guruhlari)
+ */
+router.get('/groups-list', (req, res) => {
+  try {
+    const studentGroups = db.prepare(`
+      SELECT DISTINCT group_code FROM student 
+      WHERE group_code IS NOT NULL AND TRIM(group_code) != '' 
+      ORDER BY group_code ASC
+    `).all().map(r => r.group_code.trim());
+
+    const tutorGroups = db.prepare(`
+      SELECT DISTINCT group_code FROM tutor_group 
+      WHERE group_code IS NOT NULL AND TRIM(group_code) != '' 
+      ORDER BY group_code ASC
+    `).all().map(r => r.group_code.trim());
+
+    const allGroups = Array.from(new Set([...studentGroups, ...tutorGroups])).filter(Boolean).sort();
+    res.json({ groups: allGroups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/admin/users
  * Barcha xodimlar ro'yxati (biriktirilgan guruhlari bilan)
  */

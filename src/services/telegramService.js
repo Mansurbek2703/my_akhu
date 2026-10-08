@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { db } = require('../db/database');
 const config = require('../config');
 const { recalculateStudentScores } = require('./ratingService');
-const { logAudit } = require('./pointService');
+const { logAudit, awardWelcomeBonus } = require('./pointService');
 
 const BOT_TOKEN = config.telegram.botToken;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
@@ -150,10 +150,21 @@ function linkStudentTelegramAccount(telegramUserId, phoneNumber) {
     WHERE id = ?
   `).run(String(telegramUserId), now, student.id);
 
+  // Xush kelibsiz bonusi (+5 ball)
+  const bonusRes = awardWelcomeBonus(student.id);
+
+  // Bildirishnoma yuborish (N-10)
+  if (bonusRes && bonusRes.success) {
+    notifyStudent(student.id, 'N-10').catch(e => console.error('Bonus notify error:', e));
+  }
+
   return {
     success: true,
     student,
-    message: 'Akkauntingiz muvaffaqiyatli bog\'landi! ✅'
+    bonus_awarded: Boolean(bonusRes && bonusRes.success),
+    message: bonusRes && bonusRes.success 
+      ? 'Akkauntingiz muvaffaqiyatli bog\'landi! Sizga +5 ball xush kelibsiz bonusi taqdim etildi! 🎉'
+      : 'Akkauntingiz muvaffaqiyatli bog\'landi! ✅'
   };
 }
 

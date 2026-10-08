@@ -35,10 +35,12 @@ for (const x of fmc) {
 const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;
 console.log('SERVER BAZASIDAGI TALABALAR SONI:', count);
 
-const bcrypt = require('bcryptjs');
-const superHash = bcrypt.hashSync('akhu2026!', 8);
-db.prepare('UPDATE staff_user SET password_hash = ? WHERE id = ?').run(superHash, 'superadmin');
-console.log('SUPERADMIN PAROLI YANGILANDI: akhu2026!');
+const { awardWelcomeBonus } = require('./src/services/pointService');
+const linkedStudents = db.prepare("SELECT id FROM student WHERE telegram_user_id IS NOT NULL").all();
+for (const s of linkedStudents) {
+  awardWelcomeBonus(s.id);
+}
+console.log('TELEGRAM BOGLANGAN TALABALARGA ILK BONUS TEKSHIRILDI VA TAQDIM ETILDI');
 "
 
 pm2 restart akhu-talabalar

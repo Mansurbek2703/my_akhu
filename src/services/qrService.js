@@ -33,6 +33,11 @@ function generateEventQrPayload(eventId) {
  * Tadbir QR kodi DataURL rasmini yaratish (ekranda/TV da ko'rsatish uchun)
  */
 async function generateEventQrDataUrl(eventId) {
+  const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
+  let ttl = 30;
+  if (event && event.qr_refresh_seconds >= 5 && event.qr_refresh_seconds <= 120) {
+    ttl = event.qr_refresh_seconds;
+  }
   const payload = generateEventQrPayload(eventId);
   const payloadStr = JSON.stringify(payload);
   const dataUrl = await QRCode.toDataURL(payloadStr, {
@@ -43,7 +48,7 @@ async function generateEventQrDataUrl(eventId) {
   return {
     payload,
     dataUrl,
-    ttl: 60
+    ttl
   };
 }
 
@@ -97,10 +102,12 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(event_id);
   if (!event) throw new Error('Tadbir topilmadi');
 
-  // Q-01: ts ni tekshirish: qabul oynasi +-90s
+  // Q-01: ts ni tekshirish: tadbir yangilanish oralig'i (5-120s) + 15s tarmoq kechikish buferi
+  const refreshSec = (event.qr_refresh_seconds >= 5 && event.qr_refresh_seconds <= 120) ? event.qr_refresh_seconds : 30;
+  const allowedWindow = refreshSec + 15;
   const nowTs = Math.floor(Date.now() / 1000);
-  if (Math.abs(nowTs - ts) > 90) {
-    throw new Error('QR kodi eskirgan (amal qilish muddati 90 soniya). Yangi QR kodni skanerlang (Q-01, AT-12)');
+  if (Math.abs(nowTs - ts) > allowedWindow) {
+    throw new Error(`QR kodi eskirgan (amal qilish muddati ${refreshSec} soniya). Yangi QR kodni skanerlang`);
   }
 
   // Imzo (sig) tekshiruvi

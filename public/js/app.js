@@ -2161,6 +2161,27 @@ async function openCreateEventModal() {
           </label>
         </div>
       </div>
+
+      <!-- QR KOD YANGILANISH VAQTI (5s - 120s) -->
+      <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px;">
+        <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px;">
+          ⏱️ QR Kod Yangilanish Oralig'i (Dinamik xavfsizlik) *
+        </label>
+        <p style="font-size: 12px; color: #64748B; margin-bottom: 8px;">
+          Tadbir ekrandagi QR kodi har necha soniyada yangilanishini belgilang (5 soniyadan 120 soniyagacha):
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="number" id="ev-qr-refresh" class="form-control" min="5" max="120" value="30" style="max-width: 140px; font-weight: 700; font-size: 14px;">
+          <span style="font-size: 13px; font-weight: 600; color: #334155;">soniya</span>
+        </div>
+        <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=15">15 soniya</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=20">20 soniya</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=30">30 soniya</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=45">45 soniya</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=60">60 soniya</button>
+        </div>
+      </div>
     </form>
   `;
 
@@ -2183,11 +2204,14 @@ async function submitCreateEvent() {
   const level = document.getElementById('ev-level')?.value;
   const capacity = document.getElementById('ev-capacity')?.value;
   const req_reg = document.getElementById('ev-req-reg')?.checked;
+  const qr_refresh_val = document.getElementById('ev-qr-refresh')?.value;
 
   if (!title || !starts_at_val || !ends_at_val || !place || !category_id || !level) {
     alert("Iltimos, barcha majburiy maydonlarni to'ldiring!");
     return;
   }
+
+  const qr_refresh_seconds = Math.min(120, Math.max(5, Number(qr_refresh_val) || 30));
 
   try {
     const payload = {
@@ -2199,7 +2223,8 @@ async function submitCreateEvent() {
       category_id,
       level,
       capacity: capacity ? Number(capacity) : null,
-      requires_registration: Boolean(req_reg)
+      requires_registration: Boolean(req_reg),
+      qr_refresh_seconds
     };
 
     const res = await apiFetch('/api/events', {
@@ -2701,15 +2726,25 @@ async function showEventParticipantsModal(eventId) {
             </tr>
           </thead>
           <tbody>
-            ${list.map((p, idx) => `
+            ${list.map((p, idx) => {
+              const rawDate = p.checked_in_at || p.at || p.created_at;
+              let timeStr = '-';
+              if (rawDate) {
+                const d = new Date(rawDate);
+                if (!isNaN(d.getTime())) {
+                  timeStr = d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+                }
+              }
+              const stName = (p.student_name || p.full_name || (p.first_name ? `${p.first_name} ${p.last_name || ''}` : 'Talaba')).trim();
+              return `
               <tr>
                 <td>${idx + 1}</td>
-                <td style="font-weight: 600;">${p.student_name || p.full_name}</td>
-                <td><span class="badge badge-group">${p.group_code}</span></td>
-                <td style="color: var(--text-muted); font-size: 12px;">${new Date(p.checked_in_at || p.created_at).toLocaleString('uz-UZ')}</td>
+                <td style="font-weight: 600;">${stName}</td>
+                <td><span class="badge badge-group">${p.group_code || '-'}</span></td>
+                <td style="color: var(--text-muted); font-size: 12px;">${timeStr}</td>
                 <td><span class="badge" style="background:#ECFDF5; color:#059669; font-weight: 700;">+${p.points || 5}</span></td>
               </tr>
-            `).join('')}
+            `;}).join('')}
           </tbody>
         </table>
       </div>
@@ -3831,6 +3866,10 @@ function closeModal() {
   if (typeof window.stopStaffQrScanner === 'function') {
     try { window.stopStaffQrScanner(); } catch (e) {}
   }
+  if (window.eventQrTimer) {
+    clearInterval(window.eventQrTimer);
+    window.eventQrTimer = null;
+  }
   if (typeof currentModalPasteHandler === 'function') {
     window.removeEventListener('paste', currentModalPasteHandler);
     currentModalPasteHandler = null;
@@ -3916,47 +3955,166 @@ async function showStudentModal(studentId) {
   }
 }
 
-// Tadbir QR kodini ko'rish
+// Tadbir QR kodini ko'rish (Dinamik yangilanish & Boshqariladigan interval)
+window.eventQrTimer = null;
+window.currentQrTtl = 30;
+window.currentQrRemaining = 30;
+
 async function showEventQrModal(eventId) {
+  if (window.eventQrTimer) {
+    clearInterval(window.eventQrTimer);
+    window.eventQrTimer = null;
+  }
+
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = 'Tadbir Check-in QR Kodi';
+  modalTitle.textContent = '1-USUL: Jonli Tadbir QR Kodi';
   modalBody.innerHTML = '<div class="spinner"></div>';
   modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
   openModal();
 
   try {
     const res = await apiFetch(`/api/events/${eventId}/qr`);
+    const ttl = res.qr_refresh_seconds || res.ttl || 30;
+    window.currentQrTtl = ttl;
+    window.currentQrRemaining = ttl;
     const qrImg = res.qr_data_url || res.dataUrl;
+
     modalBody.innerHTML = `
-      <div style="text-align: center; padding: 16px;">
-        <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px; margin-bottom: 8px;">1-USUL: UMUMIY TADBIR QR KODI</span>
-        <h3 style="margin: 8px 0 6px 0; font-size: 18px;">${res.title || 'Tadbir'}</h3>
-        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px; max-width: 440px; margin-left: auto; margin-right: auto;">
-          Ushbu QR kodni auditoriya ekraniga yoki posterga chiqaring. Talabalar Telegram Mini App da skaner qilib avtomatik <strong>+${res.points || 5} ball</strong> oladilar.
+      <div style="text-align: center; padding: 12px 16px;">
+        <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px; margin-bottom: 6px;">1-USUL: UMUMIY TADBIR QR KODI (TALABA SKANERLAYDI)</span>
+        <h3 style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700;">${res.title || 'Tadbir'}</h3>
+        <p style="color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px; max-width: 460px; margin-left: auto; margin-right: auto;">
+          Talabalar Telegram Mini App dagi <strong>"📷 QR Check-in"</strong> orqali ushbu kodni skanerlab darhol <strong>+${res.points || 5} ball</strong> oladilar.
         </p>
-        <div style="background: white; padding: 16px; display: inline-block; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid var(--border-light);">
-          <img src="${qrImg}" alt="QR Kod" style="width: 250px; height: 250px; display: block; margin: 0 auto;">
+
+        <!-- Dinamik Yangilanish Paneli -->
+        <div style="margin-bottom: 12px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="text-align: left;">
+            <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #1E40AF; letter-spacing: 0.5px;">🔄 Dinamik Yangilanish</div>
+            <div style="font-size: 13px; font-weight: 700; color: #1E3A8A; margin-top: 1px;">
+              Yangi kodga: <span id="event-qr-countdown" style="font-family: monospace; font-size: 15px; color: #2563EB;">${ttl}s</span> qoldi
+            </div>
+          </div>
+          <!-- Intervalni Boshqarish (5s - 120s) -->
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label for="event-qr-interval-select" style="font-size: 12px; color: #475569; margin: 0; font-weight: 600;">Yangilanish vaqti:</label>
+            <select id="event-qr-interval-select" class="form-control" style="width: auto; padding: 4px 10px; font-size: 12px; font-weight: 700;" onchange="updateEventQrInterval('${eventId}', this.value)">
+              <option value="5" ${ttl === 5 ? 'selected' : ''}>5 soniya</option>
+              <option value="10" ${ttl === 10 ? 'selected' : ''}>10 soniya</option>
+              <option value="15" ${ttl === 15 ? 'selected' : ''}>15 soniya</option>
+              <option value="20" ${ttl === 20 ? 'selected' : ''}>20 soniya</option>
+              <option value="30" ${ttl === 30 ? 'selected' : ''}>30 soniya (standart)</option>
+              <option value="45" ${ttl === 45 ? 'selected' : ''}>45 soniya</option>
+              <option value="60" ${ttl === 60 ? 'selected' : ''}>1 daqiqa (60s)</option>
+              <option value="90" ${ttl === 90 ? 'selected' : ''}>1.5 daqiqa (90s)</option>
+              <option value="120" ${ttl === 120 ? 'selected' : ''}>2 daqiqa (120s)</option>
+            </select>
+          </div>
         </div>
 
-        <div style="margin-top: 16px; padding: 12px; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border-light); font-size: 12px; color: var(--text-secondary);">
-          🔄 Ushbu QR kod avtomatik yangilanadi va soxtalashtirishdan himoyalangan.
+        <!-- Animated Progress Bar -->
+        <div style="width: 100%; height: 5px; background: #E2E8F0; border-radius: 999px; overflow: hidden; margin-bottom: 14px;">
+          <div id="event-qr-progress" style="width: 100%; height: 100%; background: #2563EB; transition: width 1s linear;"></div>
+        </div>
+
+        <!-- QR Kod Tasviri -->
+        <div style="background: white; padding: 16px; display: inline-block; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid #E2E8F0;">
+          <img id="event-live-qr-img" src="${qrImg}" alt="Tadbir QR Kod" style="width: 250px; height: 250px; display: block; margin: 0 auto; border-radius: 6px;">
+        </div>
+
+        <div id="event-qr-status-msg" style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">
+          🛡️ QR kod har ${ttl} soniyada avtomatik yangilanib, rasmga tushirib uzatishdan (firibgarlikdan) himoyalaydi.
         </div>
       </div>
     `;
+
     modalFooter.innerHTML = `
       <button class="btn btn-primary" onclick="showStudentCheckinModal('${eventId}')" style="display:inline-flex; align-items:center; gap:6px;">
-        ${icon('qrCode', 14)} <span>2-Usul: Talaba QR Skanerlash</span>
+        ${icon('qrCode', 14)} <span>2-Usul: Talaba QR Skanerlash (Operativ)</span>
       </button>
-      <a href="${qrImg}" download="tadbir_qr_${eventId}.png" class="btn btn-outline">Yuklab Olish (PNG)</a>
+      <a id="event-qr-download-btn" href="${qrImg}" download="tadbir_qr_${eventId}.png" class="btn btn-outline">Yuklab Olish (PNG)</a>
       <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
     `;
+
+    startEventQrCountdown(eventId);
+
   } catch (e) {
     modalBody.innerHTML = `<p class="text-danger">${e.message}</p>`;
   }
 }
+
+function startEventQrCountdown(eventId) {
+  if (window.eventQrTimer) {
+    clearInterval(window.eventQrTimer);
+  }
+
+  window.eventQrTimer = setInterval(async () => {
+    window.currentQrRemaining--;
+
+    const countdownEl = document.getElementById('event-qr-countdown');
+    const progressEl = document.getElementById('event-qr-progress');
+
+    if (countdownEl) {
+      countdownEl.textContent = `${Math.max(0, window.currentQrRemaining)}s`;
+    }
+    if (progressEl && window.currentQrTtl > 0) {
+      const pct = (window.currentQrRemaining / window.currentQrTtl) * 100;
+      progressEl.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    }
+
+    if (window.currentQrRemaining <= 0) {
+      try {
+        const fresh = await apiFetch(`/api/events/${eventId}/qr`);
+        const imgEl = document.getElementById('event-live-qr-img');
+        const dwnBtn = document.getElementById('event-qr-download-btn');
+        const newImg = fresh.qr_data_url || fresh.dataUrl;
+        if (imgEl && newImg) imgEl.src = newImg;
+        if (dwnBtn && newImg) dwnBtn.href = newImg;
+      } catch (err) {
+        console.warn('QR auto refresh error:', err);
+      }
+      window.currentQrRemaining = window.currentQrTtl;
+      if (progressEl) progressEl.style.width = '100%';
+    }
+  }, 1000);
+}
+
+async function updateEventQrInterval(eventId, newSeconds) {
+  const val = Number(newSeconds);
+  if (isNaN(val) || val < 5 || val > 120) return;
+
+  try {
+    await apiFetch(`/api/events/${eventId}/qr-interval`, {
+      method: 'PUT',
+      body: JSON.stringify({ qr_refresh_seconds: val })
+    });
+
+    window.currentQrTtl = val;
+    window.currentQrRemaining = val;
+
+    const statusMsg = document.getElementById('event-qr-status-msg');
+    if (statusMsg) {
+      statusMsg.textContent = `✅ Yangilanish vaqti ${val} soniyaga o'zgartirildi!`;
+      statusMsg.style.color = '#059669';
+    }
+
+    const fresh = await apiFetch(`/api/events/${eventId}/qr`);
+    const imgEl = document.getElementById('event-live-qr-img');
+    const dwnBtn = document.getElementById('event-qr-download-btn');
+    const newImg = fresh.qr_data_url || fresh.dataUrl;
+    if (imgEl && newImg) imgEl.src = newImg;
+    if (dwnBtn && newImg) dwnBtn.href = newImg;
+
+    startEventQrCountdown(eventId);
+  } catch (err) {
+    alert("Xatolik: " + err.message);
+  }
+}
+window.updateEventQrInterval = updateEventQrInterval;
+window.showEventQrModal = showEventQrModal;
 
 // Qayta topshirish modali
 function showResubmitModal(entryId) {
@@ -5419,6 +5577,14 @@ async function showCreateStaffModal() {
     ];
   }
 
+  let allGroups = [];
+  try {
+    const gRes = await apiFetch('/api/admin/groups-list');
+    allGroups = gRes.groups || [];
+  } catch (e) {
+    allGroups = ['FMC01', 'FMC02', 'FMC03', 'FMC04', 'FMC05'];
+  }
+
   modalBody.innerHTML = `
     <form id="create-staff-form">
       <!-- Foto qismi -->
@@ -5485,8 +5651,16 @@ async function showCreateStaffModal() {
       </div>
 
       <div class="form-group mb-2">
-        <label class="form-label">Tyutor Guruhlari (vergul bilan, faqat Tyutor roli tanlanganda):</label>
-        <input type="text" id="new-staff-tutor-groups" class="form-control" placeholder="FMC01, FMC02">
+        <label class="form-label" style="font-weight: 700; color: var(--text-main);">Tyutor Biriktirilgan Guruhlari (Select / Tanlang):</label>
+        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px;">Tyutor roli tanlanganda tegishli guruhlarni belgilang:</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 120px; overflow-y: auto; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0;">
+          ${allGroups.map(g => `
+            <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #CBD5E1; padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 600; user-select: none;">
+              <input type="checkbox" name="new-staff-groups-checkbox" value="${g}" onchange="this.parentElement.style.background = this.checked ? '#EFF6FF' : 'white'; this.parentElement.style.borderColor = this.checked ? '#3B82F6' : '#CBD5E1';">
+              <span>${g}</span>
+            </label>
+          `).join('')}
+        </div>
       </div>
     </form>
   `;
@@ -5513,8 +5687,9 @@ async function handleCreateStaffSubmit() {
     .map(cb => cb.value)
     .filter(r => r && r !== 'undefined');
 
-  const rawGroups = document.getElementById('new-staff-tutor-groups')?.value.trim();
-  const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
+  const tutor_groups = Array.from(document.querySelectorAll(`input[name="new-staff-groups-checkbox"]:checked`))
+    .map(cb => cb.value.trim())
+    .filter(Boolean);
 
   if (!username || !password || !full_name) {
     alert("Login, Parol va F.I.Sh kiritilishi shart!");
@@ -5574,6 +5749,14 @@ async function showEditStaffModal(userId) {
       { key: 'tutor', id: 'tutor', name: 'Tyutor', desc: 'Talabalarga ball kiritish va monitoring' },
       { key: 'observer', id: 'observer', name: 'Kuzatuvchi (Rektorat)', desc: 'Monitoring va Katta ekran (TV)' }
     ];
+  }
+
+  let allGroups = [];
+  try {
+    const gRes = await apiFetch('/api/admin/groups-list');
+    allGroups = gRes.groups || [];
+  } catch (e) {
+    allGroups = ['FMC01', 'FMC02', 'FMC03', 'FMC04', 'FMC05'];
   }
 
   modalBody.innerHTML = `
@@ -5648,18 +5831,28 @@ async function showEditStaffModal(userId) {
         </div>
       </div>
 
-      <div class="grid grid-2 mb-2">
-        <div class="form-group">
-          <label class="form-label">Tyutor Guruhlari (vergul bilan):</label>
-          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${userGroups.join(', ')}" placeholder="FMC01, FMC02">
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight: 700; color: var(--text-main);">Tyutor Biriktirilgan Guruhlari (Select / Tanlang):</label>
+        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px;">Ushbu xodim qaysi guruhlarga tyutorlik qilishini belgilang:</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 120px; overflow-y: auto; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0;">
+          ${allGroups.map(g => {
+            const isSel = (userGroups || []).includes(g);
+            return `
+              <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; background: ${isSel ? '#EFF6FF' : 'white'}; border: 1px solid ${isSel ? '#3B82F6' : '#CBD5E1'}; padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 600; user-select: none;">
+                <input type="checkbox" name="edit-staff-groups-checkbox" value="${g}" ${isSel ? 'checked' : ''} onchange="this.parentElement.style.background = this.checked ? '#EFF6FF' : 'white'; this.parentElement.style.borderColor = this.checked ? '#3B82F6' : '#CBD5E1';">
+                <span>${g}</span>
+              </label>
+            `;
+          }).join('')}
         </div>
-        <div class="form-group">
-          <label class="form-label">Xodimning Tizimdagi Holati</label>
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer; font-weight: 600;">
-            <input type="checkbox" id="edit-staff-active" ${isActive ? 'checked' : ''}>
-            <span>Faol (Tizimga kirishga to'liq ruxsat)</span>
-          </label>
-        </div>
+      </div>
+
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-weight: 600;">Xodimning Tizimdagi Holati</label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 4px; cursor: pointer; font-weight: 600;">
+          <input type="checkbox" id="edit-staff-active" ${isActive ? 'checked' : ''}>
+          <span>Faol (Tizimga kirishga to'liq ruxsat)</span>
+        </label>
       </div>
     </form>
   `;
@@ -5725,8 +5918,9 @@ async function handleEditStaffSubmit(userId) {
     .map(cb => cb.value)
     .filter(r => r && r !== 'undefined');
 
-  const rawGroups = document.getElementById('edit-staff-tutor-groups')?.value.trim();
-  const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
+  const tutor_groups = Array.from(document.querySelectorAll(`input[name="edit-staff-groups-checkbox"]:checked`))
+    .map(cb => cb.value.trim())
+    .filter(Boolean);
 
   if (!full_name) {
     alert("F.I.Sh kiritilishi shart!");

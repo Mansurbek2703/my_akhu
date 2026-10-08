@@ -46,6 +46,14 @@ function initSchema() {
         db.exec('ALTER TABLE student ADD COLUMN photo_url TEXT;');
       }
     } catch (e) {}
+
+    // Migration: ensure qr_refresh_seconds exists on event
+    try {
+      const cols = db.pragma('table_info(event)').map(c => c.name);
+      if (!cols.includes('qr_refresh_seconds')) {
+        db.exec('ALTER TABLE event ADD COLUMN qr_refresh_seconds INTEGER DEFAULT 30;');
+      }
+    } catch (e) {}
   }
 
 module.exports = {
