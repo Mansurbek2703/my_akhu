@@ -120,11 +120,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLoginForm();
   await loadCatalogData();
   
-  // Agar xodim kirmagan bo'lsa, har doim observe-dashboard ochiq portaliga o'tadi
-  if (!AppState.isLoggedIn && !AppState.currentPage.startsWith('observe-')) {
+  // Boshlang'ich sahifani aniqlash (Hash yoki localStorage orqali tiklash)
+  const hashPage = (window.location.hash || '').replace(/^#/, '').trim();
+  const savedPage = localStorage.getItem('akhu_current_page');
+  const targetPage = hashPage || savedPage || 'observe-dashboard';
+
+  // Agar xodim kirmagan bo'lsa va sahifa yopiq xodimlar bo'limi bo'lsa
+  if (!AppState.isLoggedIn && !targetPage.startsWith('observe-')) {
     AppState.currentPage = 'observe-dashboard';
+  } else {
+    AppState.currentPage = targetPage;
   }
   navigateTo(AppState.currentPage);
+
+  // Hash o'zgarganda sahifani avtomatik almashtirish (Browser Back/Forward)
+  window.addEventListener('hashchange', () => {
+    const curHash = (window.location.hash || '').replace(/^#/, '').trim();
+    if (curHash && curHash !== AppState.currentPage) {
+      navigateTo(curHash);
+    }
+  });
 
   // Hodimlar kirishi tugmasi (to'g'ridan-to'g'ri tinglovchi)
   const loginBtn = document.getElementById('btn-login-modal');
@@ -199,6 +214,7 @@ function updateAuthUI() {
 function logoutStaffUser() {
   if (confirm("Haqiqatan ham tizimdan chiqmoqchimisiz?")) {
     localStorage.removeItem('akhu_auth_user');
+    localStorage.removeItem('akhu_current_page');
     AppState.isLoggedIn = false;
     AppState.currentRole = 'observer';
     AppState.user = {
@@ -208,6 +224,7 @@ function logoutStaffUser() {
     };
     updateAuthUI();
     updateSidebarPermissions();
+    window.location.hash = '#observe-dashboard';
     navigateTo('observe-dashboard');
   }
 }
@@ -379,6 +396,12 @@ function navigateTo(pageName) {
   }
 
   AppState.currentPage = pageName;
+  localStorage.setItem('akhu_current_page', pageName);
+  try {
+    if (window.location.hash !== '#' + pageName) {
+      history.replaceState(null, '', '#' + pageName);
+    }
+  } catch (e) {}
 
   document.querySelectorAll('.sidebar-nav a.nav-item').forEach(link => {
     if (link.getAttribute('data-page') === pageName) {
@@ -4218,7 +4241,7 @@ async function loadStaffUsersList() {
 
     // Metrikalar
     const total = adminStaffState.users.length;
-    const active = adminStaffState.users.filter(u => u.is_active).length;
+    const active = adminStaffState.users.filter(u => (u.is_active !== undefined ? Boolean(u.is_active) : (u.active === 1))).length;
     const tutors = adminStaffState.users.filter(u => (u.roles || []).includes('tutor')).length;
     const depts = adminStaffState.users.filter(u => (u.roles || []).some(r => r.startsWith('dep_'))).length;
 
@@ -4272,7 +4295,8 @@ function renderStaffTableRows() {
 
   tbody.innerHTML = filtered.map(u => {
     const initials = (u.full_name || '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-    const isActive = Boolean(u.is_active);
+    const isActive = (u.is_active !== undefined) ? Boolean(u.is_active) : (u.active === 1);
+    const groups = u.tutor_groups || u.groups || [];
 
     const roleBadges = (u.roles || []).map(r => {
       let bg = '#F1F5F9', color = '#475569', label = r;
@@ -4283,7 +4307,7 @@ function renderStaffTableRows() {
       return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.06);">${label}</span>`;
     }).join('');
 
-    const groupBadges = (u.tutor_groups || []).map(g => `<span class="badge badge-group" style="margin-right:4px;">${g}</span>`).join('') || '<span style="color:#94A3B8; font-size:11px;">-</span>';
+    const groupBadges = groups.map(g => `<span class="badge badge-group" style="margin-right:4px;">${g}</span>`).join('') || '<span style="color:#94A3B8; font-size:11px;">-</span>';
 
     return `
       <tr>
@@ -4292,7 +4316,7 @@ function renderStaffTableRows() {
             <span class="avatar-badge">${initials || 'X'}</span>
             <div>
               <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${u.full_name}</div>
-              <div class="table-sub-text">@${u.username}</div>
+              <div class="table-sub-text">@${u.username || u.id}</div>
             </div>
           </div>
         </td>
@@ -4440,7 +4464,7 @@ async function handleCreateStaffSubmit() {
     await apiFetch('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify({
-        username, password, full_name, email, phone, roles, tutor_groups
+        username, password, full_name, email, phone, roles, tutor_groups, groups: tutor_groups
       })
     });
 
@@ -4454,8 +4478,11 @@ async function handleCreateStaffSubmit() {
 
 // XODIMNI TAHRIRLASH
 async function showEditStaffModal(userId) {
-  const user = adminStaffState.users.find(u => u.id === userId);
+  const user = adminStaffState.users.find(u => String(u.id) === String(userId));
   if (!user) return;
+
+  const isActive = (user.is_active !== undefined) ? Boolean(user.is_active) : (user.active === 1);
+  const userGroups = user.tutor_groups || user.groups || [];
 
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
@@ -4518,13 +4545,13 @@ async function showEditStaffModal(userId) {
 
       <div class="grid grid-2 mb-2">
         <div class="form-group">
-          <label class="form-label">Tyutor Guruhlari:</label>
-          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${(user.tutor_groups || []).join(', ')}">
+          <label class="form-label">Tyutor Guruhlari (vergul bilan):</label>
+          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${userGroups.join(', ')}">
         </div>
         <div class="form-group">
           <label class="form-label">Holati</label>
           <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer;">
-            <input type="checkbox" id="edit-staff-active" ${user.is_active ? 'checked' : ''}>
+            <input type="checkbox" id="edit-staff-active" ${isActive ? 'checked' : ''}>
             <span>Faol (Tizimga kirishga ruxsat)</span>
           </label>
         </div>
@@ -4567,9 +4594,18 @@ async function handleEditStaffSubmit(userId) {
 
   try {
     const payload = {
-      full_name, email, phone, is_active, roles, tutor_groups
+      full_name,
+      email,
+      phone,
+      active: is_active,
+      is_active: is_active === 1,
+      roles,
+      tutor_groups,
+      groups: tutor_groups
     };
-    if (password) payload.password = password;
+    if (password && String(password).trim().length > 0) {
+      payload.password = String(password).trim();
+    }
 
     await apiFetch(`/api/admin/users/${userId}`, {
       method: 'PUT',
@@ -4577,7 +4613,7 @@ async function handleEditStaffSubmit(userId) {
     });
 
     closeModal();
-    alert("Xodim ma'lumotlari va rollari yangilandi!");
+    alert("Xodim ma'lumotlari va rollari muvaffaqiyatli yangilandi!");
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
@@ -4591,10 +4627,11 @@ async function toggleStaffStatus(userId, currentActive) {
   if (!confirm(`Xodim ${actionText}?`)) return;
 
   try {
-    await apiFetch(`/api/admin/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ is_active: newActive })
+    await apiFetch(`/api/admin/users/${userId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ active: newActive })
     });
+    alert(`Xodim holati ${newActive ? 'faollashtirildi' : 'bloklandi'}!`);
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
@@ -4602,18 +4639,26 @@ async function toggleStaffStatus(userId, currentActive) {
 }
 
 async function deleteStaffUser(userId, fullName) {
-  if (!confirm(`Haqiqatan ham "${fullName}" xodimi tizimdan o'chirilsinmi?`)) return;
+  if (!confirm(`Haqiqatan ham "${fullName}" xodimi tizimdan butunlay o'chirilsinmi?`)) return;
 
   try {
     await apiFetch(`/api/admin/users/${userId}`, {
       method: 'DELETE'
     });
-    alert("Xodim o'chirildi");
+    alert("Xodim muvaffaqiyatli o'chirildi!");
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
   }
 }
+
+window.showCreateStaffModal = showCreateStaffModal;
+window.handleCreateStaffSubmit = handleCreateStaffSubmit;
+window.showEditStaffModal = showEditStaffModal;
+window.handleEditStaffSubmit = handleEditStaffSubmit;
+window.toggleStaffStatus = toggleStaffStatus;
+window.deleteStaffUser = deleteStaffUser;
+window.resetStaffFilters = resetStaffFilters;
 
 // ====================================================================
 // SUPERADMIN: XODIM SIFATIDA TIZIMNI TEKSHIRISH (IMPERSONATION)

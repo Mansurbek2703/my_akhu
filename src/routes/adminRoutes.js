@@ -789,6 +789,8 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
 
     return {
       ...u,
+      is_active: u.active === 1,
+      tutor_groups: groups,
       roles,
       groups,
       password_hash: undefined // maxfiy
@@ -904,6 +906,8 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       password
     } = req.body;
 
+    const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
+    const newEmail = email !== undefined ? String(email).trim() : user.email;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
@@ -915,20 +919,23 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         passHash = bcrypt.hashSync(String(password).trim(), 8);
       }
 
-      const updatedRoles = roles !== undefined ? JSON.stringify(roles) : user.roles;
+      let updatedRoles = user.roles;
+      if (roles !== undefined) {
+        updatedRoles = typeof roles === 'string' ? roles : JSON.stringify(roles);
+      }
 
       db.prepare(`
         UPDATE staff_user
-        SET full_name = COALESCE(?, full_name),
-          email = COALESCE(?, email),
+        SET full_name = ?,
+          email = ?,
           roles = ?,
           telegram_user_id = ?,
           active = ?,
           password_hash = ?
         WHERE id = ?
       `).run(
-        full_name,
-        email,
+        newFullName,
+        newEmail,
         updatedRoles,
         tgId,
         activeVal,
@@ -939,7 +946,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       // Tyutor guruhlarini yangilash
       if (targetGroups !== undefined && Array.isArray(targetGroups)) {
         db.prepare(`DELETE FROM tutor_group WHERE tutor_id = ?`).run(req.params.id);
-        const stmtGroup = db.prepare(`INSERT INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
+        const stmtGroup = db.prepare(`INSERT OR REPLACE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
         for (const g of targetGroups) {
           if (String(g).trim()) stmtGroup.run(req.params.id, String(g).trim());
         }
@@ -952,7 +959,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         object_type: 'staff_user',
         object_id: req.params.id,
         before: { full_name: user.full_name, roles: user.roles, active: user.active },
-        after: req.body,
+        after: { full_name: newFullName, email: newEmail, roles: updatedRoles, active: activeVal, groups: targetGroups },
         ip: req.ip || '127.0.0.1'
       });
     })();
@@ -964,8 +971,37 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
 });
 
 /**
+ * POST /api/admin/users/:id/status
+ * Xodim statusini faol/blok holatiga o'tkazish
+ */
+router.post('/users/:id/status', authenticateSuperadmin, (req, res) => {
+  try {
+    const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
+
+    const newActive = req.body.active !== undefined ? (req.body.active ? 1 : 0) : (user.active === 1 ? 0 : 1);
+    db.prepare(`UPDATE staff_user SET active = ? WHERE id = ?`).run(newActive, req.params.id);
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: 'superadmin',
+      action: newActive ? 'ACTIVATE_STAFF_USER' : 'DEACTIVATE_STAFF_USER',
+      object_type: 'staff_user',
+      object_id: req.params.id,
+      before: { active: user.active },
+      after: { active: newActive },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, active: newActive, message: `Xodim holati ${newActive ? 'faollashtirildi' : 'bloklandi'}` });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * DELETE /api/admin/users/:id
- * Xodimni o'chirish yoki nofaol qilish
+ * Xodimni tizimdan to'liq o'chirish (Superadmin)
  */
 router.delete('/users/:id', authenticateSuperadmin, (req, res) => {
   try {
@@ -973,18 +1009,29 @@ router.delete('/users/:id', authenticateSuperadmin, (req, res) => {
       return res.status(400).json({ error: 'Asosiy superadmin hisobini o\'chirib bo\'lmaydi' });
     }
 
-    db.prepare(`UPDATE staff_user SET active = 0 WHERE id = ?`).run(req.params.id);
+    const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
 
-    logAudit({
-      actor_id: req.staffUser.id,
-      actor_role: 'superadmin',
-      action: 'DEACTIVATE_STAFF_USER',
-      object_type: 'staff_user',
-      object_id: req.params.id,
-      ip: req.ip || '127.0.0.1'
-    });
+    db.transaction(() => {
+      // 1. Tyutor guruhlarini tozalash
+      db.prepare(`DELETE FROM tutor_group WHERE tutor_id = ?`).run(req.params.id);
+      // 2. Talabalardagi tutor_id ni bo'shatish
+      db.prepare(`UPDATE student SET tutor_id = NULL WHERE tutor_id = ?`).run(req.params.id);
+      // 3. Xodimni bazadan butunlay o'chirish
+      db.prepare(`DELETE FROM staff_user WHERE id = ?`).run(req.params.id);
 
-    res.json({ success: true, message: 'Xodim hisobi nofaol qilindi' });
+      logAudit({
+        actor_id: req.staffUser.id,
+        actor_role: 'superadmin',
+        action: 'DELETE_STAFF_USER',
+        object_type: 'staff_user',
+        object_id: req.params.id,
+        before: { full_name: user.full_name, email: user.email, roles: user.roles },
+        ip: req.ip || '127.0.0.1'
+      });
+    })();
+
+    res.json({ success: true, message: 'Xodim tizimdan butunlay o\'chirildi' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

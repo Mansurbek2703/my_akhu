@@ -160,22 +160,6 @@
         <strong style="color: #10B981;">✅ Bog'langan</strong>
       </div>
     </div>
-
-    <!-- TEST TALABANI TANLASH (Demo & Review) -->
-    <div style="background: white; border-radius: 16px; padding: 18px; border: 1px solid #E2E8F0;">
-      <h4 style="font-size: 14px; margin-bottom: 8px;">Talabani almashtirish (Demo):</h4>
-      <select id="select-demo-student" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #CBD5E1; font-size: 13px;">
-        <option value="std_mansurbek" selected>Mansurbek Qazaqov (ADMIN-01 / Superadmin)</option>
-        <option value="std_01">Diyorbek Ismoilov (210-21)</option>
-        <option value="std_02">Malika Nazarova (210-21)</option>
-        <option value="std_03">Otabek Xalilov (210-22)</option>
-        <option value="std_07">Bekzod Rahimov (211-22)</option>
-        <option value="std_11">Umidbek Sultonov (M-101 / Magistr)</option>
-      </select>
-      <button onclick="switchDemoStudent()" style="width: 100%; margin-top: 10px; background: #2563EB; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer;">
-        Profilni Yuklash
-      </button>
-    </div>
   </div>
 
   <!-- BOTTOM NAVIGATION -->
@@ -485,12 +469,6 @@
       }
     }
 
-    function switchDemoStudent() {
-      const selectedId = document.getElementById('select-demo-student').value;
-      localStorage.setItem('akhu_test_student_id', selectedId);
-      localStorage.removeItem('akhu_student_token');
-      location.reload();
-    }
   </script>
 </body>
 </html>
