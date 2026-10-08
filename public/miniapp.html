@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/miniapp.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/js/html5-qrcode.min.js"></script>
 </head>
 <body>
   <!-- HEADER -->
@@ -188,23 +189,26 @@
 
   <!-- QR SCANNER MODAL -->
   <div class="qr-modal" id="qr-scanner-modal">
-    <div style="text-align: center; color: white; margin-bottom: 20px;">
-      <h3 style="font-size: 18px; margin-bottom: 4px;">Tadbir QR Kodini Skanerlang</h3>
-      <p style="font-size: 12px; color: #94A3B8;">Kamerani tadbir ekrani yoki plakatiga qarating</p>
+    <div style="text-align: center; color: white; margin-bottom: 14px; width: 100%; max-width: 320px;">
+      <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 4px;">📷 Tadbir QR Kodini Skanerlang</h3>
+      <p id="miniapp-scan-status" style="font-size: 12px; color: #94A3B8;">Kamerani tadbir ekrani yoki plakatiga qarating</p>
     </div>
 
-    <div class="qr-scanner-box">
-      <div class="scanner-laser"></div>
+    <!-- Kamera oynasi -->
+    <div style="width: 100%; max-width: 290px; border-radius: 20px; overflow: hidden; background: #000; box-shadow: 0 0 30px rgba(56, 189, 248, 0.4); border: 2px solid #38BDF8; position: relative;">
+      <div id="miniapp-camera-view" style="width: 100%; min-height: 260px;"></div>
     </div>
 
-    <!-- Qo'lda kod kiritish (Fallback) -->
-    <div style="margin-top: 24px; width: 100%; max-width: 280px;">
-      <input type="text" id="manual-qr-payload" placeholder="QR kod matni yoki tadbir kodi..." style="width: 100%; padding: 10px; border-radius: 10px; border: none; font-size: 13px; margin-bottom: 8px; text-align: center;">
-      <button onclick="submitManualCheckin()" style="width: 100%; background: #38BDF8; color: #0F172A; font-weight: 700; border: none; padding: 10px; border-radius: 10px; cursor: pointer; margin-bottom: 8px;">
-        Tekshirish & Check-in
-      </button>
-      <button onclick="closeQrScannerModal()" style="width: 100%; background: transparent; color: white; border: 1px solid rgba(255,255,255,0.3); padding: 10px; border-radius: 10px; cursor: pointer;">
-        Yopish
+    <!-- Qo'lda kod kiritish va yopish -->
+    <div style="margin-top: 16px; width: 100%; max-width: 290px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; gap: 6px;">
+        <input type="text" id="manual-qr-payload" placeholder="QR kod matni yoki tadbir kodi..." style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.12); color: white; font-size: 13px; text-align: center; outline: none;">
+        <button onclick="submitManualCheckin()" style="background: #38BDF8; color: #0F172A; font-weight: 700; border: none; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: 13px;">
+          Qabul
+        </button>
+      </div>
+      <button onclick="closeQrScannerModal()" style="width: 100%; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 10px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;">
+        ✕ Yopish
       </button>
     </div>
   </div>
@@ -437,18 +441,93 @@
       if (tabName === 'qr') loadStudentQr();
     }
 
-    function openQrScannerModal() {
+    let miniAppQrScanner = null;
+    let isProcessingScan = false;
+
+    async function openQrScannerModal() {
+      // 1. Agar Telegram mobil mijozida bo'lsa, Telegramning o'z tezkor kamerasini ishga tushirish
+      if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.showScanQrPopup === 'function') {
+        try {
+          window.Telegram.WebApp.showScanQrPopup({
+            text: "Tadbir QR kodini kameraga qarating"
+          }, async (scannedText) => {
+            if (scannedText) {
+              window.Telegram.WebApp.closeScanQrPopup();
+              await executeCheckin(scannedText);
+              return true;
+            }
+          });
+          return;
+        } catch (tgErr) {
+          console.warn("Telegram popup ochilmadi, ichki kameraga o'tilmoqda:", tgErr);
+        }
+      }
+
+      // 2. Aks holda Web modal va Html5Qrcode kamerani ochish
       document.getElementById('qr-scanner-modal').style.display = 'flex';
+      await startMiniappScanner();
     }
 
-    function closeQrScannerModal() {
+    async function startMiniappScanner() {
+      const statusEl = document.getElementById('miniapp-scan-status');
+      try {
+        if (statusEl) statusEl.textContent = '📷 Kamera yoqilmoqda...';
+
+        if (!miniAppQrScanner && window.Html5Qrcode) {
+          miniAppQrScanner = new Html5Qrcode('miniapp-camera-view');
+        }
+
+        if (miniAppQrScanner) {
+          await miniAppQrScanner.start(
+            { facingMode: 'environment' },
+            {
+              fps: 15,
+              qrbox: { width: 220, height: 220 },
+              aspectRatio: 1.0
+            },
+            async (decodedText) => {
+              if (isProcessingScan) return;
+              isProcessingScan = true;
+              await stopMiniappScanner();
+              closeQrScannerModal();
+              await executeCheckin(decodedText);
+              isProcessingScan = false;
+            },
+            () => {} // Frame error ignor qilinadi
+          );
+          if (statusEl) statusEl.textContent = 'Kamerani tadbir QR kodiga qarating';
+        }
+      } catch (err) {
+        console.error('Kamera xatosi:', err);
+        if (statusEl) {
+          statusEl.textContent = 'Kamera ochilmadi (ruxsat berilmagan). Quyida kodni qo\'lda kiriting:';
+          statusEl.style.color = '#F87171';
+        }
+      }
+    }
+
+    async function stopMiniappScanner() {
+      if (miniAppQrScanner) {
+        try {
+          await miniAppQrScanner.stop();
+        } catch (e) {
+          // ignore already stopped
+        }
+      }
+    }
+
+    async function closeQrScannerModal() {
+      await stopMiniappScanner();
       document.getElementById('qr-scanner-modal').style.display = 'none';
+      const statusEl = document.getElementById('miniapp-scan-status');
+      if (statusEl) {
+        statusEl.textContent = 'Kamerani tadbir ekrani yoki plakatiga qarating';
+        statusEl.style.color = '#94A3B8';
+      }
     }
 
-    async function submitManualCheckin() {
-      const qrPayload = document.getElementById('manual-qr-payload').value.trim();
-      if (!qrPayload) return alert('Iltimos, QR kodni kiriting!');
-
+    async function executeCheckin(qrPayload) {
+      if (!qrPayload) return;
       try {
         const res = await fetch('/api/app/checkin', {
           method: 'POST',
@@ -456,17 +535,25 @@
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${currentAuthToken}`
           },
-          body: JSON.stringify({ qr_payload: qrPayload })
+          body: JSON.stringify({ qr_payload: qrPayload.trim() })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) throw new Error(data.error || 'Qabul qilinmadi');
 
         alert(`🎉 ${data.message} (+${data.points} ball)`);
-        closeQrScannerModal();
         await loadStudentDashboard();
       } catch (e) {
         alert(`❌ Check-in xatosi: ${e.message}`);
       }
+    }
+
+    async function submitManualCheckin() {
+      const qrPayload = document.getElementById('manual-qr-payload').value.trim();
+      if (!qrPayload) return alert('Iltimos, QR kodni kiriting!');
+
+      await closeQrScannerModal();
+      await executeCheckin(qrPayload);
+      document.getElementById('manual-qr-payload').value = '';
     }
 
   </script>

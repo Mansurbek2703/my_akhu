@@ -2217,12 +2217,255 @@ async function submitCreateEvent() {
 }
 
 // 2-USUL: Xodim Talabaning QR Kodini yoki ID sini skanerlab qabul qilishi
+// ====================================================================
+// 2-USUL: Xodim Talabaning QR Kodini Jonli Kamera yoki ID bilan Skanerlab Qabul Qilishi
+// ====================================================================
+window.staffHtml5QrScanner = null;
+window.staffScanCooldown = false;
+window.isStaffCameraRunning = false;
+
+function playScannerSound(isSuccess = true) {
+  const soundToggle = document.getElementById('staff-sound-toggle');
+  if (soundToggle && !soundToggle.checked) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (isSuccess) {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.18);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.22);
+    }
+  } catch (e) {}
+}
+
+async function stopStaffQrScanner() {
+  if (window.staffHtml5QrScanner && window.isStaffCameraRunning) {
+    try {
+      await window.staffHtml5QrScanner.stop();
+    } catch (e) {}
+  }
+  window.isStaffCameraRunning = false;
+  const statusEl = document.getElementById('staff-scanner-status');
+  const toggleBtn = document.getElementById('btn-toggle-camera');
+  if (statusEl) {
+    statusEl.textContent = '⏹️ Jonli kamera to\'xtatilgan';
+    statusEl.style.color = 'var(--text-muted)';
+  }
+  if (toggleBtn) toggleBtn.innerHTML = `▶️ Kamerani Yoqish`;
+}
+window.stopStaffQrScanner = stopStaffQrScanner;
+
+async function startStaffQrScanner() {
+  const readerEl = document.getElementById('staff-qr-reader');
+  const statusEl = document.getElementById('staff-scanner-status');
+  const toggleBtn = document.getElementById('btn-toggle-camera');
+  if (!readerEl) return;
+
+  if (window.staffHtml5QrScanner && window.isStaffCameraRunning) {
+    return;
+  }
+
+  try {
+    if (statusEl) {
+      statusEl.textContent = '📷 Jonli kamera ishga tushirilmoqda...';
+      statusEl.style.color = '#2563EB';
+    }
+
+    if (!window.staffHtml5QrScanner && window.Html5Qrcode) {
+      window.staffHtml5QrScanner = new Html5Qrcode('staff-qr-reader');
+    }
+
+    if (!window.staffHtml5QrScanner) {
+      if (statusEl) statusEl.textContent = 'Kamera moduli topilmadi (brauzerni yangilang)';
+      return;
+    }
+
+    await window.staffHtml5QrScanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 15,
+        qrbox: { width: 220, height: 220 },
+        aspectRatio: 1.0
+      },
+      async (decodedText) => {
+        await handleStaffScannedCode(decodedText);
+      },
+      () => {}
+    );
+
+    window.isStaffCameraRunning = true;
+    if (statusEl) {
+      statusEl.textContent = '🟢 Jonli skaner faol — navbatdagi talaba QR kodini ko\'rsating...';
+      statusEl.style.color = '#059669';
+    }
+    if (toggleBtn) toggleBtn.innerHTML = `⏹️ Kamerani To'xtatish`;
+  } catch (err) {
+    console.error('Staff camera error:', err);
+    window.isStaffCameraRunning = false;
+    if (statusEl) {
+      statusEl.textContent = '❌ Kamerani ochib bo\'lmadi (ruxsat berilmagan yoki HTTPS talab qilinadi).';
+      statusEl.style.color = '#DC2626';
+    }
+    if (toggleBtn) toggleBtn.innerHTML = `▶️ Qayta Urinish`;
+  }
+}
+window.startStaffQrScanner = startStaffQrScanner;
+
+async function toggleStaffCamera() {
+  if (window.isStaffCameraRunning) {
+    await stopStaffQrScanner();
+  } else {
+    await startStaffQrScanner();
+  }
+}
+window.toggleStaffCamera = toggleStaffCamera;
+
+async function handleStaffScannedCode(code) {
+  if (window.staffScanCooldown) return;
+  window.staffScanCooldown = true;
+
+  const eventId = document.getElementById('checkin-event-id')?.value;
+  const flashEl = document.getElementById('staff-live-flash');
+  const statusEl = document.getElementById('staff-scanner-status');
+
+  if (!eventId) {
+    window.staffScanCooldown = false;
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = '⏳ Skanerlandi, ma\'lumot tekshirilmoqda...';
+    statusEl.style.color = '#D97706';
+  }
+
+  try {
+    const res = await apiFetch(`/api/events/${eventId}/checkin-student`, {
+      method: 'POST',
+      body: JSON.stringify({
+        qr_payload: code,
+        student_query: code
+      })
+    });
+
+    playScannerSound(true);
+
+    if (flashEl) {
+      flashEl.style.display = 'block';
+      flashEl.style.background = '#ECFDF5';
+      flashEl.style.border = '1px solid #6EE7B7';
+      flashEl.style.color = '#065F46';
+      flashEl.innerHTML = `
+        <div style="font-weight: 700; font-size: 14px;">✅ Muvaffaqiyatli qabul qilindi!</div>
+        <div style="font-size: 13px; margin-top: 2px;">
+          <strong>${res.student.first_name} ${res.student.last_name}</strong> (${res.student.group_code}) talabaga <strong>+${res.points} ball</strong> berildi!
+        </div>
+      `;
+    }
+
+    if (statusEl) {
+      statusEl.textContent = `✅ ${res.student.first_name} ${res.student.last_name} qabul qilindi! Keyingi talaba...`;
+      statusEl.style.color = '#059669';
+    }
+
+    loadEventRecentCheckins(eventId);
+
+    // 1.5 soniyalik pauzadan keyin navbatdagi talabani skanerlashga tayyor
+    setTimeout(() => {
+      window.staffScanCooldown = false;
+      if (statusEl && window.isStaffCameraRunning) {
+        statusEl.textContent = '🟢 Jonli skaner faol — navbatdagi talaba QR kodini ko\'rsating...';
+        statusEl.style.color = '#059669';
+      }
+    }, 1500);
+
+  } catch (err) {
+    playScannerSound(false);
+
+    if (flashEl) {
+      flashEl.style.display = 'block';
+      flashEl.style.background = '#FEF2F2';
+      flashEl.style.border = '1px solid #FCA5A5';
+      flashEl.style.color = '#991B1B';
+      flashEl.innerHTML = `<strong>⚠️ Ogohlantirish:</strong> ${err.message}`;
+    }
+
+    if (statusEl) {
+      statusEl.textContent = `⚠️ Xatolik yuz berdi. Qayta urinib ko'ring...`;
+      statusEl.style.color = '#DC2626';
+    }
+
+    // 1.8 soniyalik pauzadan keyin qayta skanerlashga tayyor
+    setTimeout(() => {
+      window.staffScanCooldown = false;
+      if (statusEl && window.isStaffCameraRunning) {
+        statusEl.textContent = '🟢 Jonli skaner faol — navbatdagi talaba QR kodini ko\'rsating...';
+        statusEl.style.color = '#059669';
+      }
+    }, 1800);
+  }
+}
+window.handleStaffScannedCode = handleStaffScannedCode;
+
+function switchStaffCheckinMode(mode) {
+  const camBox = document.getElementById('staff-camera-box');
+  const manBox = document.getElementById('staff-manual-box');
+  const tabCam = document.getElementById('btn-tab-scanner');
+  const tabMan = document.getElementById('btn-tab-manual');
+
+  if (mode === 'camera') {
+    if (camBox) camBox.style.display = 'block';
+    if (manBox) manBox.style.display = 'none';
+    if (tabCam) {
+      tabCam.classList.add('active', 'btn-primary');
+      tabCam.classList.remove('btn-outline');
+    }
+    if (tabMan) {
+      tabMan.classList.remove('active', 'btn-primary');
+      tabMan.classList.add('btn-outline');
+    }
+    startStaffQrScanner();
+  } else {
+    stopStaffQrScanner();
+    if (camBox) camBox.style.display = 'none';
+    if (manBox) manBox.style.display = 'block';
+    if (tabMan) {
+      tabMan.classList.add('active', 'btn-primary');
+      tabMan.classList.remove('btn-outline');
+    }
+    if (tabCam) {
+      tabCam.classList.remove('active', 'btn-primary');
+      tabCam.classList.add('btn-outline');
+    }
+    setTimeout(() => {
+      document.getElementById('checkin-query-input')?.focus();
+    }, 80);
+  }
+}
+window.switchStaffCheckinMode = switchStaffCheckinMode;
+
 async function showStudentCheckinModal(preselectedEventId = '') {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('qrCode', 18)} 2-USUL: Talabani Qabul Qilish (Check-in & Ball Berish)</span>`;
+  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('qrCode', 18)} 2-USUL: Talabani Qabul Qilish (Operativ Jonli Check-in)</span>`;
 
   let events = [];
   try {
@@ -2244,15 +2487,9 @@ async function showStudentCheckinModal(preselectedEventId = '') {
   }
 
   modalBody.innerHTML = `
-    <div style="margin-bottom: 16px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: #1E40AF; line-height: 1.45;">
-      💡 <strong>2-xil usulda qabul qilish mumkin:</strong><br>
-      1) Talabaning Telegram Mini App dagi shaxsiy QR kodini skanerlang (yoki nusxalab tashlang)<br>
-      2) Talabaning ID raqami, Pasport yoki Telefon raqamini kiriting.
-    </div>
-
     <div class="form-group mb-3">
-      <label class="form-label" style="font-weight: 600;">Qaysi tadbirga qabul qilinmoqda? *</label>
-      <select id="checkin-event-id" class="form-control" style="font-weight: 600;" onchange="loadEventRecentCheckins(this.value)">
+      <label class="form-label" style="font-weight: 700; font-size: 13px;">Qaysi tadbirga qabul qilinmoqda? *</label>
+      <select id="checkin-event-id" class="form-control" style="font-weight: 600; font-size: 13.5px;" onchange="loadEventRecentCheckins(this.value)">
         ${events.map(ev => `
           <option value="${ev.id}" ${ev.id === preselectedEventId ? 'selected' : ''}>
             ${ev.title} (+${ev.points} ball) — ${ev.place}
@@ -2261,21 +2498,53 @@ async function showStudentCheckinModal(preselectedEventId = '') {
       </select>
     </div>
 
-    <form id="checkin-student-form" onsubmit="handleStudentCheckinSubmit(event)">
-      <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 600;">Talaba QR kodi / ID raqami / Telefon *</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="checkin-query-input" class="form-control" placeholder="STU:... yoki talaba ID, telefon" required autofocus autocomplete="off" style="font-size: 14px; font-family: monospace;">
-          <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
-            ${icon('checkCircle', 15)} <span>Qabul Qilish</span>
-          </button>
+    <!-- USULNI TANLASH TABLARI -->
+    <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+      <button type="button" id="btn-tab-scanner" class="btn btn-primary active" style="flex: 1; padding: 9px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="switchStaffCheckinMode('camera')">
+        📷 Jonli Kamera Skaner (Operativ)
+      </button>
+      <button type="button" id="btn-tab-manual" class="btn btn-outline" style="flex: 1; padding: 9px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="switchStaffCheckinMode('manual')">
+        ⌨️ Qo'lda / Qidiruv
+      </button>
+    </div>
+
+    <!-- 1. JONLI KAMERA REJIMI -->
+    <div id="staff-camera-box" style="margin-bottom: 14px;">
+      <div style="position: relative; width: 100%; max-width: 440px; margin: 0 auto; background: #0B1120; border-radius: 14px; overflow: hidden; border: 2px solid #2563EB; box-shadow: 0 4px 20px rgba(37,99,235,0.25);">
+        <div id="staff-qr-reader" style="width: 100%; min-height: 250px;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; max-width: 440px; margin-left: auto; margin-right: auto;">
+        <span id="staff-scanner-status" style="font-size: 12px; font-weight: 600; color: #2563EB;">🟢 Kamera yuklanmoqda...</span>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button type="button" class="btn btn-sm btn-outline" id="btn-toggle-camera" onclick="toggleStaffCamera()">⏹️ To'xtatish</button>
+          <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); cursor: pointer; margin: 0;">
+            <input type="checkbox" id="staff-sound-toggle" checked style="cursor: pointer;"> 🔊 Ovoz
+          </label>
         </div>
       </div>
-    </form>
+    </div>
 
-    <div id="checkin-result-alert" style="display: none; margin-bottom: 16px;"></div>
+    <!-- 2. QO'LDA KIRITISH REJIMI -->
+    <div id="staff-manual-box" style="display: none; margin-bottom: 14px;">
+      <form id="checkin-student-form" onsubmit="handleStudentCheckinSubmit(event)">
+        <div class="form-group mb-2">
+          <label class="form-label" style="font-weight: 600;">Talaba QR kodi / ID raqami / Telefon *</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="checkin-query-input" class="form-control" placeholder="STU:... yoki talaba ID, telefon" autocomplete="off" style="font-size: 14px; font-family: monospace;">
+            <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+              ${icon('checkCircle', 15)} <span>Qabul Qilish</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
 
-    <div style="border-top: 1px solid var(--border-light); padding-top: 14px; margin-top: 16px;">
+    <!-- TEZKOR NATIJA FLASHERI -->
+    <div id="staff-live-flash" style="display: none; margin-bottom: 14px; border-radius: 8px; padding: 12px 14px;"></div>
+    <div id="checkin-result-alert" style="display: none; margin-bottom: 14px;"></div>
+
+    <!-- ISHTIROKCHILAR JADVALI -->
+    <div style="border-top: 1px solid var(--border-light); padding-top: 14px; margin-top: 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <span style="font-weight: 700; font-size: 12.5px; color: var(--text-main);">Ushbu tadbirga qabul qilingan talabalar:</span>
         <span id="checkin-count-badge" class="badge badge-primary">0 nafar</span>
@@ -2294,9 +2563,10 @@ async function showStudentCheckinModal(preselectedEventId = '') {
   const chosenId = document.getElementById('checkin-event-id')?.value;
   if (chosenId) loadEventRecentCheckins(chosenId);
 
+  // Standart bo'yicha jonli kamera rejimini yoqish
   setTimeout(() => {
-    document.getElementById('checkin-query-input')?.focus();
-  }, 100);
+    startStaffQrScanner();
+  }, 120);
 }
 
 async function loadEventRecentCheckins(eventId) {
@@ -3558,6 +3828,9 @@ function openModal() {
 }
 
 function closeModal() {
+  if (typeof window.stopStaffQrScanner === 'function') {
+    try { window.stopStaffQrScanner(); } catch (e) {}
+  }
   if (typeof currentModalPasteHandler === 'function') {
     window.removeEventListener('paste', currentModalPasteHandler);
     currentModalPasteHandler = null;

@@ -150,48 +150,10 @@ function linkStudentTelegramAccount(telegramUserId, phoneNumber) {
     WHERE id = ?
   `).run(String(telegramUserId), now, student.id);
 
-  // +5 kirish balli yozilganligini tekshirish (i0)
-  const existingBonus = db.prepare(`
-    SELECT id FROM point_entry
-    WHERE student_id = ? AND item_id = 'i0'
-  `).get(student.id);
-
-  if (!existingBonus) {
-    const entryId = 'pe_' + crypto.randomBytes(6).toString('hex');
-    const currentSeason = db.prepare(`SELECT * FROM season WHERE is_current = 1 LIMIT 1`).get() || { id: '2026-2027' };
-
-    db.prepare(`
-      INSERT INTO point_entry (
-        id, student_id, item_id, item_version, category_id, base_points, points,
-        note, event_date, source, created_by, created_at, status, approver_role,
-        approved_by, approved_at, season_id
-      ) VALUES (?, ?, 'i0', 1, '1', 5, 5, 'Tizimga ilk kirish bonusi', ?, 'system', 'system', ?, 'approved', 'dep_yb', 'system', ?, ?)
-    `).run(
-      entryId,
-      student.id,
-      now.split('T')[0],
-      now,
-      now,
-      currentSeason.id
-    );
-
-    recalculateStudentScores();
-
-    logAudit({
-      actor_id: student.id,
-      actor_role: 'system',
-      action: 'WELCOME_BONUS',
-      object_type: 'point_entry',
-      object_id: entryId,
-      after: { points: 5 },
-      ip: '127.0.0.1'
-    });
-  }
-
   return {
     success: true,
     student,
-    message: 'Akkauntingiz muvaffaqiyatli bog\'landi va +5 kirish balli yozildi! 🎉'
+    message: 'Akkauntingiz muvaffaqiyatli bog\'landi! ✅'
   };
 }
 

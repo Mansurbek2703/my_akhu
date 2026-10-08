@@ -205,7 +205,11 @@ router.post('/:id/checkin-student', (req, res) => {
       return res.status(400).json({ error: 'Talaba aniqlanmadi (ID yoki QR kod noto\'g\'ri)' });
     }
 
-    const student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(targetStudentId, targetStudentId);
+    const student = db.prepare(`
+      SELECT * FROM student 
+      WHERE id = ? OR external_id = ? OR phone = ? OR telegram_user_id = ?
+      LIMIT 1
+    `).get(targetStudentId, targetStudentId, targetStudentId, targetStudentId);
     if (!student) {
       return res.status(404).json({ error: 'Talaba tizimdan topilmadi' });
     }
@@ -303,6 +307,11 @@ router.delete('/:id', (req, res) => {
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
 
     db.transaction(() => {
+      const linkedEntries = db.prepare(`SELECT id FROM point_entry WHERE event_id = ?`).all(eventId);
+      for (const ent of linkedEntries) {
+        db.prepare(`DELETE FROM point_entry_history WHERE entry_id = ?`).run(ent.id);
+      }
+      db.prepare(`DELETE FROM point_entry WHERE event_id = ?`).run(eventId);
       db.prepare(`DELETE FROM checkin WHERE event_id = ?`).run(eventId);
       db.prepare(`DELETE FROM event_registration WHERE event_id = ?`).run(eventId);
       db.prepare(`DELETE FROM event WHERE id = ?`).run(eventId);
@@ -313,12 +322,15 @@ router.delete('/:id', (req, res) => {
         action: 'DELETE_EVENT',
         object_type: 'event',
         object_id: eventId,
-        before: { title: event.title },
+        before: { title: event.title, deleted_points_count: linkedEntries.length },
         ip: req.ip || '127.0.0.1'
       });
     })();
 
-    res.json({ success: true, message: 'Tadbir o\'chirildi' });
+    const { recalculateStudentScores } = require('../services/ratingService');
+    recalculateStudentScores();
+
+    res.json({ success: true, message: 'Tadbir va unga tegishli ballar to\'liq o\'chirildi' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
