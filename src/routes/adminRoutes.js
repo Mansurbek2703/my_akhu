@@ -10,7 +10,7 @@ const xlsx = require('xlsx');
 const { db } = require('../db/database');
 const config = require('../config');
 const { logAudit } = require('../services/pointService');
-const { importStudentsBatch } = require('../services/importService');
+const { importStudentsBatch, parseStudentsFromWorkbook } = require('../services/importService');
 const { recalculateStudentScores } = require('../services/ratingService');
 
 // Multer upload sozlamasi (Excel va CSV uchun)
@@ -389,6 +389,7 @@ router.post('/students/:id/status', authenticateSuperadminOrRegistrator, (req, r
 /**
  * POST /api/admin/import/students
  * Excel (.xlsx, .xls, .csv) fayl yuklash va talabalar ro'yxatini import qilish
+ * Format: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
  */
 router.post('/import/students', authenticateSuperadminOrRegistrator, upload.single('file'), (req, res) => {
   try {
@@ -397,52 +398,13 @@ router.post('/import/students', authenticateSuperadminOrRegistrator, upload.sing
     }
 
     const filePath = req.file.path;
-    const workbook = xlsx.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const rawRows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const normalizedRows = parseStudentsFromWorkbook(filePath);
 
-    if (!rawRows || rawRows.length === 0) {
+    if (!normalizedRows || normalizedRows.length === 0) {
       try { fs.unlinkSync(filePath); } catch (e) {}
-      return res.status(400).json({ error: 'Faylda ma\'lumotlar topilmadi' });
-    }
-
-    // Ustunlarni normallashtirish (o'zbek va inglizcha sarlavhalarga moslash)
-    const normalizedRows = rawRows.map(r => {
-      const getVal = (...keys) => {
-        for (const k of keys) {
-          if (r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') return String(r[k]).trim();
-        }
-        return '';
-      };
-
-      const extId = getVal('external_id', 'ID', 'Id', 'id', 'student_id', 'Talaba ID', 'talaba_id');
-      const fn = getVal('first_name', 'Ism', 'ism', 'name', 'FirstName');
-      const ln = getVal('last_name', 'Familiya', 'familiya', 'surname', 'LastName');
-      const gr = getVal('group_code', 'Guruh', 'guruh', 'group', 'Group');
-      const pr = getVal('program_code', 'Yonalish', 'yo\'nalish', 'program', 'Fakultet') || 'Dasturiy injiniring';
-      const lvl = getVal('level', 'Bosqich', 'bosqich', 'Daraja').toLowerCase().startsWith('m') ? 'mag' : 'bak';
-      const cr = parseInt(getVal('course', 'Kurs', 'kurs'), 10) || 1;
-      const gen = getVal('gender', 'Jins', 'jins').toLowerCase().startsWith('f') || getVal('gender', 'Jins').toLowerCase().startsWith('a') ? 'f' : 'm';
-      const em = getVal('email', 'Email', 'pochta');
-      const ph = getVal('phone', 'Telefon', 'telefon', 'tel');
-
-      return {
-        external_id: extId,
-        first_name: fn,
-        last_name: ln,
-        group_code: gr,
-        program_code: pr,
-        level: lvl,
-        course: cr,
-        gender: gen,
-        email: em,
-        phone: ph
-      };
-    }).filter(r => r.external_id && r.first_name && r.last_name);
-
-    if (normalizedRows.length === 0) {
-      try { fs.unlinkSync(filePath); } catch (e) {}
-      return res.status(400).json({ error: 'Fayldagi qatorlar formati mos kelmadi. Kerakli ustunlar: external_id, first_name, last_name, group_code' });
+      return res.status(400).json({
+        error: 'Fayldagi qatorlar formati mos kelmadi. Talab qilinadigan ustunlar: ID, Ism, Familiya, yo\'nalishi, guruh, telefon raqami, jinsi, kursi'
+      });
     }
 
     const result = importStudentsBatch(normalizedRows, {
@@ -454,8 +416,15 @@ router.post('/import/students', authenticateSuperadminOrRegistrator, upload.sing
 
     res.json({
       success: true,
-      ...result,
-      message: `Import muvaffaqiyatli yakunlandi! Yangi talabalar: ${result.created}, Yangilanganlar: ${result.updated}`
+      batch_id: result.batch_id,
+      total: normalizedRows.length,
+      created: result.created,
+      inserted: result.created,
+      updated: result.updated,
+      left: 0,
+      skipped: 0,
+      errors: result.errors,
+      message: `Import muvaffaqiyatli yakunlandi! Jami: ${normalizedRows.length} ta, Yangi qo'shilgan: ${result.created} ta, Yangilangan: ${result.updated} ta`
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) {
@@ -467,49 +436,75 @@ router.post('/import/students', authenticateSuperadminOrRegistrator, upload.sing
 
 /**
  * GET /api/admin/students/template
- * Namuna Excel shablonini yuklab olish
+ * Namuna Excel shablonini yuklab olish (Foydalanuvchi talab qilgan 8 ustunli format)
+ * Ustunlar: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
  */
 router.get('/students/template', authenticateSuperadminOrRegistrator, (req, res) => {
   const sampleData = [
     {
-      'external_id': 'AKHU-2026-101',
-      'first_name': 'Jasurbek',
-      'last_name': 'Alimov',
-      'group_code': '210-21',
-      'program_code': 'Dasturiy injiniring',
-      'level': 'bak',
-      'course': 2,
-      'gender': 'm',
-      'email': 'jasur@student.akhu.uz',
-      'phone': '+998901234567'
+      'ID': 'AE1126333',
+      'Ism': 'AYGUL',
+      'Familiya': 'SHADIMURATOVA',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC04',
+      'telefon raqami': '+998-93-374-19-80',
+      'jinsi': 'Ayol',
+      'kursi': 1
     },
     {
-      'external_id': 'AKHU-2026-102',
-      'first_name': 'Madinabonu',
-      'last_name': 'Qosimova',
-      'group_code': '210-21',
-      'program_code': 'Dasturiy injiniring',
-      'level': 'bak',
-      'course': 2,
-      'gender': 'f',
-      'email': 'madina@student.akhu.uz',
-      'phone': '+998907654321'
+      'ID': 'AE3547765',
+      'Ism': 'BEHRUZBEK',
+      'Familiya': 'RAJABOV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC04',
+      'telefon raqami': '+998-99-469-43-30',
+      'jinsi': 'Erkak',
+      'kursi': 1
     },
     {
-      'external_id': 'AKHU-2026-103',
-      'first_name': 'Sardor',
-      'last_name': 'Shamsiyev',
-      'group_code': 'M-101',
-      'program_code': 'Sun\'iy intellekt',
-      'level': 'mag',
-      'course': 1,
-      'gender': 'm',
-      'email': 'sardor@student.akhu.uz',
-      'phone': '+998935554433'
+      'ID': 'AD9349433',
+      'Ism': 'MUSLIMAXON',
+      'Familiya': 'FOZILOVA',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC02',
+      'telefon raqami': '+998-91-616-05-30',
+      'jinsi': 'Ayol',
+      'kursi': 1
+    },
+    {
+      'ID': 'AD8170783',
+      'Ism': 'SARVARBEK',
+      'Familiya': 'JANIBEKOV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC01',
+      'telefon raqami': '+998-95-192-17-34',
+      'jinsi': 'Erkak',
+      'kursi': 1
+    },
+    {
+      'ID': 'AD6634372',
+      'Ism': 'MAQSUD BEK',
+      'Familiya': 'OBIDOV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC05',
+      'telefon raqami': '+998-97-577-01-08',
+      'jinsi': 'Erkak',
+      'kursi': 1
     }
   ];
 
   const ws = xlsx.utils.json_to_sheet(sampleData);
+  ws['!cols'] = [
+    { wch: 15 }, // ID
+    { wch: 18 }, // Ism
+    { wch: 22 }, // Familiya
+    { wch: 22 }, // yo'nalishi
+    { wch: 12 }, // guruh
+    { wch: 22 }, // telefon raqami
+    { wch: 10 }, // jinsi
+    { wch: 8 }   // kursi
+  ];
+
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, 'Talabalar');
   const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
@@ -517,6 +512,68 @@ router.get('/students/template', authenticateSuperadminOrRegistrator, (req, res)
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="talabalar_import_shablon.xlsx"');
   res.send(buffer);
+});
+
+/**
+ * DELETE /api/admin/students/:id
+ * Talabani butunlay o'chirish
+ */
+router.delete('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
+  try {
+    const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    db.transaction(() => {
+      db.prepare(`DELETE FROM student_score WHERE student_id = ?`).run(req.params.id);
+      db.prepare(`DELETE FROM point_entry WHERE student_id = ?`).run(req.params.id);
+      db.prepare(`DELETE FROM checkin WHERE student_id = ?`).run(req.params.id);
+      db.prepare(`DELETE FROM event_registration WHERE student_id = ?`).run(req.params.id);
+      db.prepare(`DELETE FROM appeal WHERE student_id = ?`).run(req.params.id);
+      db.prepare(`DELETE FROM notification WHERE recipient_id = ?`).run(req.params.id);
+      db.prepare(`DELETE FROM student WHERE id = ?`).run(req.params.id);
+    })();
+
+    recalculateStudentScores();
+    res.json({ success: true, message: 'Talaba muvaffaqiyatli o\'chirildi' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/students/clear-all
+ * Barcha talabalarni va ularning ballarini bazadan tozalash (Faqat Superadmin)
+ */
+router.post('/students/clear-all', authenticateSuperadmin, (req, res) => {
+  try {
+    db.transaction(() => {
+      db.prepare('DELETE FROM point_entry_history').run();
+      db.prepare('DELETE FROM point_entry').run();
+      db.prepare('DELETE FROM checkin').run();
+      db.prepare('DELETE FROM event_registration').run();
+      db.prepare('DELETE FROM appeal').run();
+      db.prepare('DELETE FROM student_score').run();
+      db.prepare('DELETE FROM notification WHERE recipient_type = "student"').run();
+      db.prepare('DELETE FROM student').run();
+      db.prepare('DELETE FROM weekly_stars').run();
+    })();
+
+    recalculateStudentScores();
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: 'superadmin',
+      action: 'CLEAR_ALL_STUDENTS',
+      object_type: 'student',
+      object_id: 'all',
+      after: { cleared_at: new Date().toISOString() },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: 'Barcha talabalar bazadan muvaffaqiyatli o\'chirildi' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ====================================================================

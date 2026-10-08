@@ -236,37 +236,21 @@ function seedDatabase() {
     }
   }
 
-  // 7. NAMUNAVIY TALABALAR (student)
-  const insertStudent = db.prepare(`
-    INSERT OR REPLACE INTO student (
-      id, external_id, first_name, last_name, group_code, program_code, level, course, gender, email, phone, tutor_id, telegram_user_id, photo_consent, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const students = [
-    { id: 'std_mansurbek', ext: 'AKHU-2024-777', fn: 'Mansurbek', ln: 'Qazaqov', gr: 'ADMIN-01', pr: 'Sun\'iy intellekt va Dasturiy injiniring', lvl: 'mag', cr: 2, gen: 'm', em: 'mansurbek@akhu.uz', ph: '+998901234567', tut: 'tutor_1', tg: '1202082857' },
-    { id: 'std_01', ext: 'AKHU-2024-001', fn: 'Diyorbek', ln: 'Ismoilov', gr: '210-21', pr: 'Dasturiy injiniring', lvl: 'bak', cr: 2, gen: 'm', em: 'diyorbek@student.akhu.uz', ph: '+998901112233', tut: 'tutor_1', tg: '987654321' },
-    { id: 'std_02', ext: 'AKHU-2024-002', fn: 'Malika', ln: 'Nazarova', gr: '210-21', pr: 'Dasturiy injiniring', lvl: 'bak', cr: 2, gen: 'f', em: 'malika@student.akhu.uz', ph: '+998902223344', tut: 'tutor_1', tg: '987654322' },
-    { id: 'std_03', ext: 'AKHU-2024-003', fn: 'Otabek', ln: 'Xalilov', gr: '210-22', pr: 'Sun\'iy intellekt', lvl: 'bak', cr: 2, gen: 'm', em: 'otabek@student.akhu.uz', ph: '+998903334455', tut: 'tutor_1', tg: '987654323' },
-    { id: 'std_04', ext: 'AKHU-2024-004', fn: 'Sevara', ln: 'Yoqubova', gr: '210-22', pr: 'Sun\'iy intellekt', lvl: 'bak', cr: 2, gen: 'f', em: 'sevara@student.akhu.uz', ph: '+998904445566', tut: 'tutor_1', tg: null },
-    { id: 'std_05', ext: 'AKHU-2024-005', fn: 'Jahongir', ln: 'Mirzayev', gr: '211-21', pr: 'Kiberxavfsizlik', lvl: 'bak', cr: 1, gen: 'm', em: 'jahongir@student.akhu.uz', ph: '+998905556677', tut: 'tutor_2', tg: '987654325' },
-    { id: 'std_06', ext: 'AKHU-2024-006', fn: 'Zilola', ln: 'Shokirova', gr: '211-21', pr: 'Kiberxavfsizlik', lvl: 'bak', cr: 1, gen: 'f', em: 'zilola@student.akhu.uz', ph: '+998906667788', tut: 'tutor_2', tg: null },
-    { id: 'std_07', ext: 'AKHU-2024-007', fn: 'Bekzod', ln: 'Rahimov', gr: '211-22', pr: 'Axborot tizimlari', lvl: 'bak', cr: 1, gen: 'm', em: 'bekzod@student.akhu.uz', ph: '+998907778899', tut: 'tutor_2', tg: '987654327' },
-    { id: 'std_08', ext: 'AKHU-2024-008', fn: 'Madina', ln: 'G\'aniyeva', gr: '211-22', pr: 'Axborot tizimlari', lvl: 'bak', cr: 1, gen: 'f', em: 'madina@student.akhu.uz', ph: '+998908889900', tut: 'tutor_2', tg: null },
-    { id: 'std_09', ext: 'AKHU-2024-009', fn: 'Shohruh', ln: 'Karimov', gr: '310-21', pr: 'Kompyuter injiniringi', lvl: 'bak', cr: 2, gen: 'm', em: 'shohruh@student.akhu.uz', ph: '+998909990011', tut: 'tutor_3', tg: '987654329' },
-    { id: 'std_10', ext: 'AKHU-2024-010', fn: 'Feruza', ln: 'Mamatova', gr: '310-21', pr: 'Kompyuter injiniringi', lvl: 'bak', cr: 2, gen: 'f', em: 'feruza@student.akhu.uz', ph: '+998911112233', tut: 'tutor_3', tg: '987654330' },
-    { id: 'std_11', ext: 'AKHU-2024-011', fn: 'Umidbek', ln: 'Sultonov', gr: 'M-101', pr: 'Ma\'lumotlar ilmi (Master)', lvl: 'mag', cr: 1, gen: 'm', em: 'umidbek@student.akhu.uz', ph: '+998912223344', tut: 'tutor_3', tg: '987654331' },
-    { id: 'std_12', ext: 'AKHU-2024-012', fn: 'Shahnoza', ln: 'Hamidova', gr: 'M-101', pr: 'Ma\'lumotlar ilmi (Master)', lvl: 'mag', cr: 1, gen: 'f', em: 'shahnoza@student.akhu.uz', ph: '+998913334455', tut: 'tutor_3', tg: null },
-    { id: 'std_13', ext: 'AKHU-2024-013', fn: 'Anvar', ln: 'Tolipov', gr: '210-23', pr: 'Dasturiy injiniring', lvl: 'bak', cr: 2, gen: 'm', em: 'anvar@student.akhu.uz', ph: '+998914445566', tut: 'tutor_1', tg: null }
+  // FMC guruhlarini tyutorlarga biriktirish
+  const fmcGroups = [
+    { tutor_id: 'tutor_1', group: 'FMC01' },
+    { tutor_id: 'tutor_1', group: 'FMC02' },
+    { tutor_id: 'tutor_1', group: 'FMC03' },
+    { tutor_id: 'tutor_2', group: 'FMC04' },
+    { tutor_id: 'tutor_2', group: 'FMC05' }
   ];
-
-  for (const st of students) {
-    insertStudent.run(
-      st.id, st.ext, st.fn, st.ln, st.gr, st.pr, st.lvl, st.cr, st.gen, st.em, st.ph, st.tut, st.tg, 0, 'active', now, now
-    );
+  for (const fg of fmcGroups) {
+    insertTutorGroup.run(fg.tutor_id, fg.group);
   }
 
-  // 8. NAMUNAVIY TADBIRLAR (event)
+  // 7. NAMUNAVIY TALABALAR - Haqiqiy talabalar Excel orqali import qilinadi (mock o'chirildi)
+
+  // 8. TADBIRLAR (event)
   const insertEvent = db.prepare(`
     INSERT OR REPLACE INTO event (
       id, title, starts_at, ends_at, place, organizer_unit, category_id, level, points, capacity, requires_registration, status, qr_secret, created_by, created_at
@@ -325,64 +309,7 @@ function seedDatabase() {
     );
   }
 
-  // 9. NAMUNAVIY BALL YOZUVLARI (point_entry)
-  const insertEntry = db.prepare(`
-    INSERT OR REPLACE INTO point_entry (
-      id, student_id, item_id, item_version, category_id, base_points, points, scale_level, scale_role, note, event_date, evidence_file_id, evidence_url, source, created_by, created_at, status, approver_role, approved_by, approved_at, pv_by, pv_at, reject_reason_code, reject_note, event_id, import_batch_id, season_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const initialEntries = [
-    // Approved entries
-    { id: 'pe_01', st: 'std_01', it: 'i3', cat: '1', bp: 10, pts: 12, note: 'Navro\'z bayrami tashkiliy guruhida faol ishtirok', dt: '2026-09-15', src: 'tutor', by: 'tutor_1', stt: 'approved', app_role: 'dep_yb', app_by: 'dep_yb', app_at: '2026-09-16T11:00:00' },
-    { id: 'pe_02', st: 'std_01', it: 'a4', cat: '3', bp: 15, pts: 15, note: 'IELTS 6.5 yangi sertifikat topshirdi', dt: '2026-09-20', src: 'tutor', by: 'tutor_1', stt: 'approved', app_role: 'dep_ob', app_by: 'dep_ob', app_at: '2026-09-21T14:30:00', url: 'https://ielts.org/verify/12345' },
-    { id: 'pe_03', st: 'std_01', it: 'i1', cat: '1', bp: 5, pts: 5, note: 'QR check-in: O\'quv yili ochilish marosimi', dt: '2026-09-02', src: 'qr', by: 'system', stt: 'approved', app_role: 'dep_yb', app_by: 'system', app_at: '2026-09-02T10:15:00', ev: 'ev_01' },
-    { id: 'pe_04', st: 'std_02', it: 'm2', cat: '2', bp: 10, pts: 10, note: 'Alisher Navoiy g\'azalxonlik kechasida badiiy chiqish', dt: '2026-09-22', src: 'tutor', by: 'tutor_1', stt: 'approved', app_role: 'dep_mb', app_by: 'dep_mb', app_at: '2026-09-23T16:00:00' },
-    { id: 'pe_05', st: 'std_02', it: 'i5', cat: '1', bp: 15, pts: 16, note: 'Toshkent marafonida to\'liq kun volontyorlik', dt: '2026-09-28', src: 'tutor', by: 'tutor_1', stt: 'approved', app_role: 'dep_yb', app_by: 'dep_yb', app_at: '2026-09-29T10:00:00', url: 'https://example.com/volunteer-cert' },
-    { id: 'pe_06', st: 'std_03', it: 's7', cat: '4', bp: 5, pts: 5, note: 'EduSmart startap g\'oyasi ro\'yxatdan o\'tkazildi', dt: '2026-09-25', src: 'tutor', by: 'tutor_1', stt: 'approved', app_role: 'dep_sb', app_by: 'dep_sb', app_at: '2026-09-26T12:00:00' },
-    { id: 'pe_07', st: 'std_05', it: 'p2', cat: '5', bp: 10, pts: 10, note: 'Universitet futbol terma jamoasi a\'zosi', dt: '2026-09-10', src: 'tutor', by: 'tutor_2', stt: 'approved', app_role: 'dep_yb', app_by: 'dep_yb', app_at: '2026-09-11T09:30:00' },
-    { id: 'pe_08', st: 'std_07', it: 'r1', cat: '7', bp: 5, pts: 5, note: 'Universitet haqidagi TikTok/Reel 12000 ko\'rildi', dt: '2026-09-18', src: 'tutor', by: 'tutor_2', stt: 'approved', app_role: 'dep_pb', app_by: 'dep_pb', app_at: '2026-09-19T17:00:00', url: 'https://instagram.com/reel/example' },
-    { id: 'pe_09', st: 'std_10', it: 'c4', cat: '6', bp: 15, pts: 15, note: 'Universitet Zakovat chempionati 2-o\'rin', dt: '2026-09-29', src: 'tutor', by: 'tutor_3', stt: 'approved', app_role: 'dep_mb', app_by: 'dep_mb', app_at: '2026-09-30T10:00:00', sl: 'universitet', sr: 'sovrindor' },
-    { id: 'pe_10', st: 'std_11', it: 's6', cat: '4', bp: 40, pts: 40, note: 'Scopus Q2 jurnalida maqola chop etildi', dt: '2026-09-12', src: 'tutor', by: 'tutor_3', stt: 'approved', app_role: 'dep_ib', app_by: 'dep_ib', app_at: '2026-09-14T11:00:00', pv_by: 'prorektor', pv_at: '2026-09-15T10:00:00', url: 'https://doi.org/10.1016/j.example.2026' },
-
-    // Pending entries (Tasdiq navbatida turgan yozuvlar)
-    { id: 'pe_11', st: 'std_01', it: 'i4', cat: '1', bp: 8, pts: 8, note: 'Bolalar uyi xayriya tadbirida volontyorlik', dt: '2026-10-02', src: 'tutor', by: 'tutor_1', stt: 'pending', app_role: 'dep_yb' },
-    { id: 'pe_12', st: 'std_02', it: 'm4', cat: '2', bp: 10, pts: 10, note: 'Mahalla yoshlari bilan ma\'rifiy davra suhbati', dt: '2026-10-03', src: 'tutor', by: 'tutor_1', stt: 'pending', app_role: 'dep_mb' },
-    { id: 'pe_13', st: 'std_03', it: 's8', cat: '4', bp: 15, pts: 15, note: 'EduSmart MVP mobil ilovasi namoyish qilindi', dt: '2026-10-04', src: 'tutor', by: 'tutor_1', stt: 'pending', app_role: 'dep_sb', url: 'https://demo.edusmart.uz' },
-    { id: 'pe_14', st: 'std_05', it: 's10', cat: '4', bp: 30, pts: 30, note: 'Respublika CyberSecurity Hackathon 2-o\'rin sovrindori', dt: '2026-10-01', src: 'tutor', by: 'tutor_2', stt: 'pending_pv', app_role: 'dep_sb', app_by: 'dep_sb', app_at: '2026-10-03T11:00:00', sl: 'respublika', sr: 'sovrindor', url: 'https://cybersec.uz/results' }
-  ];
-
-  for (const p of initialEntries) {
-    insertEntry.run(
-      p.id,
-      p.st,
-      p.it,
-      1,
-      p.cat,
-      p.bp,
-      p.pts,
-      p.sl || null,
-      p.sr || null,
-      p.note,
-      p.dt,
-      null,
-      p.url || null,
-      p.src,
-      p.by,
-      `${p.dt}T09:00:00`,
-      p.stt,
-      p.app_role,
-      p.app_by || null,
-      p.app_at || null,
-      p.pv_by || null,
-      p.pv_at || null,
-      null,
-      null,
-      p.ev || null,
-      null,
-      currentSeasonId
-    );
-  }
+  // 9. BALL YOZUVLARI - Haqiqiy talabalar uchun arizalar va ballar tizim orqali kiritiladi (mock o'chirildi)
 
   // Audit log seed
   const insertAudit = db.prepare(`

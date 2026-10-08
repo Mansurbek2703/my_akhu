@@ -2136,6 +2136,9 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
             <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: flex; align-items: center; gap: 6px; background: #10B981; border-color: #10B981;">
               <span>➕</span> Yangi Talaba Qo'shish
             </button>
+            <button class="btn btn-outline" onclick="handleClearAllStudents()" style="color: #F87171; border-color: rgba(239, 68, 68, 0.5); display: flex; align-items: center; gap: 6px;" title="Barcha talabalarni tozalash">
+              <span>🗑️</span> Barchasini Tozalash
+            </button>
           </div>
         </div>
       </div>
@@ -2145,7 +2148,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     <div id="student-import-panel" class="card mb-4" style="display: none; border: 2px dashed #3B82F6; background: #F8FAFC;">
       <div class="card-header" style="background: #EFF6FF; border-bottom: 1px solid #DBEAFE;">
         <h3 style="font-size: 15px; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-          <span>📤</span> Talabalar Ro'yxatini Ommaviy Import Qilish (.xlsx / .csv)
+          <span>📤</span> Talabalar Ro'yxatini Ommaviy Import Qilish (.xlsx / .xls / .csv)
         </h3>
         <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="toggleImportPanel()">Yopish</button>
       </div>
@@ -2153,20 +2156,20 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
           <div>
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-              Fayldagi ustunlar tartibi yoki sarlavhalari quyidagicha bo'lishi mumkin:
+              Fayldagi ustunlar tartibi va sarlavhalari (aniq 8 ta ustun):
             </p>
             <ul style="font-size: 12px; color: var(--text-muted); padding-left: 20px; line-height: 1.8;">
-              <li><strong>external_id / id:</strong> Talaba ID kodi (masalan, STD-0012)</li>
-              <li><strong>familiya, ism:</strong> Talabaning to'liq familiyasi va ismi</li>
-              <li><strong>guruh / group_code:</strong> Guruh kodi (masalan, 210-21)</li>
-              <li><strong>yo'nalish / fakultet:</strong> Ta'lim yo'nalishi yoki fakultet</li>
-              <li><strong>kurs:</strong> Bosqich (1, 2, 3, 4)</li>
-              <li><strong>jins:</strong> Erkak / Ayol (M / F)</li>
-              <li><strong>telefon, email:</strong> Shaxsiy aloqa ma'lumotlari</li>
-              <li><strong>holat:</strong> active (faol) yoki left (chiqarilgan)</li>
+              <li><strong>1. ID:</strong> Talaba ID kodi (masalan, <code>AE1126333</code>)</li>
+              <li><strong>2. Ism:</strong> Ismi (masalan, <code>AYGUL</code>)</li>
+              <li><strong>3. Familiya:</strong> Familiyasi (masalan, <code>SHADIMURATOVA</code>)</li>
+              <li><strong>4. yo'nalishi:</strong> Ta'lim yo'nalishi (masalan, <code>Sun'iy intellekt</code>)</li>
+              <li><strong>5. guruh:</strong> Guruh kodi (masalan, <code>FMC04</code>)</li>
+              <li><strong>6. telefon raqami:</strong> Telefon raqami (masalan, <code>+998-93-374-19-80</code>)</li>
+              <li><strong>7. jinsi:</strong> Jinsi (<code>Ayol</code> yoki <code>Erkak</code>)</li>
+              <li><strong>8. kursi:</strong> Bosqichi (<code>1</code>, <code>2</code>, <code>3</code>, <code>4</code>)</li>
             </ul>
             <div style="margin-top: 12px; font-size: 12px; color: #2563EB;">
-              💡 <em>Eslatma: Mavjud talabalar ID bo'yicha yangilanadi, yangilari esa qo'shiladi va boshlang'ich 0 ball beriladi.</em>
+              💡 <em>Eslatma: ID bo'yicha mavjud talabalar yangilanadi, yangilari esa qo'shiladi va boshlang'ich 0 ball beriladi.</em>
             </div>
           </div>
 
@@ -2381,10 +2384,15 @@ async function loadStudentsData() {
             <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Tahrirlash" onclick="showEditStudentModal('${st.id}')">
               ✏️
             </button>
-            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: ${st.status === 'active' ? '#DC2626' : '#059669'};" 
+            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: ${st.status === 'active' ? '#F59E0B' : '#059669'};" 
                     title="${st.status === 'active' ? 'Left qilish' : 'Faollashtirish'}"
                     onclick="toggleStudentStatus('${st.id}', '${st.status}')">
-              ${st.status === 'active' ? '🚫' : '✅'}
+              ${st.status === 'active' ? '⏸️' : '▶️'}
+            </button>
+            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: #EF4444;" 
+                    title="Butunlay o'chirish"
+                    onclick="deleteStudent('${st.id}', '${st.first_name} ${st.last_name}')">
+              🗑️
             </button>
             <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Batafsil profil" onclick="showStudentModal('${st.id}')">
               👁️
@@ -2510,6 +2518,31 @@ async function toggleStudentStatus(studentId, currentStatus) {
     await loadStudentsData();
   } catch (err) {
     alert(err.message);
+  }
+}
+
+async function deleteStudent(studentId, name) {
+  if (!confirm(`Talaba "${name}" ni butunlay o'chirib tashlamoqchimisiz? Ushbu talabaning barcha ballari ham o'chiriladi.`)) return;
+
+  try {
+    const res = await apiFetch(`/api/admin/students/${studentId}`, { method: 'DELETE' });
+    alert(res.message || 'Talaba muvaffaqiyatli o\'chirildi');
+    await loadStudentsData();
+  } catch (err) {
+    alert('Xatolik: ' + err.message);
+  }
+}
+
+async function handleClearAllStudents() {
+  if (!confirm('DIQQAT! Barcha talabalar va ularning to\'plagan ballari bazadan butunlay o\'chiriladi!\nDavom etishni xohlaysizmi?')) return;
+  if (!confirm('Tasdiqlash: Ushbu amalni ortga qaytarib bo\'lmaydi. Rozimisiz?')) return;
+
+  try {
+    const res = await apiFetch('/api/admin/students/clear-all', { method: 'POST' });
+    alert(res.message || 'Barcha talabalar muvaffaqiyatli tozalandi');
+    await loadStudentsData();
+  } catch (err) {
+    alert('Xatolik: ' + err.message);
   }
 }
 

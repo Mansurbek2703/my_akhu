@@ -5,6 +5,143 @@ const { recalculateStudentScores } = require('./ratingService');
 const { logAudit } = require('./pointService');
 
 /**
+ * Matnli kalitni normallashtirish: bo'sh joylar, tire va apostroflarni tozalash
+ */
+function normalizeKey(str) {
+  return String(str || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\'‘’`ʻʼ]/g, '')
+    .replace(/[_\s-]+/g, '');
+}
+
+/**
+ * Excel / CSV faylni o'qish va talabalar ro'yxatini chiqarib olish
+ * Talab qilingan ustunlar:
+ * ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
+ */
+function parseStudentsFromWorkbook(filePath) {
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+
+  if (!sheet) return [];
+
+  // 1. Sarlavhali obyektlar massivi
+  const rawRows = xlsx.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  // 2. 2D qatorlar massivi (ustun tartibi bo'yicha zaxira tahlil)
+  const rawGrid = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+
+  // Sarlavha qatori indeksini aniqlash (odatda 0)
+  let headerRowIndex = 0;
+  for (let i = 0; i < Math.min(rawGrid.length, 5); i++) {
+    const row = rawGrid[i];
+    if (Array.isArray(row)) {
+      const hasId = row.some(cell => {
+        const c = normalizeKey(cell);
+        return c === 'id' || c === 'talabaid' || c === 'externalid';
+      });
+      const hasName = row.some(cell => {
+        const c = normalizeKey(cell);
+        return c === 'ism' || c === 'name' || c === 'firstname';
+      });
+      if (hasId && hasName) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+  }
+
+  const parsedStudents = [];
+
+  for (let rIndex = 0; rIndex < rawRows.length; rIndex++) {
+    const raw = rawRows[rIndex];
+    const normMap = {};
+    for (const [k, v] of Object.entries(raw)) {
+      normMap[normalizeKey(k)] = String(v !== undefined && v !== null ? v : '').trim();
+    }
+
+    const getVal = (...keys) => {
+      for (const k of keys) {
+        const cleaned = normalizeKey(k);
+        if (normMap[cleaned] && normMap[cleaned] !== '') return normMap[cleaned];
+      }
+      return '';
+    };
+
+    let extId = getVal('id', 'externalid', 'talabaid', 'studentid', 'kod');
+    let firstName = getVal('ism', 'firstname', 'name', 'talabaismi');
+    let lastName = getVal('familiya', 'lastname', 'surname', 'talabafamiliyasi');
+    let programCode = getVal('yonalishi', 'yonalish', 'fakultet', 'mutaxassislik', 'programcode', 'program');
+    let groupCode = getVal('guruh', 'groupcode', 'group', 'guruhkodi');
+    let phone = getVal('telefonraqami', 'telefon', 'phone', 'tel', 'aloqa', 'phonenumber');
+    let genderRaw = getVal('jinsi', 'jins', 'gender', 'pol');
+    let courseRaw = getVal('kursi', 'kurs', 'course', 'bosqich');
+
+    // Ustunlar pozitsiyasi bo'yicha zaxira tahlil (A-H: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi)
+    const gridRowIndex = headerRowIndex + 1 + rIndex;
+    if ((!extId || !firstName || !lastName) && rawGrid[gridRowIndex] && rawGrid[gridRowIndex].length >= 3) {
+      const rowArr = rawGrid[gridRowIndex];
+      if (!extId && rowArr[0] !== undefined) extId = String(rowArr[0]).trim();
+      if (!firstName && rowArr[1] !== undefined) firstName = String(rowArr[1]).trim();
+      if (!lastName && rowArr[2] !== undefined) lastName = String(rowArr[2]).trim();
+      if (!programCode && rowArr[3] !== undefined) programCode = String(rowArr[3]).trim();
+      if (!groupCode && rowArr[4] !== undefined) groupCode = String(rowArr[4]).trim();
+      if (!phone && rowArr[5] !== undefined) phone = String(rowArr[5]).trim();
+      if (!genderRaw && rowArr[6] !== undefined) genderRaw = String(rowArr[6]).trim();
+      if (!courseRaw && rowArr[7] !== undefined) courseRaw = String(rowArr[7]).trim();
+    }
+
+    // Sarlavha qatorining o'zini o'tkazib yuborish
+    if (normalizeKey(extId) === 'id' && normalizeKey(firstName) === 'ism') {
+      continue;
+    }
+
+    if (!extId || !firstName || !lastName) {
+      continue;
+    }
+
+    // Jinsni normallashtirish: Ayol / Female / Qiz -> 'f', Erkak / Male -> 'm'
+    const genLower = genderRaw.toLowerCase();
+    const gender = (genLower.startsWith('ay') || genLower.startsWith('q') || genLower.startsWith('f') || genLower === 'woman' || genLower === 'female') ? 'f' : 'm';
+
+    // Kurs: 1, 2, 3, 4
+    let course = parseInt(courseRaw, 10);
+    if (isNaN(course) || course < 1 || course > 4) course = 1;
+
+    // Yo'nalish va Guruh
+    if (!programCode) programCode = 'Sun\'iy intellekt';
+    if (!groupCode) groupCode = 'FMC01';
+
+    // Level: magistr yoki bakalavr
+    const level = (programCode.toLowerCase().includes('mag') || groupCode.toLowerCase().includes('mag') || groupCode.toLowerCase().startsWith('m-')) ? 'mag' : 'bak';
+
+    // Telefon raqami: tozalash va standart formatga keltirish
+    if (phone) {
+      phone = phone.replace(/[\s\-\(\)]/g, '');
+      if (!phone.startsWith('+')) {
+        phone = '+' + phone;
+      }
+    }
+
+    parsedStudents.push({
+      external_id: extId,
+      first_name: firstName,
+      last_name: lastName,
+      program_code: programCode,
+      group_code: groupCode,
+      phone: phone || null,
+      gender,
+      course,
+      level,
+      email: null
+    });
+  }
+
+  return parsedStudents;
+}
+
+/**
  * 10-bo'lim & AT-19: Registrator talabalar bazasi importi
  * rows: [{ external_id, first_name, last_name, group_code, program_code, level, course, gender, email, phone }]
  */
@@ -15,18 +152,23 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
   let createdCount = 0;
   let updatedCount = 0;
   const errors = [];
-  const incomingExtIds = new Set();
 
   const insertStudent = db.prepare(`
     INSERT INTO student (
-      id, external_id, first_name, last_name, group_code, program_code, level, course, gender, email, phone, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+      id, external_id, first_name, last_name, group_code, program_code, level, course, gender, email, phone, tutor_id, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
   `);
 
   const updateStudent = db.prepare(`
     UPDATE student
-    SET first_name = ?, last_name = ?, group_code = ?, program_code = ?, level = ?, course = ?, gender = ?, email = ?, phone = ?, status = 'active', updated_at = ?
+    SET first_name = ?, last_name = ?, group_code = ?, program_code = ?, level = ?, course = ?, gender = ?, email = ?, phone = ?, tutor_id = COALESCE(?, tutor_id), status = 'active', updated_at = ?
     WHERE external_id = ?
+  `);
+
+  const insertScore = db.prepare(`
+    INSERT OR IGNORE INTO student_score (
+      student_id, total, season, week_cur, week_prev, by_category, events_count, rank_cohort, is_passive, updated_at
+    ) VALUES (?, 0, 0, 0, 0, '{}', 0, 1, 0, ?)
   `);
 
   const tx = db.transaction(() => {
@@ -36,7 +178,9 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
         continue;
       }
 
-      incomingExtIds.add(String(row.external_id));
+      // Tyutorni guruh orqali avtomatik aniqlash
+      const tutorRow = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ? LIMIT 1`).get(row.group_code);
+      const tutorId = row.tutor_id || (tutorRow ? tutorRow.tutor_id : null);
 
       const existing = db.prepare(`SELECT * FROM student WHERE external_id = ?`).get(String(row.external_id));
       if (existing) {
@@ -50,9 +194,11 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
           row.gender || existing.gender,
           row.email || existing.email,
           row.phone || existing.phone,
+          tutorId,
           now,
           String(row.external_id)
         );
+        insertScore.run(existing.id, now);
         updatedCount++;
       } else {
         const studentId = 'std_' + crypto.randomBytes(6).toString('hex');
@@ -62,31 +208,18 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
           row.first_name,
           row.last_name,
           row.group_code,
-          row.program_code || 'IT',
+          row.program_code || 'Sun\'iy intellekt',
           row.level || 'bak',
           Number(row.course) || 1,
           row.gender || 'm',
           row.email || null,
           row.phone || null,
+          tutorId,
           now,
           now
         );
+        insertScore.run(studentId, now);
         createdCount++;
-      }
-    }
-
-    // AT-19: Ro'yxatda yo'q talabalar status = 'left' (o'chirilmaydi, ballari saqlanadi, reytingdan chiqadi)
-    if (incomingExtIds.size > 0) {
-      const allActive = db.prepare(`SELECT id, external_id FROM student WHERE status = 'active'`).all();
-      let leftCount = 0;
-      for (const st of allActive) {
-        if (st.external_id && !incomingExtIds.has(st.external_id)) {
-          db.prepare(`UPDATE student SET status = 'left', updated_at = ? WHERE id = ?`).run(now, st.id);
-          leftCount++;
-        }
-      }
-      if (leftCount > 0) {
-        errors.push(`${leftCount} ta talaba ro'yxatda bo'lmagani sababli 'left' holatiga o'tkazildi`);
       }
     }
 
@@ -284,6 +417,7 @@ function importAttendance100(studentIds, staffUser, { fileName = 'attendance_100
 }
 
 module.exports = {
+  parseStudentsFromWorkbook,
   importStudentsBatch,
   importGpaTop20,
   importAttendance100
