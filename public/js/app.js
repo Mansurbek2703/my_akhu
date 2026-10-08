@@ -684,87 +684,275 @@ async function renderObserveRating(container) {
 // -------------------------------------------------------------
 // SAHIFA: TALABALAR KATALOGI (K-02)
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// SAHIFA: TALABALAR RO'YXATI (KUZATUV & KATALOG)
+// -------------------------------------------------------------
+let observeStudentsState = {
+  search: '',
+  group: '',
+  course: '',
+  gender: '',
+  page: 1,
+  limit: 50,
+  total: 0,
+  students: []
+};
+
 async function renderObserveStudents(container) {
-  let html = `
-    <div class="card mb-3">
-      <div class="card-body">
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <input type="text" id="students-search" class="form-control" placeholder="Ism, familiya, guruh yoki telefon..." style="flex: 1; min-width: 250px;">
-          <select id="students-passive-filter" class="form-control" style="width: auto;">
-            <option value="">Barcha holatlar</option>
-            <option value="1">Faqat passiv talabalar</option>
-            <option value="0">Faol talabalar</option>
-          </select>
-          <button id="btn-students-search" class="btn btn-primary">Izlash</button>
+  container.innerHTML = `
+    <!-- HERO BANNER -->
+    <div class="admin-hero-card" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div>
+          <div class="admin-hero-title">
+            <span style="color: #60A5FA;">${icon('users', 22)}</span>
+            <span>Talabalar Katalogi & Reyting Ro'yxati</span>
+          </div>
+          <p class="admin-hero-desc">
+            Universitetning barcha talabalari to'liq ro'yxati, guruhlar, joriy mavsum ballari va faollik ko'rsatkichlari.
+            Ixtiyoriy talaba satri ustiga bosib batafsil profilini ko'rishingiz mumkin.
+          </p>
         </div>
       </div>
     </div>
 
+    <!-- QIDIRUV VA FILTRLAR -->
+    <div class="admin-toolbar">
+      <div class="admin-search-box">
+        ${icon('search', 16)}
+        <input type="text" id="obs-students-search" class="admin-search-input" placeholder="Ism, familiya, ID, guruh yoki telefon bo'yicha qidiruv...">
+      </div>
+      <div class="admin-filters-group">
+        <select id="obs-students-course" class="admin-filter-select">
+          <option value="">Barcha kurslar</option>
+          <option value="1">1-kurs</option>
+          <option value="2">2-kurs</option>
+          <option value="3">3-kurs</option>
+          <option value="4">4-kurs</option>
+        </select>
+        <select id="obs-students-gender" class="admin-filter-select">
+          <option value="">Barcha jinslar</option>
+          <option value="m">Erkak</option>
+          <option value="f">Ayol</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="resetObserveStudentFilters()" style="display: inline-flex; align-items: center; gap: 4px;">
+          ${icon('refresh', 13)} Tozalash
+        </button>
+      </div>
+    </div>
+
+    <!-- JADVAL KARTASI -->
     <div class="card">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Talaba</th>
-                <th>Guruh</th>
-                <th>Kurs & Yo'nalish</th>
-                <th>Telefon</th>
-                <th>Telegram</th>
-                <th>Mavsum</th>
-                <th style="text-align: right;">Amallar</th>
-              </tr>
-            </thead>
-            <tbody id="students-table-body">
-              <tr><td colspan="7" class="text-center p-4">Yuklanmoqda...</td></tr>
-            </tbody>
-          </table>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 130px;">Talaba ID</th>
+              <th>Talaba (F.I.Sh)</th>
+              <th>Guruh & Yo'nalish</th>
+              <th>Kurs</th>
+              <th>Telefon Raqami</th>
+              <th>Telegram</th>
+              <th>Mavsum Balli</th>
+              <th>Jami Ball</th>
+              <th style="text-align: right; width: 100px;">Profil</th>
+            </tr>
+          </thead>
+          <tbody id="obs-students-table-body">
+            <tr>
+              <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <div class="spinner" style="margin-bottom: 8px;"></div>
+                <p>Talabalar ro'yxati yuklanmoqda...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="pagination-bar" id="obs-students-pagination-bar">
+        <span id="obs-students-page-info">0 ta ma'lumot</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn btn-outline btn-sm" id="btn-obs-prev" onclick="prevObsStudentPage()" disabled>Oldingi</button>
+          <span id="obs-students-page-num" style="font-weight: 600; padding: 0 6px;">1</span>
+          <button class="btn btn-outline btn-sm" id="btn-obs-next" onclick="nextObsStudentPage()" disabled>Keyingi</button>
         </div>
       </div>
     </div>
   `;
-  container.innerHTML = html;
 
-  async function loadStudents() {
-    const search = document.getElementById('students-search').value;
-    const isPassive = document.getElementById('students-passive-filter').value;
+  // Search input debounce
+  const sInput = document.getElementById('obs-students-search');
+  let timer;
+  sInput.addEventListener('input', (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      observeStudentsState.search = e.target.value.trim();
+      observeStudentsState.page = 1;
+      loadObserveStudentsList();
+    }, 350);
+  });
 
-    const params = new URLSearchParams();
-    if (search) params.append('search', search);
-    if (isPassive) params.append('is_passive', isPassive);
+  document.getElementById('obs-students-course').addEventListener('change', (e) => {
+    observeStudentsState.course = e.target.value;
+    observeStudentsState.page = 1;
+    loadObserveStudentsList();
+  });
 
-    const tbody = document.getElementById('students-table-body');
-    try {
-      const data = await apiFetch(`/api/observe/students?${params.toString()}`);
-      if (!data.students || data.students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center p-4">Talabalar topilmadi</td></tr>';
-        return;
-      }
+  document.getElementById('obs-students-gender').addEventListener('change', (e) => {
+    observeStudentsState.gender = e.target.value;
+    observeStudentsState.page = 1;
+    loadObserveStudentsList();
+  });
 
-      tbody.innerHTML = data.students.map(s => `
+  await loadObserveStudentsList();
+}
+
+function resetObserveStudentFilters() {
+  observeStudentsState.search = '';
+  observeStudentsState.course = '';
+  observeStudentsState.gender = '';
+  observeStudentsState.page = 1;
+
+  const s = document.getElementById('obs-students-search');
+  if (s) s.value = '';
+  const c = document.getElementById('obs-students-course');
+  if (c) c.value = '';
+  const g = document.getElementById('obs-students-gender');
+  if (g) g.value = '';
+
+  loadObserveStudentsList();
+}
+
+function prevObsStudentPage() {
+  if (observeStudentsState.page > 1) {
+    observeStudentsState.page--;
+    loadObserveStudentsList();
+  }
+}
+
+function nextObsStudentPage() {
+  const maxPage = Math.ceil(observeStudentsState.total / observeStudentsState.limit);
+  if (observeStudentsState.page < maxPage) {
+    observeStudentsState.page++;
+    loadObserveStudentsList();
+  }
+}
+
+async function loadObserveStudentsList() {
+  const tbody = document.getElementById('obs-students-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div class="spinner" style="margin-bottom: 8px;"></div>
+        <p>Ma'lumotlar yangilanmoqda...</p>
+      </td>
+    </tr>
+  `;
+
+  try {
+    const params = new URLSearchParams({
+      page: observeStudentsState.page,
+      limit: observeStudentsState.limit
+    });
+    if (observeStudentsState.search) params.append('search', observeStudentsState.search);
+    if (observeStudentsState.course) params.append('course', observeStudentsState.course);
+    if (observeStudentsState.gender) params.append('gender', observeStudentsState.gender);
+
+    const res = await apiFetch(`/api/observe/students?${params.toString()}`);
+    const students = res.students || [];
+    observeStudentsState.total = res.total || 0;
+    observeStudentsState.students = students;
+
+    // Pagination info
+    const startIdx = observeStudentsState.total === 0 ? 0 : (observeStudentsState.page - 1) * observeStudentsState.limit + 1;
+    const endIdx = Math.min(observeStudentsState.page * observeStudentsState.limit, observeStudentsState.total);
+    const maxPage = Math.ceil(observeStudentsState.total / observeStudentsState.limit) || 1;
+
+    const pageInfo = document.getElementById('obs-students-page-info');
+    const pageNum = document.getElementById('obs-students-page-num');
+    const btnPrev = document.getElementById('btn-obs-prev');
+    const btnNext = document.getElementById('btn-obs-next');
+
+    if (pageInfo) pageInfo.textContent = `${startIdx}-${endIdx} dan ${observeStudentsState.total} ta`;
+    if (pageNum) pageNum.textContent = `${observeStudentsState.page} / ${maxPage}`;
+    if (btnPrev) btnPrev.disabled = observeStudentsState.page <= 1;
+    if (btnNext) btnNext.disabled = observeStudentsState.page >= maxPage;
+
+    if (students.length === 0) {
+      tbody.innerHTML = `
         <tr>
-          <td>
-            <strong>${s.first_name} ${s.last_name}</strong>
-            ${s.is_passive ? '<span class="badge badge-warning" style="margin-left: 6px;">14+ kun passiv</span>' : ''}
-          </td>
-          <td><span class="badge badge-light">${s.group_code}</span></td>
-          <td>${s.course}-kurs • ${s.program_code}</td>
-          <td>${s.phone || '-'}</td>
-          <td>${s.telegram_user_id ? '<span class="text-success">' + icon('checkCircle', 13) + ' Ulangan</span>' : '<span class="text-muted">' + icon('xCircle', 13) + ' Ulanmagan</span>'}</td>
-          <td><strong style="color: #2563EB;">${s.season || 0} ball</strong></td>
-          <td style="text-align: right;">
-            <button class="btn btn-outline btn-sm" onclick="showStudentModal('${s.id}')">Profil</button>
+          <td colspan="9" style="text-align: center; padding: 48px; color: var(--text-muted);">
+            <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('users', 32)}</div>
+            <p style="font-size: 14px; font-weight: 600; color: var(--text-main);">Talabalar topilmadi</p>
+            <p style="font-size: 12px; margin-top: 4px;">Qidiruv parametrlarini o'zgartirib ko'ring.</p>
           </td>
         </tr>
-      `).join('');
-    } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-danger p-4">${e.message}</td></tr>`;
+      `;
+      return;
     }
-  }
 
-  document.getElementById('btn-students-search').addEventListener('click', loadStudents);
-  loadStudents();
+    tbody.innerHTML = students.map(s => {
+      const isFemale = s.gender === 'female' || s.gender === 'f';
+      const initials = `${(s.first_name || '').charAt(0)}${(s.last_name || '').charAt(0)}`.toUpperCase();
+      const photoHtml = s.photo_url
+        ? `<img src="${s.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1px solid #CBD5E1; width: 34px; height: 34px; border-radius: 50%;" alt="${s.first_name}">`
+        : `<span class="avatar-badge ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>`;
+
+      return `
+        <tr class="student-table-row" onclick="showStudentDetailsModal('${s.id}')" style="cursor: pointer;" title="Batafsil profilni ko'rish uchun bosing">
+          <td>
+            <span class="badge badge-group">${s.external_id || '-'}</span>
+          </td>
+          <td>
+            <div class="table-student-name">
+              ${photoHtml}
+              <div>
+                <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${s.first_name} ${s.last_name}</div>
+                <div class="table-sub-text">${s.email || 'Email biriktirilmagan'}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div style="font-weight: 600; font-size: 12px;">${s.group_code || '-'}</div>
+            <div class="table-sub-text">${s.program_code || 'IT'}</div>
+          </td>
+          <td>
+            <span class="badge badge-course">${s.course || 1}-kurs</span>
+          </td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
+              <span style="color: #64748B;">${icon('phone', 12)}</span>
+              <span>${s.phone || '-'}</span>
+            </div>
+          </td>
+          <td>
+            ${s.telegram_user_id
+              ? `<span class="status-badge badge-active">${icon('checkCircle', 12)} Ulangan</span>`
+              : `<span class="status-badge badge-neutral">${icon('xCircle', 12)} Ulanmagan</span>`}
+          </td>
+          <td>
+            <strong style="color: #2563EB; font-size: 13.5px;">${s.season || 0}</strong> <span style="font-size: 11px; color: var(--text-muted);">ball</span>
+          </td>
+          <td>
+            <span style="font-weight: 600; font-size: 12.5px; color: var(--text-main);">${s.total || 0}</span>
+          </td>
+          <td style="text-align: right;" onclick="event.stopPropagation()">
+            <button class="btn btn-outline btn-sm" onclick="showStudentDetailsModal('${s.id}')" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 11.5px;">
+              ${icon('eye', 13)} Profil
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 24px; color: var(--danger);">Xatolik: ${err.message}</td></tr>`;
+  }
 }
+
 
 // -------------------------------------------------------------
 // SAHIFA: TADBIRLAR & QR (B-04, Q-10)
@@ -816,56 +1004,85 @@ async function renderObserveEvents(container) {
 }
 
 // -------------------------------------------------------------
-// SAHIFA: BALL KATALOGI v1.0
 // -------------------------------------------------------------
+// SAHIFA: BALL KATALOGI v1.0 (RASMIY MEZONLAR VA SHKALA)
+// -------------------------------------------------------------
+let observeCatalogState = {
+  search: '',
+  categoryId: '',
+  categories: [],
+  items: [],
+  scale: []
+};
+
 async function renderObserveCatalog(container) {
   try {
     const data = await apiFetch('/api/observe/catalog');
-    const categories = data.categories || [];
-    const items = data.items || [];
-    const scale = data.scale || [];
+    observeCatalogState.categories = data.categories || [];
+    observeCatalogState.items = data.items || [];
+    observeCatalogState.scale = data.scale || [];
 
-    let html = `
-      <!-- KATEGORIYALAR -->
-      <div class="card mb-4">
-        <div class="card-header">
-          <h3>Sohalar (Kategoriyalar)</h3>
-        </div>
-        <div class="card-body p-0">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Soha Nomi</th>
-                <th>Tasdiqlovchi Rol</th>
-                <th>Rang</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${categories.map(c => `
-                <tr>
-                  <td><strong>${c.id}</strong></td>
-                  <td><span style="color: ${c.color}; font-weight: 700;">●</span> ${c.name}</td>
-                  <td><span class="badge badge-light">${c.approver_role}</span></td>
-                  <td><code>${c.color}</code></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+    const categories = observeCatalogState.categories;
+    const scale = observeCatalogState.scale;
+
+    container.innerHTML = `
+      <!-- HERO BANNER -->
+      <div class="admin-hero-card" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div class="admin-hero-title">
+              <span style="color: #60A5FA;">${icon('fileText', 22)}</span>
+              <span>Al-Xorazmiy Universiteti Talabalar Faolligi Ball Katalogi (v1.0)</span>
+            </div>
+            <p class="admin-hero-desc">
+              Talabalarning ilmiy, madaniy, sport, jamoat va akademik yutuqlarini baholash mezonlari, 
+              ball shkalasi va tasdiqlovchi mas'ul bo'limlar ro'yxati.
+            </p>
+          </div>
         </div>
       </div>
 
-      <!-- MUSOBAQA SHKALASI -->
+      <!-- SOHALAR (KATEGORIYALAR) KARTALARI -->
       <div class="card mb-4">
-        <div class="card-header">
-          <h3>Musobaqalar va Tanlovlar Shkalasi (Matrix)</h3>
+        <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border-light);">
+          <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+            ${icon('building', 16)} Faoliyat Sohalari (Kategoriyalar - 9 ta yo'nalish)
+          </h3>
         </div>
-        <div class="card-body p-0">
-          <table class="table">
+        <div class="card-body">
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+            ${categories.map(c => {
+              const catItemsCount = observeCatalogState.items.filter(it => it.category_id === c.id).length;
+              return `
+                <div style="border: 1px solid var(--border-light); border-left: 4px solid ${c.color || '#2563EB'}; border-radius: var(--radius-md); padding: 14px; background: #FFFFFF; box-shadow: var(--shadow-sm);">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                    <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin: 0;">${c.name}</h4>
+                    <span class="badge" style="background: ${c.color || '#2563EB'}15; color: ${c.color || '#2563EB'}; font-size: 11px; font-weight: 700;">#${c.id}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary);">
+                    <span>Mas'ul: <strong>${c.approver_role || 'Rektorat'}</strong></span>
+                    <span class="badge badge-light" style="font-size: 11px;">${catItemsCount} ta mezon</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- MUSOBAQALAR VA TANLOVLAR SHKALASI MATRIX -->
+      <div class="card mb-4">
+        <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border-light);">
+          <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+            ${icon('trophy', 16)} Musobaqalar, Tanlovlar va Konkurslar Shkalasi (Matrix)
+          </h3>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
             <thead>
               <tr>
-                <th>Daraja (Level)</th>
-                <th>Ishtirok</th>
+                <th style="width: 180px;">Daraja (Level)</th>
+                <th>Ishtirokchi (Nominal)</th>
                 <th>Sovrindor (2-3 o'rin)</th>
                 <th>G'olib (1-o'rin)</th>
               </tr>
@@ -875,12 +1092,32 @@ async function renderObserveCatalog(container) {
                 const isht = scale.find(s => s.level === lvl && s.role === 'ishtirok')?.points || 0;
                 const sovr = scale.find(s => s.level === lvl && s.role === 'sovrindor')?.points || 0;
                 const gol = scale.find(s => s.level === lvl && s.role === 'golib')?.points || 0;
+                let lvlLabel = lvl.toUpperCase();
+                let lvlColor = '#475569';
+                if (lvl === 'universitet') lvlColor = '#2563EB';
+                else if (lvl === 'viloyat') lvlColor = '#D97706';
+                else if (lvl === 'respublika') lvlColor = '#059669';
+                else if (lvl === 'xalqaro') lvlColor = '#7C3AED';
+
                 return `
                   <tr>
-                    <td><strong>${lvl.toUpperCase()}</strong></td>
-                    <td><span class="badge badge-light">${isht} ball (±20%: ${Math.round(isht*0.8)}-${Math.round(isht*1.2)})</span></td>
-                    <td><span class="badge badge-warning">${sovr} ball (±20%: ${Math.round(sovr*0.8)}-${Math.round(sovr*1.2)})</span></td>
-                    <td><span class="badge badge-success">${gol} ball (±20%: ${Math.round(gol*0.8)}-${Math.round(gol*1.2)})</span></td>
+                    <td>
+                      <span class="badge" style="background: ${lvlColor}15; color: ${lvlColor}; border: 1px solid ${lvlColor}30; font-size: 12px; font-weight: 700;">
+                        ${lvlLabel}
+                      </span>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">+${isht} ball</div>
+                      <div class="table-sub-text">±20% koridor: ${Math.round(isht*0.8)} - ${Math.round(isht*1.2)} ball</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: #D97706; font-size: 13px;">+${sovr} ball</div>
+                      <div class="table-sub-text">±20% koridor: ${Math.round(sovr*0.8)} - ${Math.round(sovr*1.2)} ball</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: #059669; font-size: 13px;">+${gol} ball</div>
+                      <div class="table-sub-text">±20% koridor: ${Math.round(gol*0.8)} - ${Math.round(gol*1.2)} ball</div>
+                    </td>
                   </tr>
                 `;
               }).join('')}
@@ -889,54 +1126,114 @@ async function renderObserveCatalog(container) {
         </div>
       </div>
 
-      <!-- KATALOG BANDLARI -->
+      <!-- KATALOG BANDLARI RO'YXATI -->
       <div class="card">
-        <div class="card-header">
-          <h3>Katalog Bandlari Ro'yxati</h3>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Kategoriya</th>
-                  <th>Band Nomi</th>
-                  <th>Baza Balli</th>
-                  <th>Turi</th>
-                  <th>Dalil Talabi</th>
-                  <th>Tasdiqlovchi</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(it => `
-                  <tr>
-                    <td><code>${it.id}</code></td>
-                    <td>${it.category_name}</td>
-                    <td><strong>${it.name}</strong></td>
-                    <td>
-                      ${it.is_scale ? '<span class="badge badge-primary">Shkala bo\'yicha</span>' : 
-                        (it.base_points !== null ? `<strong>${it.base_points} ball</strong>` : '-')}
-                    </td>
-                    <td>
-                      ${it.is_auto ? '<span class="badge badge-light">Avtomatik</span>' : 
-                        (it.is_scale ? '<span class="badge badge-warning">Musobaqa</span>' : '<span class="badge badge-light">Oddiy</span>')}
-                    </td>
-                    <td><small style="color: var(--text-muted);">${it.evidence_hint || 'Majburiy emas'}</small></td>
-                    <td><span class="badge badge-light">${it.approver_role || '-'}</span></td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+        <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+            ${icon('fileSpreadsheet', 16)} Katalog Bandlari va Mezonlar Ro'yxati (${observeCatalogState.items.length} ta mezon)
+          </h3>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="obs-catalog-filter-cat" class="form-select" style="width: auto; font-size: 12px; padding: 6px 10px;">
+              <option value="">Barcha sohalar</option>
+              ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+            </select>
+            <input type="text" id="obs-catalog-filter-search" class="form-control" placeholder="Mezon nomi bo'yicha..." style="font-size: 12px; padding: 6px 10px; width: 200px;">
           </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 70px;">ID</th>
+                <th>Soha / Kategoriya</th>
+                <th>Mezon (Band Nomi)</th>
+                <th>Baza Balli</th>
+                <th>Turi</th>
+                <th>Dalil Talabi</th>
+                <th>Tasdiqlovchi Bo'lim</th>
+              </tr>
+            </thead>
+            <tbody id="obs-catalog-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
         </div>
       </div>
     `;
-    container.innerHTML = html;
+
+    // Filter events
+    document.getElementById('obs-catalog-filter-cat').addEventListener('change', (e) => {
+      observeCatalogState.categoryId = e.target.value;
+      renderObserveCatalogTable();
+    });
+
+    document.getElementById('obs-catalog-filter-search').addEventListener('input', (e) => {
+      observeCatalogState.search = e.target.value.trim().toLowerCase();
+      renderObserveCatalogTable();
+    });
+
+    renderObserveCatalogTable();
+
   } catch (err) {
     container.innerHTML = `<div class="card"><p class="text-danger">${err.message}</p></div>`;
   }
 }
+
+function renderObserveCatalogTable() {
+  const tbody = document.getElementById('obs-catalog-table-body');
+  if (!tbody) return;
+
+  let filtered = observeCatalogState.items;
+  if (observeCatalogState.categoryId) {
+    filtered = filtered.filter(it => String(it.category_id) === String(observeCatalogState.categoryId));
+  }
+  if (observeCatalogState.search) {
+    const q = observeCatalogState.search;
+    filtered = filtered.filter(it => (it.name || '').toLowerCase().includes(q));
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">Mezonlar topilmadi</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(it => {
+    const catColor = it.category_color || '#2563EB';
+    const catName = it.category_name || `Kategoriya #${it.category_id}`;
+
+    return `
+      <tr>
+        <td><span class="badge badge-group">#${it.id}</span></td>
+        <td>
+          <span class="badge" style="background: ${catColor}15; color: ${catColor}; border: 1px solid ${catColor}30; font-weight: 600;">
+            ${catName}
+          </span>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${it.name}</div>
+        </td>
+        <td>
+          ${it.is_scale 
+            ? `<span class="badge badge-course" style="font-weight: 700;">Shkala bo'yicha</span>` 
+            : (it.base_points !== null ? `<span style="font-weight: 700; color: #2563EB; font-size: 13px;">+${it.base_points} ball</span>` : '-')}
+        </td>
+        <td>
+          ${it.is_auto 
+            ? '<span class="badge badge-active">Avtomatik</span>' 
+            : (it.is_scale ? '<span class="badge badge-warning">Musobaqa</span>' : '<span class="badge badge-neutral">Arizaviy</span>')}
+        </td>
+        <td>
+          <span style="font-size: 11.5px; color: var(--text-secondary);">${it.evidence_hint || 'Majburiy emas'}</span>
+        </td>
+        <td>
+          <span class="badge badge-group" style="font-weight: 600;">${it.approver_role || '-'}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
 
 // -------------------------------------------------------------
 // SAHIFA: TYUTORNING TALABALARI (T-01, T-05)
@@ -1846,147 +2143,547 @@ async function decideAppealAction(id, decision) {
 }
 
 // -------------------------------------------------------------
-// SAHIFA: SUPERADMIN KATALOG SOZLAMALARI
 // -------------------------------------------------------------
+// SAHIFA: SUPERADMIN KATALOG SOZLAMALARI (AT-21, S-01)
+// -------------------------------------------------------------
+let adminCatalogState = {
+  search: '',
+  categoryId: '',
+  items: [],
+  categories: []
+};
+
 async function renderAdminCatalog(container) {
   try {
     const data = await apiFetch('/api/admin/catalog');
-    const items = data.items || [];
+    adminCatalogState.items = data.items || [];
+    adminCatalogState.categories = data.categories || [];
 
-    let html = `
-      <div class="card">
-        <div class="card-header">
-          <h3>Katalog Bandlarini Versiyalash va Boshqarish (S-01, AT-21)</h3>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nomi</th>
-                  <th>Baza Balli</th>
-                  <th>Versiya</th>
-                  <th>Tasdiqlovchi Rol</th>
-                  <th style="text-align: right;">Tahrirlash</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(it => `
-                  <tr>
-                    <td><code>${it.id}</code></td>
-                    <td><strong>${it.name}</strong></td>
-                    <td>${it.base_points !== null ? it.base_points : 'Shkala'}</td>
-                    <td><span class="badge badge-light">v${it.version_from}</span></td>
-                    <td>${it.approver_role || '-'}</td>
-                    <td style="text-align: right;">
-                      <button class="btn btn-outline btn-sm" onclick="editCatalogItemModal('${it.id}', '${it.name.replace(/'/g, "\\'")}', ${it.base_points})">
-                        Tahrirlash
-                      </button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+    const categories = adminCatalogState.categories;
+
+    container.innerHTML = `
+      <!-- HERO BANNER -->
+      <div class="admin-hero-card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div class="admin-hero-title">
+              <span style="color: #60A5FA;">${icon('settings', 22)}</span>
+              <span>Ball Katalogi Sozlamalari & Versiyalash</span>
+              <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 11px;">Superadmin</span>
+            </div>
+            <p class="admin-hero-desc">
+              Katalog mezonlarini tahrirlash uchun jadvaldagi ixtiyoriy band ustiga bosing. 
+              Har bir o'zgartirish tizimda o'zgarmas versiya sifatida saqlanadi va audit qilinadi.
+            </p>
           </div>
         </div>
       </div>
+
+      <!-- TOOLBAR -->
+      <div class="admin-toolbar">
+        <div class="admin-search-box">
+          ${icon('search', 16)}
+          <input type="text" id="admin-cat-search" class="admin-search-input" placeholder="Mezon nomi bo'yicha tezkor qidiruv...">
+        </div>
+        <div class="admin-filters-group">
+          <select id="admin-cat-filter-cat" class="admin-filter-select">
+            <option value="">Barcha kategoriyalar</option>
+            ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="resetAdminCatalogFilters()" style="display:inline-flex; align-items:center; gap:4px;">
+            ${icon('refresh', 13)} Tozalash
+          </button>
+        </div>
+      </div>
+
+      <!-- DATA TABLE -->
+      <div class="card">
+        <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border-light);">
+          <span style="font-size: 12.5px; color: var(--text-secondary); font-weight: 600;">
+            Maslahat: Mezonni tahrirlash uchun qatordan ixtiyoriy joyiga bosing.
+          </span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 70px;">ID</th>
+                <th>Kategoriya</th>
+                <th>Mezon (Band Nomi)</th>
+                <th>Baza Balli</th>
+                <th>Versiya</th>
+                <th>Tasdiqlovchi Rol</th>
+                <th>Dalil Talabi</th>
+              </tr>
+            </thead>
+            <tbody id="admin-cat-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     `;
-    container.innerHTML = html;
+
+    document.getElementById('admin-cat-search').addEventListener('input', (e) => {
+      adminCatalogState.search = e.target.value.trim().toLowerCase();
+      renderAdminCatalogRows();
+    });
+
+    document.getElementById('admin-cat-filter-cat').addEventListener('change', (e) => {
+      adminCatalogState.categoryId = e.target.value;
+      renderAdminCatalogRows();
+    });
+
+    renderAdminCatalogRows();
+
   } catch (err) {
     container.innerHTML = `<div class="card"><p class="text-danger">${err.message}</p></div>`;
   }
 }
 
-function editCatalogItemModal(id, currentName, currentPoints) {
-  const modalBody = document.getElementById('modal-body');
+function resetAdminCatalogFilters() {
+  adminCatalogState.search = '';
+  adminCatalogState.categoryId = '';
+  const s = document.getElementById('admin-cat-search');
+  if (s) s.value = '';
+  const c = document.getElementById('admin-cat-filter-cat');
+  if (c) c.value = '';
+  renderAdminCatalogRows();
+}
+
+function renderAdminCatalogRows() {
+  const tbody = document.getElementById('admin-cat-table-body');
+  if (!tbody) return;
+
+  let filtered = adminCatalogState.items;
+  if (adminCatalogState.categoryId) {
+    filtered = filtered.filter(it => String(it.category_id) === String(adminCatalogState.categoryId));
+  }
+  if (adminCatalogState.search) {
+    const q = adminCatalogState.search;
+    filtered = filtered.filter(it => (it.name || '').toLowerCase().includes(q));
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">Mezonlar topilmadi</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(it => {
+    const catColor = it.category_color || '#2563EB';
+    const catName = it.category_name || `Kategoriya #${it.category_id}`;
+
+    return `
+      <tr class="student-table-row" onclick="showEditCatalogModal('${it.id}')" style="cursor: pointer;" title="Tahrirlash uchun bosing">
+        <td><span class="badge badge-group">#${it.id}</span></td>
+        <td>
+          <span class="badge" style="background: ${catColor}15; color: ${catColor}; border: 1px solid ${catColor}30; font-weight: 600;">
+            ${catName}
+          </span>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${it.name}</div>
+        </td>
+        <td>
+          ${it.is_scale 
+            ? `<span class="badge badge-course" style="font-weight: 700;">Shkala bo'yicha</span>` 
+            : (it.base_points !== null ? `<span style="font-weight: 700; color: #2563EB; font-size: 13px;">+${it.base_points} ball</span>` : '-')}
+        </td>
+        <td><span class="badge badge-neutral">v${it.version_from || 1}</span></td>
+        <td><span class="badge badge-group" style="font-weight: 600;">${it.approver_role || '-'}</span></td>
+        <td><span style="font-size: 11.5px; color: var(--text-muted);">${it.evidence_hint || 'Majburiy emas'}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function showEditCatalogModal(id) {
+  const item = adminCatalogState.items.find(i => String(i.id) === String(id));
+  if (!item) return;
+
   const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = `Bandni Tahrirlash: ${id}`;
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Mezonni Tahrirlash: #${item.id}</span>`;
   modalBody.innerHTML = `
-    <div class="form-group mb-3">
-      <label class="form-label">Band Nomi:</label>
-      <input type="text" id="edit-cat-name" class="form-control" value="${currentName}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Baza Balli:</label>
-      <input type="number" id="edit-cat-points" class="form-control" value="${currentPoints || 0}">
-    </div>
+    <form id="edit-cat-form">
+      <div class="form-group mb-3">
+        <label class="form-label">Mezon (Band Nomi) *</label>
+        <textarea id="edit-cat-name" class="form-control" rows="2" required>${item.name}</textarea>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Baza Balli</label>
+          <input type="number" id="edit-cat-points" class="form-control" value="${item.base_points !== null ? item.base_points : 0}" ${item.is_scale ? 'disabled' : ''}>
+          ${item.is_scale ? `<small class="text-muted">Bu band musobaqa shkalasi bo'yicha hisoblanadi</small>` : ''}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tasdiqlovchi Mas'ul Rol</label>
+          <input type="text" id="edit-cat-role" class="form-control" value="${item.approver_role || ''}">
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Dalil Talabi (Yo'riqnoma)</label>
+        <input type="text" id="edit-cat-evidence" class="form-control" value="${item.evidence_hint || ''}">
+      </div>
+
+      <div class="form-group mb-2">
+        <label class="form-label">Limit Qoidasi</label>
+        <input type="text" id="edit-cat-limit" class="form-control" value="${item.limit_rule || ''}" placeholder="Masalan: semestrda 2 marta">
+      </div>
+    </form>
   `;
 
   modalFooter.innerHTML = `
-    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-    <button class="btn btn-primary" onclick="saveCatalogItem('${id}')">Yangi Versiya Saqlash</button>
+    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+    <button class="btn btn-primary" onclick="saveCatalogItem('${id}')" style="display:inline-flex; align-items:center; gap:6px;">
+      ${icon('check', 14)} Saqlash
+    </button>
   `;
 
   openModal();
 }
 
 async function saveCatalogItem(id) {
-  const name = document.getElementById('edit-cat-name').value;
-  const base_points = Number(document.getElementById('edit-cat-points').value);
+  const name = document.getElementById('edit-cat-name')?.value.trim();
+  const base_points = Number(document.getElementById('edit-cat-points')?.value || 0);
+  const approver_role = document.getElementById('edit-cat-role')?.value.trim();
+  const evidence_hint = document.getElementById('edit-cat-evidence')?.value.trim();
+  const limit_rule = document.getElementById('edit-cat-limit')?.value.trim();
+
+  if (!name) {
+    alert('Band nomi kiritilishi shart!');
+    return;
+  }
 
   try {
     const res = await apiFetch(`/api/admin/catalog/item/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, base_points })
+      body: JSON.stringify({ name, base_points, approver_role, evidence_hint, limit_rule })
     });
     closeModal();
-    alert(res.message);
-    navigateTo('admin-catalog');
+    alert(res.message || "Muvaffaqiyatli saqlandi!");
+    await renderAdminCatalog(document.getElementById('app-content-area'));
   } catch (e) {
     alert(e.message);
   }
 }
 
-// -------------------------------------------------------------
-// SAHIFA: AUDIT JURNALI (X-05)
-// -------------------------------------------------------------
-async function renderAdminAudit(container) {
-  try {
-    const data = await apiFetch('/api/admin/audit?limit=50');
-    const logs = data.logs || [];
 
-    let html = `
-      <div class="card">
-        <div class="card-header">
-          <h3>Tizim Harakatlari Jurnali (Audit Log - X-05)</h3>
-          <span style="font-size: 12px; color: var(--text-muted);">O'zgartirib bo'lmas to'liq xronologiya</span>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Vaqt</th>
-                  <th>Foydalanuvchi</th>
-                  <th>Harakat</th>
-                  <th>Obyekt</th>
-                  <th>IP Manzil</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${logs.map(l => `
-                  <tr>
-                    <td><small>${new Date(l.at).toLocaleString('uz-UZ')}</small></td>
-                    <td><strong>${l.actor_name || l.actor_id}</strong> (${l.actor_role})</td>
-                    <td><span class="badge badge-light">${l.action}</span></td>
-                    <td><code>${l.object_type}:${l.object_id}</code></td>
-                    <td><small style="color: var(--text-muted);">${l.ip}</small></td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+// -------------------------------------------------------------
+// -------------------------------------------------------------
+// SAHIFA: TO'LIQ AUDIT JURNALI (X-05) - ENTERPRISE AUDIT LOG
+// -------------------------------------------------------------
+let adminAuditState = {
+  action: '',
+  search: '',
+  limit: 50,
+  offset: 0,
+  total: 0,
+  logs: []
+};
+
+async function renderAdminAudit(container) {
+  container.innerHTML = `
+    <!-- HERO BANNER -->
+    <div class="admin-hero-card" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div>
+          <div class="admin-hero-title">
+            <span style="color: #F87171;">${icon('shield', 22)}</span>
+            <span>Tizim Xavfsizlik & Harakatlar Audit Jurnali (X-05)</span>
+            <span class="badge" style="background: rgba(248, 113, 113, 0.2); color: #FCA5A5; border: 1px solid rgba(248, 113, 113, 0.4); font-size: 11px;">
+              O'zgartirib bo'lmas xronologiya
+            </span>
           </div>
+          <p class="admin-hero-desc">
+            Barcha ma'muriy, ball berish, tasdiqlash, rasm biriktirish va import operatsiyalari qaydnomasi. 
+            Tafsilotlarni ko'rish uchun satr ustiga bosing.
+          </p>
         </div>
       </div>
-    `;
-    container.innerHTML = html;
-  } catch (err) {
-    container.innerHTML = `<div class="card"><p class="text-danger">${err.message}</p></div>`;
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="admin-toolbar">
+      <div class="admin-search-box">
+        ${icon('search', 16)}
+        <input type="text" id="audit-filter-search" class="admin-search-input" placeholder="Xodim, obyekt yoki IP manzil bo'yicha qidiruv...">
+      </div>
+      <div class="admin-filters-group">
+        <select id="audit-filter-action" class="admin-filter-select">
+          <option value="">Barcha harakatlar</option>
+          <option value="IMPORT_STUDENTS">IMPORT_STUDENTS</option>
+          <option value="CREATE_STUDENT">CREATE_STUDENT</option>
+          <option value="UPDATE_STUDENT">UPDATE_STUDENT</option>
+          <option value="UPDATE_STUDENT_PHOTO">UPDATE_STUDENT_PHOTO</option>
+          <option value="CREATE_POINT_ENTRY">CREATE_POINT_ENTRY</option>
+          <option value="APPROVE_POINT_ENTRY">APPROVE_POINT_ENTRY</option>
+          <option value="REJECT_POINT_ENTRY">REJECT_POINT_ENTRY</option>
+          <option value="CREATE_STAFF_USER">CREATE_STAFF_USER</option>
+          <option value="UPDATE_STAFF_USER">UPDATE_STAFF_USER</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="resetAuditFilters()" style="display:inline-flex; align-items:center; gap:4px;">
+          ${icon('refresh', 13)} Tozalash
+        </button>
+      </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="card">
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 150px;">Vaqt (Sana)</th>
+              <th>Mas'ul Foydalanuvchi</th>
+              <th>Harakat (Action)</th>
+              <th>Obyekt</th>
+              <th>IP Manzil</th>
+              <th style="text-align: right; width: 100px;">Tafsilot</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <div class="spinner" style="margin-bottom: 8px;"></div>
+                <p>Audit jurnali yuklanmoqda...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="pagination-bar" id="audit-pagination-bar">
+        <span id="audit-page-info">0 ta ma'lumot</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn btn-outline btn-sm" id="btn-audit-prev" onclick="prevAuditPage()" disabled>Oldingi</button>
+          <span id="audit-page-num" style="font-weight: 600; padding: 0 6px;">1</span>
+          <button class="btn btn-outline btn-sm" id="btn-audit-next" onclick="nextAuditPage()" disabled>Keyingi</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('audit-filter-action').addEventListener('change', (e) => {
+    adminAuditState.action = e.target.value;
+    adminAuditState.offset = 0;
+    loadAuditLogsList();
+  });
+
+  const aSearch = document.getElementById('audit-filter-search');
+  let timer;
+  aSearch.addEventListener('input', (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      adminAuditState.search = e.target.value.trim().toLowerCase();
+      renderAuditRows();
+    }, 300);
+  });
+
+  await loadAuditLogsList();
+}
+
+function resetAuditFilters() {
+  adminAuditState.action = '';
+  adminAuditState.search = '';
+  adminAuditState.offset = 0;
+
+  const a = document.getElementById('audit-filter-action');
+  if (a) a.value = '';
+  const s = document.getElementById('audit-filter-search');
+  if (s) s.value = '';
+
+  loadAuditLogsList();
+}
+
+function prevAuditPage() {
+  if (adminAuditState.offset >= adminAuditState.limit) {
+    adminAuditState.offset -= adminAuditState.limit;
+    loadAuditLogsList();
   }
 }
+
+function nextAuditPage() {
+  if (adminAuditState.offset + adminAuditState.limit < adminAuditState.total) {
+    adminAuditState.offset += adminAuditState.limit;
+    loadAuditLogsList();
+  }
+}
+
+async function loadAuditLogsList() {
+  const tbody = document.getElementById('audit-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div class="spinner" style="margin-bottom: 8px;"></div>
+        <p>Ma'lumotlar yangilanmoqda...</p>
+      </td>
+    </tr>
+  `;
+
+  try {
+    const params = new URLSearchParams({
+      limit: adminAuditState.limit,
+      offset: adminAuditState.offset
+    });
+    if (adminAuditState.action) params.append('action', adminAuditState.action);
+
+    const res = await apiFetch(`/api/admin/audit?${params.toString()}`);
+    adminAuditState.logs = res.logs || [];
+    adminAuditState.total = res.total || 0;
+
+    // Pagination
+    const startIdx = adminAuditState.total === 0 ? 0 : adminAuditState.offset + 1;
+    const endIdx = Math.min(adminAuditState.offset + adminAuditState.logs.length, adminAuditState.total);
+    const pageNum = Math.floor(adminAuditState.offset / adminAuditState.limit) + 1;
+    const maxPage = Math.ceil(adminAuditState.total / adminAuditState.limit) || 1;
+
+    const pageInfo = document.getElementById('audit-page-info');
+    const pageNumEl = document.getElementById('audit-page-num');
+    const btnPrev = document.getElementById('btn-audit-prev');
+    const btnNext = document.getElementById('btn-audit-next');
+
+    if (pageInfo) pageInfo.textContent = `${startIdx}-${endIdx} dan ${adminAuditState.total} ta`;
+    if (pageNumEl) pageNumEl.textContent = `${pageNum} / ${maxPage}`;
+    if (btnPrev) btnPrev.disabled = adminAuditState.offset <= 0;
+    if (btnNext) btnNext.disabled = endIdx >= adminAuditState.total;
+
+    renderAuditRows();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--danger);">Xatolik: ${err.message}</td></tr>`;
+  }
+}
+
+function renderAuditRows() {
+  const tbody = document.getElementById('audit-table-body');
+  if (!tbody) return;
+
+  let filtered = adminAuditState.logs;
+  if (adminAuditState.search) {
+    const q = adminAuditState.search;
+    filtered = filtered.filter(l =>
+      (l.actor_id || '').toLowerCase().includes(q) ||
+      (l.actor_name || '').toLowerCase().includes(q) ||
+      (l.object_type || '').toLowerCase().includes(q) ||
+      (l.object_id || '').toLowerCase().includes(q) ||
+      (l.ip || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 48px; color: var(--text-muted);">
+          <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('shield', 32)}</div>
+          <p style="font-weight: 600;">Audit yozuvlari topilmadi</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(l => {
+    let actionBg = '#F1F5F9', actionColor = '#475569';
+    if (l.action.includes('CREATE')) { actionBg = '#ECFDF5'; actionColor = '#059669'; }
+    else if (l.action.includes('UPDATE')) { actionBg = '#EFF6FF'; actionColor = '#2563EB'; }
+    else if (l.action.includes('PHOTO')) { actionBg = '#F5F3FF'; actionColor = '#7C3AED'; }
+    else if (l.action.includes('IMPORT')) { actionBg = '#FFFBEB'; actionColor = '#D97706'; }
+    else if (l.action.includes('DEACTIVATE') || l.action.includes('DELETE')) { actionBg = '#FEF2F2'; actionColor = '#DC2626'; }
+
+    const dateStr = new Date(l.at).toLocaleString('uz-UZ', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+
+    return `
+      <tr class="student-table-row" onclick="showAuditDetailModal(${l.id})" style="cursor: pointer;" title="Tafsilotlarni ko'rish uchun bosing">
+        <td>
+          <span style="font-family: monospace; font-size: 11.5px; color: var(--text-secondary);">${dateStr}</span>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main); font-size: 12.5px;">${l.actor_name || l.actor_id}</div>
+          <div class="table-sub-text">${l.actor_role}</div>
+        </td>
+        <td>
+          <span class="badge" style="background:${actionBg}; color:${actionColor}; border:1px solid ${actionColor}30; font-family: monospace; font-size: 11px; font-weight:700;">
+            ${l.action}
+          </span>
+        </td>
+        <td>
+          <span class="badge badge-group" style="font-size: 11px;">${l.object_type}:${(l.object_id || '').substring(0, 16)}</span>
+        </td>
+        <td>
+          <code style="font-size: 11px; color: #64748B;">${l.ip || '127.0.0.1'}</code>
+        </td>
+        <td style="text-align: right;" onclick="event.stopPropagation()">
+          <button class="btn btn-outline btn-sm" onclick="showAuditDetailModal(${l.id})" style="font-size: 11.5px; padding: 2px 8px;">
+            ${icon('eye', 13)} Ko'rish
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function showAuditDetailModal(logId) {
+  const log = adminAuditState.logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('shield', 18)} Audit Tafsiloti #${log.id}</span>`;
+  
+  let beforeFormatted = '-';
+  let afterFormatted = '-';
+  try {
+    if (log.before_data) beforeFormatted = JSON.stringify(JSON.parse(log.before_data), null, 2);
+  } catch (e) { beforeFormatted = log.before_data || '-'; }
+
+  try {
+    if (log.after_data) afterFormatted = JSON.stringify(JSON.parse(log.after_data), null, 2);
+  } catch (e) { afterFormatted = log.after_data || '-'; }
+
+  modalBody.innerHTML = `
+    <div class="grid grid-2 mb-3" style="font-size: 13px; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+      <div>
+        <p style="margin-bottom: 4px;"><strong>Vaqt:</strong> ${new Date(log.at).toLocaleString('uz-UZ')}</p>
+        <p style="margin-bottom: 4px;"><strong>Foydalanuvchi:</strong> ${log.actor_name || log.actor_id} (${log.actor_role})</p>
+        <p style="margin-bottom: 4px;"><strong>IP Manzil:</strong> ${log.ip}</p>
+      </div>
+      <div>
+        <p style="margin-bottom: 4px;"><strong>Harakat:</strong> <span class="badge badge-group">${log.action}</span></p>
+        <p style="margin-bottom: 4px;"><strong>Obyekt turi:</strong> ${log.object_type}</p>
+        <p style="margin-bottom: 4px;"><strong>Obyekt ID:</strong> <code>${log.object_id}</code></p>
+      </div>
+    </div>
+
+    ${log.after_data ? `
+      <div class="form-group mb-2">
+        <label class="form-label">O'zgarish / Kiritilgan ma'lumotlar (JSON):</label>
+        <pre style="background: #0F172A; color: #38BDF8; padding: 14px; border-radius: var(--radius-md); font-size: 11.5px; max-height: 250px; overflow: auto;">${afterFormatted}</pre>
+      </div>
+    ` : ''}
+
+    ${log.before_data ? `
+      <div class="form-group mb-2">
+        <label class="form-label">Oldingi holat (Before):</label>
+        <pre style="background: #F1F5F9; color: #334155; padding: 12px; border-radius: var(--radius-md); font-size: 11.5px; max-height: 180px; overflow: auto;">${beforeFormatted}</pre>
+      </div>
+    ` : ''}
+  `;
+
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  openModal();
+}
+
 
 // -------------------------------------------------------------
 // MODALLAR VA YORDAMCHI FUNKSIYALAR
@@ -2490,20 +3187,17 @@ async function loadAdminStudentsList() {
     const statInactive = document.getElementById('stat-inactive-students');
     const statGroups = document.getElementById('stat-groups-count');
 
-    if (statTotal) statTotal.textContent = res.total || 0;
-    
-    // Guruhlar va statuslarni aniqlash
-    const allGroups = new Set();
-    let activeCount = 0;
-    let inactiveCount = 0;
-    students.forEach(s => {
-      if (s.group_code) allGroups.add(s.group_code);
-      if (s.status === 'active') activeCount++; else inactiveCount++;
-    });
-
-    if (statActive) statActive.textContent = activeCount;
-    if (statInactive) statInactive.textContent = inactiveCount;
-    if (statGroups) statGroups.textContent = allGroups.size;
+    if (res.metrics) {
+      if (statTotal) statTotal.textContent = res.metrics.total || 0;
+      if (statActive) statActive.textContent = res.metrics.active || 0;
+      if (statInactive) statInactive.textContent = res.metrics.inactive || 0;
+      if (statGroups) statGroups.textContent = res.metrics.groups || 0;
+    } else {
+      if (statTotal) statTotal.textContent = res.total || 0;
+      if (statActive) statActive.textContent = res.total || 0;
+      if (statInactive) statInactive.textContent = 0;
+      if (statGroups) statGroups.textContent = 5;
+    }
 
     // Pagination update
     const pageInfo = document.getElementById('students-pagination-info');

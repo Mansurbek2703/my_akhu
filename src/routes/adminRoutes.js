@@ -201,7 +201,25 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
   const students = db.prepare(sql).all(...params, Number(limit), Number(offset));
   const total = db.prepare(`SELECT COUNT(*) as c FROM student st ${whereClause}`).get(...params).c;
 
-  res.json({ students, total });
+  const counts = db.prepare(`
+    SELECT
+      COUNT(*) as total_all,
+      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_all,
+      SUM(CASE WHEN status = 'left' THEN 1 ELSE 0 END) as inactive_all,
+      COUNT(DISTINCT group_code) as groups_all
+    FROM student
+  `).get();
+
+  res.json({
+    students,
+    total,
+    metrics: {
+      total: counts.total_all || 0,
+      active: counts.active_all || 0,
+      inactive: counts.inactive_all || 0,
+      groups: counts.groups_all || 0
+    }
+  });
 });
 
 /**
@@ -947,7 +965,13 @@ router.delete('/users/:id', authenticateSuperadmin, (req, res) => {
  */
 router.get('/catalog', authenticateSuperadmin, (req, res) => {
   const categories = db.prepare(`SELECT * FROM catalog_category ORDER BY sort ASC`).all();
-  const items = db.prepare(`SELECT * FROM catalog_item WHERE archived = 0 ORDER BY category_id, id ASC`).all();
+  const items = db.prepare(`
+    SELECT ci.*, cc.name as category_name, cc.color as category_color
+    FROM catalog_item ci
+    LEFT JOIN catalog_category cc ON ci.category_id = cc.id
+    WHERE ci.archived = 0
+    ORDER BY ci.category_id, ci.id ASC
+  `).all();
   const scale = db.prepare(`SELECT * FROM scale_matrix`).all();
   res.json({ categories, items, scale });
 });
@@ -1064,19 +1088,21 @@ router.get('/audit', authenticateSuperadmin, (req, res) => {
   let where = [];
   let params = [];
 
-  if (action) { where.push('action = ?'); params.push(action); }
-  if (actor_id) { where.push('actor_id = ?'); params.push(actor_id); }
+  if (action) { where.push('al.action = ?'); params.push(action); }
+  if (actor_id) { where.push('al.actor_id = ?'); params.push(actor_id); }
 
   const whereStr = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
   const logs = db.prepare(`
-    SELECT * FROM audit_log
+    SELECT al.*, su.full_name as actor_name
+    FROM audit_log al
+    LEFT JOIN staff_user su ON al.actor_id = su.id
     ${whereStr}
-    ORDER BY id DESC
+    ORDER BY al.id DESC
     LIMIT ? OFFSET ?
   `).all(...params, Number(limit), Number(offset));
 
-  const total = db.prepare(`SELECT COUNT(*) as c FROM audit_log ${whereStr}`).get(...params).c;
+  const total = db.prepare(`SELECT COUNT(*) as c FROM audit_log al ${whereStr}`).get(...params).c;
 
   res.json({ logs, total });
 });

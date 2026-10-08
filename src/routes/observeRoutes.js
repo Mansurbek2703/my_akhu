@@ -203,7 +203,13 @@ router.get('/rating', (req, res) => {
  */
 router.get('/catalog', (req, res) => {
   const categories = db.prepare(`SELECT * FROM catalog_category ORDER BY sort ASC`).all();
-  const items = db.prepare(`SELECT * FROM catalog_item WHERE archived = 0 ORDER BY category_id, id ASC`).all();
+  const items = db.prepare(`
+    SELECT ci.*, cc.name as category_name, cc.color as category_color
+    FROM catalog_item ci
+    LEFT JOIN catalog_category cc ON ci.category_id = cc.id
+    WHERE ci.archived = 0
+    ORDER BY ci.category_id, ci.id ASC
+  `).all();
   const scale = db.prepare(`SELECT * FROM scale_matrix`).all();
 
   res.json({ categories, items, scale });

@@ -106,11 +106,9 @@ function recalculateStudentScores() {
     `).get(st.id);
     const eventsCount = evRow.c || 0;
 
-    // 7. Passiv belgi: 30+ kun ballsiz yoki season == 0
+    // 7. Passiv belgi: faqat oxirgi ballidan 30+ kun o'tgan bo'lsa
     let isPassive = 0;
-    if (season === 0) {
-      isPassive = 1;
-    } else if (lastPointAt) {
+    if (lastPointAt) {
       const daysDiff = (new Date() - new Date(lastPointAt)) / (1000 * 60 * 60 * 24);
       if (daysDiff >= 30) isPassive = 1;
     }
