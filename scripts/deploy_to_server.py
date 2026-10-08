@@ -10,6 +10,7 @@ ssh.connect('192.168.1.2', port=22, username='boss', password='Sshtelnet27032004
 remote_script = """
 set -e
 cd /home/boss/my_akhu
+git pull origin main
 
 node -e "
 const { db } = require('./src/db/database');
