@@ -4298,13 +4298,20 @@ function renderStaffTableRows() {
     const isActive = (u.is_active !== undefined) ? Boolean(u.is_active) : (u.active === 1);
     const groups = u.tutor_groups || u.groups || [];
 
-    const roleBadges = (u.roles || []).map(r => {
+    const validRoles = (u.roles || []).filter(r => r && r !== 'undefined');
+    const roleBadges = validRoles.map(r => {
       let bg = '#F1F5F9', color = '#475569', label = r;
       if (r === 'superadmin') { bg = '#FEF2F2'; color = '#DC2626'; label = 'Superadmin'; }
       else if (r === 'prorektor') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Prorektor'; }
       else if (r === 'tutor') { bg = '#ECFDF5'; color = '#059669'; label = 'Tyutor'; }
-      else if (r.startsWith('dep_')) { bg = '#EFF6FF'; color = '#2563EB'; label = r; }
-      return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.06);">${label}</span>`;
+      else if (r === 'dep_yb') { bg = '#EFF6FF'; color = '#2563EB'; label = 'Yoshlar bo\'limi'; }
+      else if (r === 'dep_mb') { bg = '#FAF5FF'; color = '#9333EA'; label = 'Ma\'naviyat bo\'limi'; }
+      else if (r === 'dep_ob') { bg = '#F0FDF4'; color = '#16A34A'; label = 'O\'quv bo\'limi'; }
+      else if (r === 'dep_ib') { bg = '#FFFBEB'; color = '#D97706'; label = 'Ilmiy bo\'lim'; }
+      else if (r === 'dep_sb') { bg = '#ECFEFF'; color = '#0891B2'; label = 'Sanoat hamkorlik'; }
+      else if (r === 'dep_pb') { bg = '#FDF2F8'; color = '#DB2777'; label = 'Matbuot (PR)'; }
+      else if (r === 'observer') { bg = '#F8FAFC'; color = '#475569'; label = 'Kuzatuvchi (Rektorat)'; }
+      return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.08); font-weight: 600;">${label}</span>`;
     }).join('');
 
     const groupBadges = groups.map(g => `<span class="badge badge-group" style="margin-right:4px;">${g}</span>`).join('') || '<span style="color:#94A3B8; font-size:11px;">-</span>';
@@ -4321,12 +4328,12 @@ function renderStaffTableRows() {
           </div>
         </td>
         <td>
-          <div style="display: flex; flex-wrap: wrap; max-width: 280px;">${roleBadges || '<span class="text-muted">Rollar mavjud emas</span>'}</div>
+          <div style="display: flex; flex-wrap: wrap; max-width: 280px;">${roleBadges || '<span class="text-muted">Rollar biriktirilmagan</span>'}</div>
         </td>
         <td>${groupBadges}</td>
         <td>
           <div style="font-size: 12px; color: var(--text-main);">${u.email || '-'}</div>
-          <div class="table-sub-text">${u.phone || ''}</div>
+          <div class="table-sub-text">${u.phone || '<span style="color:#94A3B8;">Tel kiritilmagan</span>'}</div>
         </td>
         <td>
           <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
@@ -4344,7 +4351,7 @@ function renderStaffTableRows() {
             <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStaffStatus('${u.id}', ${isActive ? 1 : 0})" title="${isActive ? 'Bloklash' : 'Faollashtirish'}">
               ${isActive ? icon('pause', 13) : icon('play', 13)}
             </button>
-            <button class="btn-action btn-action-danger" onclick="deleteStaffUser('${u.id}', '${u.full_name}')" title="O'chirish">
+            <button class="btn-action btn-action-danger" onclick="deleteStaffUser('${u.id}')" title="O'chirish">
               ${icon('trash', 14)}
             </button>
           </div>
@@ -4368,14 +4375,16 @@ async function showCreateStaffModal() {
     rolesList = rolesRes.roles || [];
   } catch (e) {
     rolesList = [
-      { key: 'tutor', name: 'Tyutor' },
-      { key: 'prorektor', name: "Yoshlar bo'yicha Prorektor" },
-      { key: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi" },
-      { key: 'dep_ob', name: "O'quv bo'limi (Registrator)" },
-      { key: 'dep_mb', name: "Ma'naviyat va ma'rifat bo'limi" },
-      { key: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi" },
-      { key: 'observer', name: 'Kuzatuvchi (Rektorat)' },
-      { key: 'superadmin', name: 'Superadmin' }
+      { key: 'superadmin', id: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish va parametrlar' },
+      { key: 'prorektor', id: 'prorektor', name: "Yoshlar bo'yicha Prorektor", desc: '25+ yutuqlar va -30 jarimalar tasdig\'i' },
+      { key: 'dep_yb', id: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi", desc: 'Ijtimoiy, Sport, Liderlik sohalari va tadbirlar' },
+      { key: 'dep_ob', id: 'dep_ob', name: "O'quv bo'limi (Registrator)", desc: 'Talabalar, GPA, Davomat va Akademik soha' },
+      { key: 'dep_mb', id: 'dep_mb', name: "Ma'naviyat va ma'rifat bo'limi", desc: 'Ma\'naviyat, san\'at va tadbirlar tasdig\'i' },
+      { key: 'dep_ib', id: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi", desc: 'Ilmiy maqolalar, anjumanlar, grantlar' },
+      { key: 'dep_sb', id: 'dep_sb', name: "Sanoat bilan hamkorlik", desc: 'Startaplar, Hackathonlar, ko\'rgazmalar' },
+      { key: 'dep_pb', id: 'dep_pb', name: "Matbuot xizmati (PR)", desc: 'OAV va ijtimoiy tarmoqlar materiallari' },
+      { key: 'tutor', id: 'tutor', name: 'Tyutor', desc: 'Talabalarga ball kiritish va monitoring' },
+      { key: 'observer', id: 'observer', name: 'Kuzatuvchi (Rektorat)', desc: 'Monitoring va Katta ekran (TV)' }
     ];
   }
 
@@ -4399,7 +4408,7 @@ async function showCreateStaffModal() {
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Email</label>
+          <label class="form-label">Email *</label>
           <input type="email" id="new-staff-email" class="form-control" placeholder="staff@akhu.uz">
         </div>
         <div class="form-group">
@@ -4409,19 +4418,26 @@ async function showCreateStaffModal() {
       </div>
 
       <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 600;">Biriktiriladigan Rollar (Tanlang):</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 180px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
-          ${rolesList.map(r => `
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
-              <input type="checkbox" name="new-staff-roles-checkbox" value="${r.key}">
-              <span>${r.name}</span>
-            </label>
-          `).join('')}
+        <label class="form-label" style="font-weight: 700; color: var(--text-main);">Biriktiriladigan Rollar & Funksional Ruxsatlar (Tanlang):</label>
+        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">Xodimga tizimda qaysi bo'lim va vakolatlar berilishini belgilang:</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 240px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          ${rolesList.map(r => {
+            const rKey = r.key || r.id;
+            return `
+              <div style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; background: white; display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                <input type="checkbox" name="new-staff-roles-checkbox" value="${rKey}" id="create-role-${rKey}" style="margin-top: 3px; cursor: pointer;">
+                <label for="create-role-${rKey}" style="cursor: pointer; margin: 0; width: 100%;">
+                  <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main);">${r.name}</div>
+                  <div style="font-size: 11px; color: #64748B; line-height: 1.35; margin-top: 2px;">${r.desc || ''}</div>
+                </label>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
       <div class="form-group mb-2">
-        <label class="form-label">Tyutor Guruhlari (vergul bilan, faqat tyutorlar uchun):</label>
+        <label class="form-label">Tyutor Guruhlari (vergul bilan, faqat Tyutor roli tanlanganda):</label>
         <input type="text" id="new-staff-tutor-groups" class="form-control" placeholder="FMC01, FMC02">
       </div>
     </form>
@@ -4445,7 +4461,8 @@ async function handleCreateStaffSubmit() {
   const phone = document.getElementById('new-staff-phone')?.value.trim();
 
   const roles = Array.from(document.querySelectorAll(`input[name="new-staff-roles-checkbox"]:checked`))
-    .map(cb => cb.value);
+    .map(cb => cb.value)
+    .filter(r => r && r !== 'undefined');
 
   const rawGroups = document.getElementById('new-staff-tutor-groups')?.value.trim();
   const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
@@ -4483,6 +4500,7 @@ async function showEditStaffModal(userId) {
 
   const isActive = (user.is_active !== undefined) ? Boolean(user.is_active) : (user.active === 1);
   const userGroups = user.tutor_groups || user.groups || [];
+  const currentRoles = (user.roles || []).filter(r => r && r !== 'undefined');
 
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
@@ -4496,14 +4514,16 @@ async function showEditStaffModal(userId) {
     rolesList = rolesRes.roles || [];
   } catch (e) {
     rolesList = [
-      { key: 'tutor', name: 'Tyutor' },
-      { key: 'prorektor', name: "Yoshlar bo'yicha Prorektor" },
-      { key: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi" },
-      { key: 'dep_ob', name: "O'quv bo'limi (Registrator)" },
-      { key: 'dep_mb', name: "Ma'naviyat va ma'rifat bo'limi" },
-      { key: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi" },
-      { key: 'observer', name: 'Kuzatuvchi (Rektorat)' },
-      { key: 'superadmin', name: 'Superadmin' }
+      { key: 'superadmin', id: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish va parametrlar' },
+      { key: 'prorektor', id: 'prorektor', name: "Yoshlar bo'yicha Prorektor", desc: '25+ yutuqlar va -30 jarimalar tasdig\'i' },
+      { key: 'dep_yb', id: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi", desc: 'Ijtimoiy, Sport, Liderlik sohalari va tadbirlar' },
+      { key: 'dep_ob', id: 'dep_ob', name: "O'quv bo'limi (Registrator)", desc: 'Talabalar, GPA, Davomat va Akademik soha' },
+      { key: 'dep_mb', id: 'dep_mb', name: "Ma'naviyat va ma'rifat bo'limi", desc: 'Ma\'naviyat, san\'at va tadbirlar tasdig\'i' },
+      { key: 'dep_ib', id: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi", desc: 'Ilmiy maqolalar, anjumanlar, grantlar' },
+      { key: 'dep_sb', id: 'dep_sb', name: "Sanoat bilan hamkorlik", desc: 'Startaplar, Hackathonlar, ko\'rgazmalar' },
+      { key: 'dep_pb', id: 'dep_pb', name: "Matbuot xizmati (PR)", desc: 'OAV va ijtimoiy tarmoqlar materiallari' },
+      { key: 'tutor', id: 'tutor', name: 'Tyutor', desc: 'Talabalarga ball kiritish va monitoring' },
+      { key: 'observer', id: 'observer', name: 'Kuzatuvchi (Rektorat)', desc: 'Monitoring va Katta ekran (TV)' }
     ];
   }
 
@@ -4511,48 +4531,67 @@ async function showEditStaffModal(userId) {
     <form id="edit-staff-form">
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">F.I.Sh *</label>
+          <label class="form-label">F.I.Sh (To'liq ismi) *</label>
           <input type="text" id="edit-staff-fullname" class="form-control" value="${user.full_name || ''}" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Yangi Parol (ixtiyoriy)</label>
-          <input type="password" id="edit-staff-password" class="form-control" placeholder="O'zgartirish uchun kiriting">
+          <label class="form-label">Yangi Parol (faqat o'zgartirish uchun)</label>
+          <input type="password" id="edit-staff-password" class="form-control" placeholder="Eski parolni saqlash uchun bo'sh qoldiring">
         </div>
       </div>
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Email</label>
+          <label class="form-label">Email *</label>
           <input type="email" id="edit-staff-email" class="form-control" value="${user.email || ''}">
         </div>
         <div class="form-group">
           <label class="form-label">Telefon Raqami</label>
-          <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}">
+          <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Foydalanuvchi Nomi (Login)</label>
+          <input type="text" class="form-control" value="${user.username || user.id}" disabled style="background:#F1F5F9; color:#64748B;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram User ID (Xabarnomalar uchun)</label>
+          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="masalan: 1202082857">
         </div>
       </div>
 
       <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 600;">Biriktirilgan Rollar:</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 180px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
-          ${rolesList.map(r => `
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
-              <input type="checkbox" name="edit-staff-roles-checkbox" value="${r.key}" ${(user.roles || []).includes(r.key) ? 'checked' : ''}>
-              <span>${r.name}</span>
-            </label>
-          `).join('')}
+        <label class="form-label" style="font-weight: 700; color: var(--text-main);">Biriktirilgan Rollar & Funksional Ruxsatlar:</label>
+        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">Ushbu xodimga tegishli rollar va bo'lim ruxsatlarini yoqing yoki o'chiring:</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 240px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          ${rolesList.map(r => {
+            const rKey = r.key || r.id;
+            const isChecked = currentRoles.includes(rKey);
+            return `
+              <div style="border: 1px solid ${isChecked ? '#BFDBFE' : '#E2E8F0'}; border-radius: 8px; padding: 10px; background: ${isChecked ? '#F0F9FF' : 'white'}; display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                <input type="checkbox" name="edit-staff-roles-checkbox" value="${rKey}" id="edit-role-${rKey}" ${isChecked ? 'checked' : ''} style="margin-top: 3px; cursor: pointer;">
+                <label for="edit-role-${rKey}" style="cursor: pointer; margin: 0; width: 100%;">
+                  <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main);">${r.name}</div>
+                  <div style="font-size: 11px; color: #64748B; line-height: 1.35; margin-top: 2px;">${r.desc || ''}</div>
+                </label>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
       <div class="grid grid-2 mb-2">
         <div class="form-group">
           <label class="form-label">Tyutor Guruhlari (vergul bilan):</label>
-          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${userGroups.join(', ')}">
+          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${userGroups.join(', ')}" placeholder="FMC01, FMC02">
         </div>
         <div class="form-group">
-          <label class="form-label">Holati</label>
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer;">
+          <label class="form-label">Xodimning Tizimdagi Holati</label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer; font-weight: 600;">
             <input type="checkbox" id="edit-staff-active" ${isActive ? 'checked' : ''}>
-            <span>Faol (Tizimga kirishga ruxsat)</span>
+            <span>Faol (Tizimga kirishga to'liq ruxsat)</span>
           </label>
         </div>
       </div>
@@ -4574,10 +4613,12 @@ async function handleEditStaffSubmit(userId) {
   const password = document.getElementById('edit-staff-password')?.value;
   const email = document.getElementById('edit-staff-email')?.value.trim();
   const phone = document.getElementById('edit-staff-phone')?.value.trim();
+  const telegram_user_id = document.getElementById('edit-staff-tgid')?.value.trim();
   const is_active = document.getElementById('edit-staff-active')?.checked ? 1 : 0;
 
   const roles = Array.from(document.querySelectorAll(`input[name="edit-staff-roles-checkbox"]:checked`))
-    .map(cb => cb.value);
+    .map(cb => cb.value)
+    .filter(r => r && r !== 'undefined');
 
   const rawGroups = document.getElementById('edit-staff-tutor-groups')?.value.trim();
   const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
@@ -4597,6 +4638,7 @@ async function handleEditStaffSubmit(userId) {
       full_name,
       email,
       phone,
+      telegram_user_id: telegram_user_id || null,
       active: is_active,
       is_active: is_active === 1,
       roles,
@@ -4638,7 +4680,10 @@ async function toggleStaffStatus(userId, currentActive) {
   }
 }
 
-async function deleteStaffUser(userId, fullName) {
+async function deleteStaffUser(userId) {
+  const user = (adminStaffState.users || []).find(u => String(u.id) === String(userId));
+  const fullName = user ? user.full_name : userId;
+
   if (!confirm(`Haqiqatan ham "${fullName}" xodimi tizimdan butunlay o'chirilsinmi?`)) return;
 
   try {

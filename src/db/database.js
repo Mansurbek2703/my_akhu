@@ -31,6 +31,9 @@ function initSchema() {
       if (!cols.includes('telegram_user_id')) {
         db.exec('ALTER TABLE staff_user ADD COLUMN telegram_user_id TEXT;');
       }
+      if (!cols.includes('phone')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN phone TEXT;');
+      }
     } catch (e) {}
 
     // Migration: ensure photo_url exists on student

@@ -759,16 +759,16 @@ router.post('/students/clear-all', authenticateSuperadmin, (req, res) => {
  */
 router.get('/roles-list', authenticateSuperadmin, (req, res) => {
   const roles = [
-    { id: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish, xodimlar va sozlamalar' },
-    { id: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', desc: '25+ ballik yutuqlar, -30 jarimalar (PV tasdiq), apellyatsiyalar va xavflar' },
-    { id: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', desc: 'Ijtimoiy, Sport, Liderlik sohalarini tasdiqlash, tadbirlar yaratish' },
-    { id: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', desc: 'Ma\'naviy-ma\'rifiy, Madaniyat va san\'at sohalarini tasdiqlash, tadbirlar' },
-    { id: 'dep_ob', name: 'O\'quv bo\'limi (Registrator)', desc: 'Talabalar importi, GPA va Davomat importi, Akademik soha tasdig\'i' },
-    { id: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', desc: 'Ilmiy maqolalar, konferensiyalar, grantlar va to\'garaklar tasdig\'i' },
-    { id: 'dep_sb', name: 'Sanoat bilan hamkorlik bo\'limi', desc: 'Startaplar, Hackathonlar, innovatsion ko\'rgazmalar tasdig\'i' },
-    { id: 'dep_pb', name: 'Matbuot xizmati (PR va Media)', desc: 'OAV va ijtimoiy tarmoqlardagi materiallarni tekshirish va tasdiqlash' },
-    { id: 'tutor', name: 'Tyutor', desc: 'Biriktirilgan guruh talabalariga ball kiritish, dalil yuklash va monitoring' },
-    { id: 'observer', name: 'Universitet Kuzatuvchisi (Rektorat)', desc: 'Faqat monitoring va statistika ko\'rish, TV rejimini yoqish' }
+    { id: 'superadmin', key: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish, barcha xodimlar va parametrlar boshqaruvi' },
+    { id: 'prorektor', key: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', desc: '25+ ballik yutuqlar, -30 jarimalar (PV tasdiq), apellyatsiyalar va xavf monitoringi' },
+    { id: 'dep_yb', key: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', desc: 'Ijtimoiy, Sport, Liderlik sohalarini tasdiqlash, tadbirlar yaratish va QR chiqarish' },
+    { id: 'dep_mb', key: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', desc: 'Ma\'naviy-ma\'rifiy, Madaniyat va san\'at sohalarini tasdiqlash, tadbirlar' },
+    { id: 'dep_ob', key: 'dep_ob', name: 'O\'quv bo\'limi (Registrator)', desc: 'Talabalar importi, GPA va Davomat importi, Akademik soha arizalari tasdig\'i' },
+    { id: 'dep_ib', key: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', desc: 'Ilmiy maqolalar, konferensiyalar, grantlar va to\'garaklar arizalari tasdig\'i' },
+    { id: 'dep_sb', key: 'dep_sb', name: 'Sanoat bilan hamkorlik bo\'limi', desc: 'Startaplar, Hackathonlar, innovatsion ko\'rgazmalar tasdig\'i' },
+    { id: 'dep_pb', key: 'dep_pb', name: 'Matbuot xizmati (PR va Media)', desc: 'OAV va ijtimoiy tarmoqlardagi materiallarni tekshirish va tasdiqlash' },
+    { id: 'tutor', key: 'tutor', name: 'Tyutor', desc: 'Biriktirilgan guruh talabalariga ball kiritish, dalil yuklash va monitoring' },
+    { id: 'observer', key: 'observer', name: 'Universitet Kuzatuvchisi (Rektorat)', desc: 'Faqat monitoring va statistika ko\'rish, Katta ekran (TV) rejimi' }
   ];
   res.json({ roles });
 });
@@ -782,7 +782,14 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
 
   const parsed = users.map(u => {
     let roles = [];
-    try { roles = JSON.parse(u.roles); } catch (e) { roles = [u.roles]; }
+    try {
+      roles = JSON.parse(u.roles);
+    } catch (e) {
+      roles = [u.roles];
+    }
+    if (Array.isArray(roles)) {
+      roles = roles.filter(r => r && r !== 'undefined');
+    }
 
     // Agar tyutor bo'lsa guruhlarini olish
     const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(u.id).map(g => g.group_code);
@@ -828,9 +835,12 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
 
     const userId = (id || username) ? String(id || username).trim() : 'staff_' + crypto.randomBytes(5).toString('hex');
     const userEmail = email ? String(email).trim() : `${userId}@akhu.uz`;
+    const userPhone = phone ? String(phone).trim() : null;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id || null);
     const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : (active !== undefined ? (active ? 1 : 0) : 1);
     const targetGroups = groups.length > 0 ? groups : tutor_groups;
+
+    const cleanRoles = (Array.isArray(roles) ? roles : [roles]).filter(r => r && r !== 'undefined');
 
     // Email yoki ID mavjudligini tekshirish
     const existing = db.prepare(`SELECT id FROM staff_user WHERE id = ? OR (email = ? AND email IS NOT NULL)`).get(userId, userEmail);
@@ -845,14 +855,15 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       // 1. staff_user jadvaliga yozish
       db.prepare(`
         INSERT INTO staff_user (
-          id, full_name, email, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+          id, full_name, email, phone, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
       `).run(
         userId,
         full_name,
         userEmail,
+        userPhone,
         `sso_${userId}`,
-        JSON.stringify(roles),
+        JSON.stringify(cleanRoles),
         activeVal,
         passHash,
         tgId,
@@ -860,7 +871,7 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       );
 
       // 2. Agar tyutor roli bo'lsa guruhlarini yozish
-      if (roles.includes('tutor') && Array.isArray(targetGroups)) {
+      if (cleanRoles.includes('tutor') && Array.isArray(targetGroups)) {
         const stmtGroup = db.prepare(`INSERT OR REPLACE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
         for (const g of targetGroups) {
           if (String(g).trim()) stmtGroup.run(userId, String(g).trim());
@@ -873,7 +884,7 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
         action: 'CREATE_STAFF_USER',
         object_type: 'staff_user',
         object_id: userId,
-        after: { full_name, email: userEmail, roles, groups: targetGroups },
+        after: { full_name, email: userEmail, phone: userPhone, roles: cleanRoles, groups: targetGroups },
         ip: req.ip || '127.0.0.1'
       });
     })();
@@ -896,6 +907,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     const {
       full_name,
       email,
+      phone,
       roles,
       groups,
       tutor_groups,
@@ -908,6 +920,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
 
     const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
     const newEmail = email !== undefined ? String(email).trim() : user.email;
+    const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
@@ -921,13 +934,16 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
 
       let updatedRoles = user.roles;
       if (roles !== undefined) {
-        updatedRoles = typeof roles === 'string' ? roles : JSON.stringify(roles);
+        let arr = Array.isArray(roles) ? roles : [roles];
+        arr = arr.filter(r => r && r !== 'undefined');
+        updatedRoles = JSON.stringify(arr);
       }
 
       db.prepare(`
         UPDATE staff_user
         SET full_name = ?,
           email = ?,
+          phone = ?,
           roles = ?,
           telegram_user_id = ?,
           active = ?,
@@ -936,6 +952,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       `).run(
         newFullName,
         newEmail,
+        newPhone,
         updatedRoles,
         tgId,
         activeVal,
@@ -959,7 +976,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         object_type: 'staff_user',
         object_id: req.params.id,
         before: { full_name: user.full_name, roles: user.roles, active: user.active },
-        after: { full_name: newFullName, email: newEmail, roles: updatedRoles, active: activeVal, groups: targetGroups },
+        after: { full_name: newFullName, email: newEmail, phone: newPhone, roles: updatedRoles, active: activeVal, groups: targetGroups },
         ip: req.ip || '127.0.0.1'
       });
     })();

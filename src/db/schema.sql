@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS staff_user (
     active INTEGER NOT NULL DEFAULT 1,
     password_hash TEXT,
     telegram_user_id TEXT,
+    phone TEXT,
     created_at TEXT NOT NULL
 );
 
