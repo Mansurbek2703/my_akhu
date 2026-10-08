@@ -135,6 +135,17 @@
     <div class="section-title">
       <span>Talaba Profili</span>
     </div>
+
+    <!-- Profil Foto va Hero Kartasi -->
+    <div style="background: white; border-radius: 18px; padding: 22px 16px; border: 1px solid #E2E8F0; margin-bottom: 16px; text-align: center; box-shadow: var(--shadow-soft);">
+      <div id="prof-photo-wrap" style="width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 12px; overflow: hidden; background: linear-gradient(135deg, #2563EB, #1D4ED8); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(37,99,235,0.25); border: 3px solid #EFF6FF;">
+        <span id="prof-photo-initials" style="font-size: 32px; font-weight: 800; color: white;">AK</span>
+      </div>
+      <h3 id="prof-hero-name" style="font-size: 18px; font-weight: 700; color: #0F172A; margin-bottom: 4px;">Talaba</h3>
+      <p id="prof-hero-details" style="font-size: 12.5px; color: #64748B; margin-bottom: 8px;">Guruh • Yo'nalish</p>
+      <span class="badge" style="background: #ECFDF5; color: #059669; font-weight: 700; padding: 4px 12px; border-radius: 12px; font-size: 11.5px;">Faol Talaba</span>
+    </div>
+
     <div style="background: white; border-radius: 16px; padding: 18px; border: 1px solid #E2E8F0; margin-bottom: 16px; font-size: 14px;">
       <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9;">
         <span style="color: #64748B;">Ism Familiya:</span>
@@ -267,9 +278,32 @@
         const st = data.student || {};
         const sc = data.score || data.scores || {};
 
-        document.getElementById('student-name').textContent = `${st.first_name || ''} ${st.last_name || ''}`;
-        document.getElementById('student-group').textContent = `${st.group_code || ''} • ${st.program_code || ''}`;
-        document.getElementById('student-avatar').textContent = ((st.first_name || 'A')[0] + (st.last_name || 'K')[0]).toUpperCase();
+        const rawFullName = `${st.first_name || ''} ${st.last_name || ''}`.trim() || 'Talaba';
+        const rawGroupProg = `${st.group_code || ''} • ${st.program_code || ''}`;
+        const initials = ((st.first_name || 'A')[0] + (st.last_name || 'K')[0]).toUpperCase();
+
+        document.getElementById('student-name').textContent = rawFullName;
+        document.getElementById('student-group').textContent = rawGroupProg;
+
+        const avatarEl = document.getElementById('student-avatar');
+        const photoWrap = document.getElementById('prof-photo-wrap');
+        const profHeroName = document.getElementById('prof-hero-name');
+        const profHeroDetails = document.getElementById('prof-hero-details');
+
+        if (profHeroName) profHeroName.textContent = rawFullName;
+        if (profHeroDetails) profHeroDetails.textContent = rawGroupProg;
+
+        if (st.photo_url) {
+          avatarEl.innerHTML = `<img src="${st.photo_url}" alt="Foto" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" onerror="this.outerHTML='<span>${initials}</span>'">`;
+          if (photoWrap) {
+            photoWrap.innerHTML = `<img src="${st.photo_url}" alt="Foto" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-size:32px; font-weight:800; color:white;\\'>${initials}</span>'">`;
+          }
+        } else {
+          avatarEl.innerHTML = `<span>${initials}</span>`;
+          if (photoWrap) {
+            photoWrap.innerHTML = `<span style="font-size:32px; font-weight:800; color:white;">${initials}</span>`;
+          }
+        }
 
         document.getElementById('score-season').textContent = sc.season ?? 0;
         document.getElementById('score-total').textContent = sc.total ?? 0;

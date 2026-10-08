@@ -431,53 +431,53 @@ function renderModuleSubNav(pageName) {
 
   if (sectionKey === 'observe-dashboard') {
     tabs = [
-      { id: 'observe-dashboard', label: '📊 Asosiy Ko\'rsatkichlar' },
-      { id: 'observe-rating', label: '🏆 Talabalar Reytingi' },
-      { id: 'observe-catalog', label: '📖 Ball Katalogi v1.0' }
+      { id: 'observe-dashboard', label: 'Asosiy Ko\'rsatkichlar' },
+      { id: 'observe-rating', label: 'Talabalar Reytingi' },
+      { id: 'observe-catalog', label: 'Ball Katalogi' }
     ];
   } else if (sectionKey === 'admin-students-manage') {
     tabs = [
-      { id: 'admin-students-manage', label: '📋 Talabalar Ro\'yxati & Profil' },
-      { id: 'dept-gpa-import', label: '📈 GPA & Davomat Import' }
+      { id: 'admin-students-manage', label: 'Talabalar Ro\'yxati' },
+      { id: 'dept-gpa-import', label: 'GPA va Davomat Importi' }
     ];
   } else if (sectionKey === 'dept-events') {
     tabs = [
-      { id: 'dept-events', label: '📅 Barcha Tadbirlar' }
+      { id: 'dept-events', label: 'Barcha Tadbirlar' }
     ];
     if (AppState.isLoggedIn) {
       extraActions = `
         <div class="module-nav-actions">
           <button class="btn btn-primary btn-sm" onclick="openCreateEventModal()" style="display:inline-flex; align-items:center; gap:6px;">
-            ${icon('calendar', 14)} <span>+ Yangi Tadbir Qo'shish</span>
+            ${icon('calendar', 14)} <span>Yangi Tadbir Qo'shish</span>
           </button>
           <button class="btn btn-outline btn-sm" onclick="showStudentCheckinModal()" style="display:inline-flex; align-items:center; gap:6px; border-color:#3B82F6; color:#2563EB; background:#EFF6FF;">
-            ${icon('qrCode', 14)} <span>📷 Talaba QR Skanerlash & Check-in</span>
+            ${icon('qrCode', 14)} <span>Talaba QR Check-in</span>
           </button>
         </div>
       `;
     }
   } else if (sectionKey === 'dept-approvals') {
     tabs = [
-      { id: 'dept-approvals', label: '⏳ Tasdiq Navbati' },
-      { id: 'prorektor-queue', label: '🛡️ Prorektor 25+ / -30' },
-      { id: 'prorektor-risks', label: '⚠️ Xavf & Konsentratsiya' },
-      { id: 'prorektor-appeals', label: '📑 E\'tirozlar (Apellyatsiya)' }
+      { id: 'dept-approvals', label: 'Tasdiq Navbati' },
+      { id: 'prorektor-queue', label: 'Prorektor 25+ / -30' },
+      { id: 'prorektor-risks', label: 'Xavf va Monitoring' },
+      { id: 'prorektor-appeals', label: 'E\'tirozlar (Apellyatsiya)' }
     ];
   } else if (sectionKey === 'tutor-my-students') {
     tabs = [
-      { id: 'tutor-my-students', label: '👥 Mening Talabalarim' },
-      { id: 'tutor-add-points', label: '➕ Ball Kiritish' },
-      { id: 'tutor-history', label: '📜 Kiritgan Yozuvlarim' }
+      { id: 'tutor-my-students', label: 'Mening Talabalarim' },
+      { id: 'tutor-add-points', label: 'Ball Kiritish' },
+      { id: 'tutor-history', label: 'Kiritilgan Yozuvlar' }
     ];
   } else if (sectionKey === 'admin-users-manage') {
     tabs = [
-      { id: 'admin-users-manage', label: '👥 Xodimlar & Rollar' },
-      { id: 'admin-catalog', label: '⚙️ Katalog Sozlamalari' },
-      { id: 'admin-audit', label: '📝 To\'liq Audit Jurnali' }
+      { id: 'admin-users-manage', label: 'Xodimlar va Rollar' },
+      { id: 'admin-catalog', label: 'Katalog Sozlamalari' },
+      { id: 'admin-audit', label: 'Audit Jurnali' }
     ];
   } else if (sectionKey === 'staff-my-profile') {
     tabs = [
-      { id: 'staff-my-profile', label: '👤 Shaxsiy Profil & Rasm' }
+      { id: 'staff-my-profile', label: 'Shaxsiy Profil' }
     ];
   }
 
@@ -1475,11 +1475,14 @@ function renderObserveCatalogTable() {
 // -------------------------------------------------------------
 // SAHIFA: TYUTORNING TALABALARI (T-01, T-05)
 // -------------------------------------------------------------
+window.tutorStudentsCache = [];
+
 async function renderTutorStudents(container) {
   try {
     const summary = await apiFetch('/api/tutor/summary');
     const studRes = await apiFetch('/api/tutor/students');
     const students = studRes.students || [];
+    window.tutorStudentsCache = students;
 
     let html = `
       <div class="metrics-grid mb-4">
@@ -1488,12 +1491,12 @@ async function renderTutorStudents(container) {
           <div class="stat-data">
             <span class="stat-label">Guruh Talabalari</span>
             <h3 class="stat-val">${summary.total_students} nafar</h3>
-            <span class="stat-sub">Guruhlar: ${summary.groups.join(', ')}</span>
+            <span class="stat-sub">Guruhlar: ${(summary.groups || []).join(', ') || '-'}</span>
           </div>
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('zap', 20)}</div>
+          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('checkCircle', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Faol Talabalar (30+)</span>
             <h3 class="stat-val">${summary.active_students} nafar</h3>
@@ -1511,7 +1514,7 @@ async function renderTutorStudents(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEE2E2; color:#DC2626;">${icon('clock', 20)}</div>
+          <div class="stat-icon" style="background:#FEF2F2; color:#DC2626;">${icon('clock', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Passiv Talabalar</span>
             <h3 class="stat-val">${summary.passive_students_count} nafar</h3>
@@ -1520,48 +1523,147 @@ async function renderTutorStudents(container) {
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <h3>Mening Talabalarim Ro'yxati</h3>
-          <button class="btn btn-primary btn-sm" onclick="navigateTo('tutor-add-points')">${icon('userPlus', 14)} Yangi Ball Kiritish</button>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Talaba</th>
-                  <th>Guruh</th>
-                  <th>Mavsum Balli</th>
-                  <th>Joriy Hafta</th>
-                  <th>Holati</th>
-                  <th style="text-align: right;">Amallar</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${students.map(s => `
-                  <tr>
-                    <td><strong>${s.first_name} ${s.last_name}</strong></td>
-                    <td><span class="badge badge-light">${s.group_code}</span></td>
-                    <td><strong style="color: #2563EB;">${s.season || 0} ball</strong></td>
-                    <td>+${s.week_cur || 0}</td>
-                    <td>
-                      ${s.is_passive ? '<span class="badge badge-warning">Passiv (14 kun)</span>' : '<span class="badge badge-success">Faol</span>'}
-                    </td>
-                    <td style="text-align: right;">
-                      <button class="btn btn-outline btn-sm" onclick="showStudentModal('${s.id}')">Tarix</button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+      <!-- Qidiruv va Filtrlar paneli -->
+      <div class="admin-toolbar mb-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: white; padding: 12px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-light); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 360px;">
+          <div class="admin-search-box" style="width: 100%;">
+            ${icon('search', 16)}
+            <input type="text" id="tutor-student-search" class="admin-search-input" placeholder="F.I.Sh yoki Talaba ID bo'yicha qidiruv..." oninput="handleTutorStudentFilter()">
           </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <select id="tutor-group-filter" class="form-select form-select-sm" onchange="handleTutorStudentFilter()" style="min-width: 130px; font-size: 13px;">
+            <option value="">Barcha guruhlar</option>
+            ${(summary.groups || []).map(g => `<option value="${g}">${g}</option>`).join('')}
+          </select>
+          <select id="tutor-status-filter" class="form-select form-select-sm" onchange="handleTutorStudentFilter()" style="min-width: 130px; font-size: 13px;">
+            <option value="">Barcha holatlar</option>
+            <option value="active">Faol talabalar</option>
+            <option value="passive">Passiv talabalar</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="navigateTo('tutor-add-points')" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;">
+            ${icon('userPlus', 14)} <span>Ball Kiritish</span>
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 10px; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+        <span style="color: var(--color-primary);">${icon('info', 14)}</span>
+        <span>Talabaning ballar tarixi va batafsil profilini ko'rish uchun uning qatoriga bosing</span>
+      </div>
+
+      <div class="card" style="box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);">
+        <div class="table-responsive">
+          <table class="data-table" id="tutor-students-table">
+            <thead>
+              <tr>
+                <th style="width: 45px; text-align: center;">#</th>
+                <th>Talaba F.I.Sh</th>
+                <th style="width: 110px;">Guruh</th>
+                <th>Kurs & Yo'nalish</th>
+                <th style="width: 130px;">Mavsumiy Ball</th>
+                <th style="width: 110px;">Joriy Hafta</th>
+                <th style="width: 110px;">Holati</th>
+              </tr>
+            </thead>
+            <tbody id="tutor-students-tbody">
+              ${renderTutorTableRowsHtml(students)}
+            </tbody>
+          </table>
         </div>
       </div>
     `;
     container.innerHTML = html;
   } catch (err) {
     container.innerHTML = `<div class="card"><p class="text-danger">${err.message}</p></div>`;
+  }
+}
+
+function renderTutorTableRowsHtml(list) {
+  if (!list || list.length === 0) {
+    return `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 36px; color: var(--text-muted);">
+          Talabalar topilmadi
+        </td>
+      </tr>
+    `;
+  }
+
+  return list.map((s, idx) => {
+    const rawFullName = `${s.first_name || ''} ${s.last_name || ''}`.trim();
+    const initials = `${(s.first_name || 'T').charAt(0)}${(s.last_name || '').charAt(0)}`.toUpperCase();
+    const isFemale = s.gender === 'female' || s.gender === 'f';
+    const isPassive = Boolean(s.is_passive);
+
+    const avatarHtml = s.photo_url
+      ? `<img src="${s.photo_url}" class="avatar-badge" style="object-fit: cover; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-light);" alt="${s.first_name}" onerror="this.outerHTML='<span class=\\'avatar-badge ${isFemale ? 'female' : ''}\\'>${initials}</span>'">`
+      : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 34px; height: 34px; font-size: 13px;">${initials}</span>`;
+
+    return `
+      <tr class="tutor-table-row" onclick="showStudentModal('${s.id}')" style="cursor: pointer; transition: background-color 0.15s ease;" title="Tarix va ma'lumotlarni ko'rish uchun bosing">
+        <td style="text-align: center; color: var(--text-muted); font-size: 12px; font-weight: 500;">${idx + 1}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            ${avatarHtml}
+            <div>
+              <div style="font-weight: 600; color: var(--text-main); font-size: 13.5px; line-height: 1.3;">${rawFullName}</div>
+              <div style="font-size: 11.5px; color: var(--text-muted); font-family: monospace;">${s.external_id || s.id}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-group">${s.group_code || '-'}</span></td>
+        <td>
+          <div style="font-size: 12.5px; color: var(--text-main); font-weight: 500;">${s.course ? `${s.course}-kurs` : '-'}</div>
+          <div style="font-size: 11px; color: var(--text-muted);">${s.program_code || ''}</div>
+        </td>
+        <td>
+          <span style="font-weight: 700; color: #2563EB; font-size: 14px;">${s.season || 0}</span>
+          <span style="font-size: 11.5px; color: var(--text-muted);"> ball</span>
+        </td>
+        <td>
+          <span style="font-weight: 600; color: ${(s.week_cur || 0) > 0 ? '#059669' : 'var(--text-muted)'}; font-size: 13px;">
+            ${(s.week_cur || 0) > 0 ? `+${s.week_cur}` : '0'}
+          </span>
+        </td>
+        <td>
+          ${isPassive 
+            ? `<span class="status-badge" style="background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A;">Passiv</span>` 
+            : `<span class="status-badge badge-active">Faol</span>`}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function handleTutorStudentFilter() {
+  const q = (document.getElementById('tutor-student-search')?.value || '').trim().toLowerCase();
+  const group = document.getElementById('tutor-group-filter')?.value || '';
+  const status = document.getElementById('tutor-status-filter')?.value || '';
+
+  let list = window.tutorStudentsCache || [];
+
+  if (q) {
+    list = list.filter(s => 
+      `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase().includes(q) ||
+      (s.external_id || '').toLowerCase().includes(q) ||
+      (s.phone || '').includes(q)
+    );
+  }
+
+  if (group) {
+    list = list.filter(s => s.group_code === group);
+  }
+
+  if (status === 'active') {
+    list = list.filter(s => !s.is_passive);
+  } else if (status === 'passive') {
+    list = list.filter(s => s.is_passive);
+  }
+
+  const tbody = document.getElementById('tutor-students-tbody');
+  if (tbody) {
+    tbody.innerHTML = renderTutorTableRowsHtml(list);
   }
 }
 
@@ -2829,7 +2931,7 @@ async function renderStaffProfile(container) {
                     <span style="font-size: 11.5px; color: var(--text-muted);">(JPG, PNG formatlarda)</span>
                   </div>
                   <div>
-                    <input type="url" id="staff-profile-photo-url" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://...)" oninput="updateProfilePhotoPreview(this.value)">
+                    <input type="text" id="staff-profile-photo-url" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://... yoki /api/files/...)" oninput="updateProfilePhotoPreview(this.value)">
                   </div>
                 </div>
               </div>
@@ -5599,7 +5701,7 @@ async function showCreateStaffModal() {
                 ${icon('upload', 13)} <span>Kompyuterdan Rasm Tanlash</span>
               </button>
             </div>
-            <input type="url" id="new-staff-photourl" class="form-control" placeholder="Yoki rasm havolasi (https://...)" oninput="updateAdminStaffPhotoPreview(this.value, 'create-staff-photo-preview')">
+            <input type="text" id="new-staff-photourl" class="form-control" placeholder="Yoki rasm havolasi (https://... yoki /api/files/...)" oninput="updateAdminStaffPhotoPreview(this.value, 'create-staff-photo-preview')">
           </div>
         </div>
       </div>
@@ -5773,7 +5875,7 @@ async function showEditStaffModal(userId) {
                 ${icon('upload', 13)} <span>Kompyuterdan Rasm Yuklash</span>
               </button>
             </div>
-            <input type="url" id="edit-staff-photourl" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://...)" oninput="updateAdminStaffPhotoPreview(this.value, 'edit-staff-photo-preview')">
+            <input type="text" id="edit-staff-photourl" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://... yoki /api/files/...)" oninput="updateAdminStaffPhotoPreview(this.value, 'edit-staff-photo-preview')">
           </div>
         </div>
       </div>
@@ -6065,11 +6167,11 @@ function showImpersonationBanner(name, roles) {
 
   banner.innerHTML = `
     <div style="display:flex; align-items:center; gap:8px;">
-      <span style="font-size:16px;">👁️</span>
-      <span>TEKSHIRUV REJIMI: Siz <u>${name}</u> (${roles.join(', ')}) sifatida tizimni tekshirmoqdasiz!</span>
+      <span style="display:inline-flex; align-items:center; color:#B45309;">${icon('eye', 17)}</span>
+      <span>TEKSHIRUV REJIMI: Siz <u>${name}</u> (${roles.join(', ')}) sifatida tizimni ko'zdan kechirmoqdasiz</span>
     </div>
     <button onclick="exitImpersonation()" style="background:#DC2626; color:white; border:none; padding:6px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-      🔙 Superadminga Qaytish
+      ${icon('arrowLeft', 13)} <span>Superadminga Qaytish</span>
     </button>
   `;
 }

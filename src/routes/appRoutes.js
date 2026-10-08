@@ -179,6 +179,7 @@ router.get('/me', authenticateStudent, (req, res) => {
   res.json({
     student: {
       id: student.id,
+      external_id: student.external_id,
       first_name: student.first_name,
       last_name: student.last_name,
       group_code: student.group_code,
@@ -187,6 +188,7 @@ router.get('/me', authenticateStudent, (req, res) => {
       course: student.course,
       phone: student.phone,
       email: student.email,
+      photo_url: student.photo_url || null,
       tutor_name: student.tutor_name || 'Biriktirilmagan',
       tutor: {
         name: student.tutor_name || 'Biriktirilmagan',
