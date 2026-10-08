@@ -26,7 +26,10 @@ const fmc = [
   { t: 'tutor_2', g: 'FMC05' }
 ];
 for (const x of fmc) {
-  db.prepare('INSERT OR IGNORE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)').run(x.t, x.g);
+  const tutorExists = db.prepare('SELECT id FROM staff_user WHERE id = ?').get(x.t);
+  if (tutorExists) {
+    db.prepare('INSERT OR IGNORE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)').run(x.t, x.g);
+  }
 }
 
 const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;
