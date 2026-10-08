@@ -152,7 +152,8 @@ router.get('/:id/participants', (req, res) => {
   res.json({
     event_id: eventId,
     registrations,
-    checkins: directCheckins
+    checkins: directCheckins,
+    participants: directCheckins
   });
 });
 
