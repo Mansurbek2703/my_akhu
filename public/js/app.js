@@ -2597,9 +2597,9 @@ async function loadEventRecentCheckins(eventId) {
         <tbody>
           ${list.slice(0, 15).map(p => `
             <tr>
-              <td style="padding: 6px 8px; font-weight: 600;">${p.student_name || p.full_name}</td>
-              <td style="padding: 6px 8px;"><span class="badge badge-group">${p.group_code}</span></td>
-              <td style="padding: 6px 8px; color: var(--text-muted);">${new Date(p.checked_in_at || p.created_at).toLocaleTimeString('uz-UZ')}</td>
+              <td style="padding: 6px 8px; font-weight: 600;">${(p.first_name ? `${p.first_name} ${p.last_name || ''}` : (p.student_name || p.full_name || 'Talaba')).trim()}</td>
+              <td style="padding: 6px 8px;"><span class="badge badge-group">${p.group_code || '-'}</span></td>
+              <td style="padding: 6px 8px; color: var(--text-muted);">${(p.at || p.checked_in_at || p.created_at) ? new Date(p.at || p.checked_in_at || p.created_at).toLocaleTimeString('uz-UZ') : '-'}</td>
               <td style="padding: 6px 8px; text-align: right;"><span class="badge" style="background:#ECFDF5; color:#059669; font-weight:700;">+${p.points || 5}</span></td>
             </tr>
           `).join('')}
