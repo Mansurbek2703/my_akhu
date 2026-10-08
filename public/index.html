@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AKHU Talabalar — Boshqaruv va Kuzatuv Portali</title>
+  <title>Al-Xorazmiy Universiteti — Talabalar Reyting Portali</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
@@ -14,24 +14,28 @@
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="logo-badge">AK</div>
+        <div class="logo-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
         <div class="logo-text">
-          <h1>AKHU TALABALAR</h1>
-          <span>1-BOSQICH REYTING</span>
+          <h1>AL-XORAZMIY</h1>
+          <span>TALABALAR REYTINGI</span>
         </div>
       </div>
 
-      <!-- ROLE SWITCHER (SSO Demo) -->
+      <!-- ROLE SWITCHER (SSO Profil) -->
       <div class="role-switcher-box">
         <div class="role-label">
-          <span>Faol Rol (SSO):</span>
+          <span>Faol Profil:</span>
           <span id="role-tag" style="color: #60A5FA; font-weight: 700;">Kuzatuvchi</span>
         </div>
         <select id="role-selector" class="role-select">
-          <option value="observer">Kuzatuvchi (Ijrochi direktor / Rektorat)</option>
-          <option value="tutor_1">Tyutor 1 — Jasur Mahmudov (210-guruhlar)</option>
-          <option value="tutor_2">Tyutor 2 — Aziza Qodirova (211-guruhlar)</option>
-          <option value="tutor_3">Tyutor 3 — Bobur Alimov (310 & Magistr)</option>
+          <option value="observer">Kuzatuvchi (Rektorat & Kengash)</option>
+          <option value="tutor_1">Tyutor 1 — Jasur Mahmudov (FMC01, FMC02, FMC03)</option>
+          <option value="tutor_2">Tyutor 2 — Aziza Qodirova (FMC04, FMC05)</option>
+          <option value="tutor_3">Tyutor 3 — Bobur Alimov (Magistratura)</option>
           <option value="dep_yb">Yoshlar bilan ishlash bo'limi</option>
           <option value="dep_mb">Ma'naviyat va ma'rifat bo'limi</option>
           <option value="dep_ob">O'quv bo'limi (Registrator & GPA)</option>
@@ -39,88 +43,108 @@
           <option value="dep_sb">Sanoat bilan hamkorlik bo'limi</option>
           <option value="dep_pb">Matbuot xizmati (PR va Media)</option>
           <option value="prorektor">Yoshlar bo'yicha Prorektor</option>
-          <option value="superadmin">Superadmin (IT markazi)</option>
+          <option value="superadmin">Superadmin (IT Markazi)</option>
         </select>
       </div>
 
       <!-- NAVIGATION -->
       <nav class="sidebar-nav">
         <!-- Common / Observer -->
-        <div class="nav-section-title">KUZATUV</div>
+        <div class="nav-section-title">KUZATUV VA MONITORING</div>
         <a class="nav-item active" data-page="observe-dashboard">
-          <span>📊</span> Umumiy Ko'rsatkichlar
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          Umumiy Ko'rsatkichlar
         </a>
         <a class="nav-item" data-page="observe-rating">
-          <span>🏆</span> Talabalar Reytingi
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          Talabalar Reytingi
         </a>
         <a class="nav-item" data-page="observe-students">
-          <span>👥</span> Talabalar Ro'yxati
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Talabalar Ro'yxati
         </a>
         <a class="nav-item" data-page="observe-events">
-          <span>📅</span> Tadbirlar & QR
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Tadbirlar & QR
         </a>
         <a class="nav-item" data-page="observe-catalog">
-          <span>📖</span> Ball Katalogi v1.0
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 2v20"/></svg>
+          Ball Katalogi v1.0
         </a>
 
         <!-- Tutor Section -->
         <div class="nav-section-title nav-role-section" data-for-role="tutor">TYUTOR KABINETI</div>
         <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-my-students">
-          <span>👨‍🎓</span> Mening Talabalarim
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Mening Talabalarim
         </a>
         <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-add-points">
-          <span>➕</span> Ball Kiritish
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ball Kiritish
         </a>
         <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-history">
-          <span>📝</span> Kiritgan Yozuvlarim
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Kiritgan Yozuvlarim
         </a>
 
         <!-- Department Approvals Section -->
-        <div class="nav-section-title nav-role-section" data-for-role="approver">TASDIQLASH</div>
+        <div class="nav-section-title nav-role-section" data-for-role="approver">TASDIQLASH VA IJRO</div>
         <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-approvals">
-          <span>📥</span> Tasdiq Navbati <span class="badge" id="pending-badge" style="display:none;">0</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Tasdiq Navbati <span class="badge" id="pending-badge" style="display:none;">0</span>
         </a>
         <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-events">
-          <span>🎯</span> Tadbir Yaratish & QR
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="13" r="3"/></svg>
+          Tadbir Yaratish & QR
         </a>
         <a class="nav-item nav-role-section" data-for-role="dep_ob" data-page="dept-students-manage">
-          <span>👥</span> Talabalar Ro'yxati & Import
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Talabalar Ro'yxati & Import
         </a>
         <a class="nav-item nav-role-section" data-for-role="dep_ob" data-page="dept-gpa-import">
-          <span>📊</span> GPA & Davomat Import
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          GPA & Davomat Import
         </a>
 
         <!-- Prorektor Section -->
         <div class="nav-section-title nav-role-section" data-for-role="prorektor">PROREKTOR NAZORATI</div>
         <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-queue">
-          <span>⚖️</span> 25+ va -30 Navbati
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          25+ va -30 Navbati (PV)
         </a>
         <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-risks">
-          <span>⚠️</span> Xavf & Konsentratsiya
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Xavf & Konsentratsiya
         </a>
         <a class="nav-item nav-role-section" data-for-role="prorektor" data-page="prorektor-appeals">
-          <span>💬</span> E'tirozlar (Apellyatsiya)
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          E'tirozlar (Apellyatsiya)
         </a>
 
         <!-- Superadmin Section -->
-        <div class="nav-section-title nav-role-section" data-for-role="superadmin">SUPERADMIN</div>
+        <div class="nav-section-title nav-role-section" data-for-role="superadmin">TIZIM BOSHQARUVI</div>
         <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-students-manage">
-          <span>👥</span> Talabalar Boshqaruvi & Import
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Talabalar Boshqaruvi & Import
         </a>
         <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-users-manage">
-          <span>👨‍💼</span> Xodimlar & Rollar Boshqaruvi
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Xodimlar & Rollar Boshqaruvi
         </a>
         <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-catalog">
-          <span>⚙️</span> Katalog Sozlamasi
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Katalog Sozlamalari
         </a>
         <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-audit">
-          <span>📋</span> To'liq Audit Jurnali
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          To'liq Audit Jurnali
         </a>
       </nav>
 
       <div class="sidebar-footer">
-        <a href="/tv?token=akhu_tv_display_token_2026_xyz" target="_blank" class="btn btn-outline btn-sm" style="width: 100%; color: #38BDF8; border-color: rgba(56, 189, 248, 0.4);">
-          📺 Katta Ekran (TV)
+        <a href="/tv?token=akhu_tv_display_token_2026_xyz" target="_blank" class="btn btn-outline btn-sm w-100" style="color: #60A5FA; border-color: rgba(96, 165, 250, 0.3);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
+          Katta Ekran (TV)
         </a>
       </div>
     </aside>
@@ -136,13 +160,16 @@
 
         <div class="topbar-actions">
           <a href="/miniapp" target="_blank" class="btn btn-outline btn-sm">
-            📱 Talaba Mini App ko'rinishi
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            Talaba Mini App
           </a>
-          <button id="btn-login-modal" class="btn btn-outline btn-sm" onclick="openLoginModal()" style="border-color: #3B82F6; color: #2563EB; font-weight: 600;">
-            🔑 Kirish: <span id="topbar-user-name">Mansurbek (Superadmin)</span>
+          <button id="btn-login-modal" class="btn btn-outline btn-sm" onclick="openLoginModal()" style="border-color: #CBD5E1;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            <span id="topbar-user-name">Kirish: Mansurbek (Superadmin)</span>
           </button>
           <button id="btn-refresh-data" class="btn btn-primary btn-sm">
-            🔄 Yangilash
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Yangilash
           </button>
         </div>
       </header>
@@ -159,7 +186,9 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3 id="modal-title">Tafsilotlar</h3>
-        <button class="btn btn-sm btn-outline" onclick="closeModal()">✕</button>
+        <button class="btn btn-sm btn-outline btn-icon-only" onclick="closeModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body" id="modal-body">
         <!-- Modal kontenti -->
@@ -174,44 +203,52 @@
   <div class="modal-overlay" id="login-modal">
     <div class="modal-content" style="max-width: 440px;">
       <div class="modal-header">
-        <h3 style="display: flex; align-items: center; gap: 8px;">
-          <span>🔐</span> Tizimga Kirish
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Tizimga Kirish
         </h3>
-        <button class="btn btn-sm btn-outline" onclick="closeLoginModal()">✕</button>
+        <button class="btn btn-sm btn-outline btn-icon-only" onclick="closeLoginModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <form id="portal-login-form">
           <div class="form-group mb-3">
-            <label class="form-label">Login / Foydalanuvchi nomi:</label>
-            <input type="text" id="login-username" class="form-control" placeholder="admin yoki superadmin yoki 1202082857" value="admin" required>
+            <label class="form-label">Login yoki ID raqam:</label>
+            <input type="text" id="login-username" class="form-control" placeholder="admin yoki superadmin" value="admin" required>
           </div>
           <div class="form-group mb-3">
             <label class="form-label">Parol:</label>
-            <input type="password" id="login-password" class="form-control" placeholder="admin123" value="admin123" required>
+            <input type="password" id="login-password" class="form-control" placeholder="••••••••" value="admin123" required>
           </div>
-          <div id="login-error-msg" style="color: #EF4444; font-size: 13px; margin-bottom: 12px; display: none;"></div>
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 16px;">
-            Kirish (Kirishni Tasdiqlash)
+          <div id="login-error-msg" style="color: var(--danger); font-size: 12px; margin-bottom: 12px; display: none;"></div>
+          <button type="submit" class="btn btn-primary w-100 mb-3">
+            Kirishni Tasdiqlash
           </button>
         </form>
 
-        <div style="border-top: 1px solid var(--border); padding-top: 14px;">
-          <label class="form-label" style="font-size: 12px; color: var(--text-muted);">Tezkor rollar bilan kirish (Demo):</label>
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 14px;">
+          <label class="form-label" style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Tezkor tanlov (Demo Rollar):</label>
           <div style="display: flex; flex-direction: column; gap: 6px;">
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('superadmin')" style="text-align: left; justify-content: flex-start;">
-              👑 <strong>Superadmin</strong> — Mansurbek Qazaqov (To'liq nazorat)
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('superadmin')" style="text-align: left; justify-content: space-between;">
+              <span><strong>Superadmin</strong> — Mansurbek Qazaqov</span>
+              <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:10px;">Barcha Huquqlar</span>
             </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('tutor_1')" style="text-align: left; justify-content: flex-start;">
-              👨‍🏫 <strong>Tyutor</strong> — Jasur Mahmudov (Ball kiritish)
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('tutor_1')" style="text-align: left; justify-content: space-between;">
+              <span><strong>Tyutor</strong> — Jasur Mahmudov (FMC01-03)</span>
+              <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10px;">Tyutorlik</span>
             </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('dep_yb')" style="text-align: left; justify-content: flex-start;">
-              🏢 <strong>Yoshlar bo'limi</strong> (Arizalarni tasdiqlash)
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('dep_yb')" style="text-align: left; justify-content: space-between;">
+              <span><strong>Yoshlar bo'limi</strong> — Sardorbek Ergashev</span>
+              <span class="badge" style="background:#ECFDF5; color:#059669; font-size:10px;">Tasdiqlovchi</span>
             </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('prorektor')" style="text-align: left; justify-content: flex-start;">
-              ⚖️ <strong>Yoshlar bo'yicha Prorektor</strong> (PV tasdiq)
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('prorektor')" style="text-align: left; justify-content: space-between;">
+              <span><strong>Prorektor</strong> — Prof. Alisher Vohidov</span>
+              <span class="badge" style="background:#F5F3FF; color:#7C3AED; font-size:10px;">PV Tasdiq</span>
             </button>
-            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('observer')" style="text-align: left; justify-content: flex-start;">
-              📊 <strong>Kuzatuvchi</strong> — Ijrochi direktor / Rektorat
+            <button class="btn btn-outline btn-sm" onclick="quickLoginRole('observer')" style="text-align: left; justify-content: space-between;">
+              <span><strong>Kuzatuvchi</strong> — Rektorat Kengashi</span>
+              <span class="badge" style="background:#F8FAFC; color:#64748B; font-size:10px;">Monitoring</span>
             </button>
           </div>
         </div>

@@ -205,6 +205,33 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
 });
 
 /**
+ * GET /api/admin/students/:id
+ * Yagona talaba profili va ball tarixi
+ */
+router.get('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
+  const student = db.prepare(`
+    SELECT st.*, su.full_name as tutor_name, sc.total, sc.season, sc.rank_cohort, sc.events_count
+    FROM student st
+    LEFT JOIN staff_user su ON st.tutor_id = su.id
+    LEFT JOIN student_score sc ON st.id = sc.student_id
+    WHERE st.id = ? OR st.external_id = ?
+  `).get(req.params.id, req.params.id);
+
+  if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+  const entries = db.prepare(`
+    SELECT pe.*, ci.title as catalog_title, su.full_name as creator_name
+    FROM point_entry pe
+    LEFT JOIN catalog_item ci ON pe.catalog_item_id = ci.id
+    LEFT JOIN staff_user su ON pe.created_by = su.id
+    WHERE pe.student_id = ?
+    ORDER BY pe.created_at DESC
+  `).all(student.id);
+
+  res.json({ student, entries });
+});
+
+/**
  * POST /api/admin/students
  * Yangi talaba qo'shish (qo'lda kiritish)
  */
@@ -239,6 +266,13 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
 
     const normGender = (gender && (String(gender).toLowerCase().startsWith('f') || String(gender).toLowerCase().startsWith('ay') || String(gender).toLowerCase().startsWith('q'))) ? 'f' : 'm';
 
+    // Tyutorni guruh bo'yicha avtomatik aniqlash (agar berilmagan bo'lsa)
+    let finalTutorId = tutor_id || null;
+    if (!finalTutorId && group_code) {
+      const tg = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ?`).get(group_code);
+      if (tg) finalTutorId = tg.tutor_id;
+    }
+
     db.prepare(`
       INSERT INTO student (
         id, external_id, first_name, last_name, group_code, program_code,
@@ -256,7 +290,7 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       normGender,
       email || null,
       phone || null,
-      tutor_id || null,
+      finalTutorId,
       now,
       now
     );
@@ -312,6 +346,13 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       ? ((String(gender).toLowerCase().startsWith('f') || String(gender).toLowerCase().startsWith('ay') || String(gender).toLowerCase().startsWith('q')) ? 'f' : 'm')
       : student.gender;
 
+    let finalTutorId = tutor_id !== undefined ? tutor_id : student.tutor_id;
+    if (!finalTutorId && (group_code || student.group_code)) {
+      const gCode = group_code || student.group_code;
+      const tg = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ?`).get(gCode);
+      if (tg) finalTutorId = tg.tutor_id;
+    }
+
     const now = new Date().toISOString();
 
     db.prepare(`
@@ -341,7 +382,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       normGender,
       email !== undefined ? email : student.email,
       phone !== undefined ? phone : student.phone,
-      tutor_id !== undefined ? tutor_id : student.tutor_id,
+      finalTutorId,
       status !== undefined ? status : student.status,
       now,
       req.params.id

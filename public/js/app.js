@@ -28,6 +28,55 @@ const ROLE_MAP = {
   'superadmin': { id: 'superadmin', name: 'Mansurbek Qazaqov (Superadmin)', roles: ['superadmin'], tagColor: '#F87171' }
 };
 
+// ====================================================================
+// RASMIY UNIVERSITET VEKTOR SVG BELGILARI (ICONS SYSTEM)
+// ====================================================================
+const ICONS = {
+  users: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
+  user: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+  userPlus: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>`,
+  cap: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>`,
+  upload: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
+  download: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+  fileSpreadsheet: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M12 9v12"></path></svg>`,
+  edit: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
+  trash: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`,
+  eye: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+  check: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+  checkCircle: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
+  xCircle: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`,
+  x: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+  shield: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
+  settings: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
+  trophy: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path></svg>`,
+  star: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
+  activity: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>`,
+  zap: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+  clock: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+  calendar: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
+  target: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="6" r="2"></circle><circle cx="12" cy="18" r="2"></circle></svg>`,
+  search: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+  filter: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`,
+  phone: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`,
+  building: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="22.01"></line><line x1="15" y1="22" x2="15" y2="22.01"></line><line x1="9" y1="6" x2="9" y2="6.01"></line><line x1="15" y1="6" x2="15" y2="6.01"></line><line x1="9" y1="10" x2="9" y2="10.01"></line><line x1="15" y1="10" x2="15" y2="10.01"></line><line x1="9" y1="14" x2="9" y2="14.01"></line><line x1="15" y1="14" x2="15" y2="14.01"></line><line x1="9" y1="18" x2="9" y2="18.01"></line><line x1="15" y1="18" x2="15" y2="18.01"></line></svg>`,
+  mapPin: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+  qrCode: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`,
+  alertTriangle: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+  info: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`,
+  fileText: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
+  link: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`,
+  pause: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`,
+  play: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
+  award: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>`,
+  refresh: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`
+};
+
+function icon(name, size = 16) {
+  return ICONS[name] ? ICONS[name](size) : '';
+}
+
+
+
 // API so'rov yuborish uchun yordamchi funksiya
 async function apiFetch(endpoint, options = {}) {
   const headers = {
@@ -383,7 +432,7 @@ async function renderObserveDashboard(container) {
       <!-- METRIKALAR -->
       <div class="metrics-grid">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">👥</div>
+          <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Jami Talabalar</span>
             <h3 class="stat-val">${m.total_students} nafar</h3>
@@ -392,7 +441,7 @@ async function renderObserveDashboard(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">⚡</div>
+          <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">${icon('zap', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Mavsum Ballari</span>
             <h3 class="stat-val">${m.total_season_points.toLocaleString()}</h3>
@@ -401,7 +450,7 @@ async function renderObserveDashboard(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEE2E2; color:#DC2626;">⏳</div>
+          <div class="stat-icon" style="background:#FEE2E2; color:#DC2626;">${icon('clock', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Kutilayotgan Tasdiq</span>
             <h3 class="stat-val">${m.pending_approvals} ta</h3>
@@ -410,7 +459,7 @@ async function renderObserveDashboard(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">🎯</div>
+          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('target', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Bugungi Tadbirlar</span>
             <h3 class="stat-val">${m.today_events} ta</h3>
@@ -424,7 +473,7 @@ async function renderObserveDashboard(container) {
         <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
           <div>
             <h3 style="color: #FBBF24; display: flex; align-items: center; gap: 8px;">
-              <span>⭐</span> HAFTANING YULDUZLARI (WEEKLY STARS)
+              <span style="color:#D97706;">${icon('star', 16)}</span> HAFTANING YULDUZLARI
             </h3>
             <span style="font-size: 12px; color: #94A3B8;">Avtomatlashgan haftalik reyting g'oliblari</span>
           </div>
@@ -458,7 +507,7 @@ async function renderObserveDashboard(container) {
         <!-- TOP BAKALAVRIAT -->
         <div class="card">
           <div class="card-header">
-            <h3>🏆 Top 10 — Bakalavriat</h3>
+            <h3><span style="color:#D97706;">${icon('trophy', 16)}</span> Top 10 — Bakalavriat</h3>
             <button class="btn btn-outline btn-sm" onclick="navigateTo('observe-rating')">Barchasi →</button>
           </div>
           <div class="card-body p-0">
@@ -492,7 +541,7 @@ async function renderObserveDashboard(container) {
         <!-- SOHALAR BO'YICHA TAQSIMOT -->
         <div class="card">
           <div class="card-header">
-            <h3>📊 Sohalar Bo'yicha Taqsimot</h3>
+            <h3><span style="color:#2563EB;">${icon('activity', 16)}</span> Sohalar Bo'yicha Taqsimot</h3>
             <span style="font-size: 12px; color: var(--text-muted);">Tasdiqlangan ballar</span>
           </div>
           <div class="card-body">
@@ -517,7 +566,7 @@ async function renderObserveDashboard(container) {
       ${data.attention_required.late_approvals_count > 0 ? `
         <div class="alert-box alert-warning mb-4" style="background:#FFFBEB; border: 1px solid #FDE68A; padding: 16px; border-radius: 10px;">
           <h4 style="color:#B45309; font-size: 15px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-            ⚠️ 3 ish kunidan oshib ketgan tasdiqlar: ${data.attention_required.late_approvals_count} ta
+            ${icon('alertTriangle', 14)} 3 ish kunidan oshib ketgan tasdiqlar: ${data.attention_required.late_approvals_count} ta
           </h4>
           <p style="font-size: 13px; color: #78350F; margin-bottom: 12px;">R-07 qoidasi bo'yicha sohaviy bo'limlar ushbu arizalarni zudlik bilan ko'rib chiqishi shart.</p>
           <button class="btn btn-warning btn-sm" onclick="navigateTo('dept-approvals')">Tasdiq Navbatiga O'tish →</button>
@@ -701,7 +750,7 @@ async function renderObserveStudents(container) {
           <td><span class="badge badge-light">${s.group_code}</span></td>
           <td>${s.course}-kurs • ${s.program_code}</td>
           <td>${s.phone || '-'}</td>
-          <td>${s.telegram_user_id ? '<span class="text-success">✅ Ulangan</span>' : '<span class="text-muted">Ulanmagan</span>'}</td>
+          <td>${s.telegram_user_id ? '<span class="text-success">' + icon('checkCircle', 13) + ' Ulangan</span>' : '<span class="text-muted">' + icon('xCircle', 13) + ' Ulanmagan</span>'}</td>
           <td><strong style="color: #2563EB;">${s.season || 0} ball</strong></td>
           <td style="text-align: right;">
             <button class="btn btn-outline btn-sm" onclick="showStudentModal('${s.id}')">Profil</button>
@@ -740,11 +789,11 @@ async function renderObserveEvents(container) {
             </div>
             <div class="card-body">
               <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
-                📍 <strong>Joy:</strong> ${ev.place} &nbsp;|&nbsp; 
-                🏛️ <strong>Tashkilotchi:</strong> ${ev.organizer_unit}
+                ${icon('mapPin', 13)} <strong>Joy:</strong> ${ev.place} &nbsp;|&nbsp; 
+                ${icon('building', 13)} <strong>Tashkilotchi:</strong> ${ev.organizer_unit}
               </p>
               <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-                🕒 <strong>Boshlanish:</strong> ${new Date(ev.starts_at).toLocaleString('uz-UZ')}
+                ${icon('clock', 13)} <strong>Boshlanish:</strong> ${new Date(ev.starts_at).toLocaleString('uz-UZ')}
               </p>
               <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 12px;">
                 <span style="font-size: 12px; color: var(--text-muted);">
@@ -752,7 +801,7 @@ async function renderObserveEvents(container) {
                   ${ev.capacity ? `/ ${ev.capacity} ta o'rin` : ''}
                 </span>
                 <button class="btn btn-outline btn-sm" onclick="showEventQrModal('${ev.id}')">
-                  📷 QR Kodni Ko'rish
+                  ${icon('qrCode', 14)} QR Kodni Ko'rish
                 </button>
               </div>
             </div>
@@ -901,7 +950,7 @@ async function renderTutorStudents(container) {
     let html = `
       <div class="metrics-grid mb-4">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">👨‍🎓</div>
+          <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Guruh Talabalari</span>
             <h3 class="stat-val">${summary.total_students} nafar</h3>
@@ -910,7 +959,7 @@ async function renderTutorStudents(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">⚡</div>
+          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('zap', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Faol Talabalar (30+)</span>
             <h3 class="stat-val">${summary.active_students} nafar</h3>
@@ -919,7 +968,7 @@ async function renderTutorStudents(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">📝</div>
+          <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">${icon('fileText', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Bugungi Limit (R-06)</span>
             <h3 class="stat-val">${summary.today_limit.used} / ${summary.today_limit.max}</h3>
@@ -928,7 +977,7 @@ async function renderTutorStudents(container) {
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEE2E2; color:#DC2626;">💤</div>
+          <div class="stat-icon" style="background:#FEE2E2; color:#DC2626;">${icon('clock', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Passiv Talabalar</span>
             <h3 class="stat-val">${summary.passive_students_count} nafar</h3>
@@ -940,7 +989,7 @@ async function renderTutorStudents(container) {
       <div class="card">
         <div class="card-header">
           <h3>Mening Talabalarim Ro'yxati</h3>
-          <button class="btn btn-primary btn-sm" onclick="navigateTo('tutor-add-points')">➕ Yangi Ball Kiritish</button>
+          <button class="btn btn-primary btn-sm" onclick="navigateTo('tutor-add-points')">${icon('userPlus', 14)} Yangi Ball Kiritish</button>
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
@@ -1072,7 +1121,7 @@ async function renderTutorAddPoints(container) {
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%;">
-              💾 Ball Yozuvini Yuborish (Tasdiqqa)
+              ${icon('check', 15)} Ball Yozuvini Yuborish (Tasdiqqa)
             </button>
           </form>
         </div>
@@ -1161,10 +1210,10 @@ async function renderTutorAddPoints(container) {
           body: JSON.stringify(payload)
         });
 
-        alert(`✅ Muvaffaqiyatli saqlandi! Yaratilgan yozuvlar soni: ${res.created_entries.length}`);
+        alert(`Muvaffaqiyatli saqlandi! Yaratilgan yozuvlar soni: ${res.created_entries.length}`);
         navigateTo('tutor-history');
       } catch (err) {
-        alert(`❌ Xatolik: ${err.message}`);
+        alert(`Xatolik: ${err.message}`);
       }
     });
 
@@ -1266,7 +1315,7 @@ async function renderDeptApprovals(container) {
 
       ${entries.length === 0 ? `
         <div class="card p-5 text-center">
-          <p style="font-size: 16px; color: var(--text-muted);">🎉 Hozircha tasdiqlash uchun kutayotgan arizalar yo'q!</p>
+          <p style="font-size: 16px; color: var(--text-muted);"><div style="text-align:center; padding:32px; color:var(--text-muted);">${icon('checkCircle', 36)}<p style="margin-top:10px; font-weight:600; font-size:14px;">Hozircha tasdiqlash uchun kutayotgan arizalar mavjud emas</p></div></p>
         </div>
       ` : `
         <div class="grid grid-1">
@@ -1290,21 +1339,21 @@ async function renderDeptApprovals(container) {
 
               <div class="card-body">
                 <p style="font-size: 13px; margin-bottom: 8px;">
-                  📅 <strong>Sana:</strong> ${e.event_date} &nbsp;|&nbsp; 
-                  📝 <strong>Izoh:</strong> ${e.note || 'Ko\'rsatilmagan'}
+                  ${icon('calendar', 13)} <strong>Sana:</strong> ${e.event_date} &nbsp;|&nbsp; 
+                  ${icon('fileText', 13)} <strong>Izoh:</strong> ${e.note || 'Ko\'rsatilmagan'}
                 </p>
                 ${e.evidence_url ? `
                   <p style="font-size: 13px; margin-bottom: 12px;">
-                    📎 <strong>Dalil:</strong> <a href="${e.evidence_url}" target="_blank" style="color: #2563EB; word-break: break-all;">${e.evidence_url}</a>
+                    ${icon('link', 13)} <strong>Dalil:</strong> <a href="${e.evidence_url}" target="_blank" style="color: #2563EB; word-break: break-all;">${e.evidence_url}</a>
                   </p>
                 ` : ''}
 
                 <div style="display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 12px;">
                   <button class="btn btn-outline text-danger btn-sm" onclick="showRejectModal('${e.id}')">
-                    ❌ Rad Etish
+                    ${icon('x', 13)} Rad Etish
                   </button>
                   <button class="btn btn-success btn-sm" onclick="approveEntryAction('${e.id}')">
-                    ✅ Tasdiqlash
+                    ${icon('check', 13)} Tasdiqlash
                   </button>
                 </div>
               </div>
@@ -1448,7 +1497,7 @@ async function renderDeptEvents(container) {
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%;">
-              🎯 Tadbirni E'lon Qilish va QR Kod Yaratish
+              ${icon('calendar', 15)} Tadbirni E'lon Qilish va QR Kod Yaratish
             </button>
           </form>
         </div>
@@ -1476,7 +1525,7 @@ async function renderDeptEvents(container) {
           body: JSON.stringify(payload)
         });
 
-        alert(`✅ Tadbir e'lon qilindi! Ball: ${res.points}`);
+        alert(` Tadbir e'lon qilindi! Ball: ${res.points}`);
         showEventQrModal(res.event_id);
       } catch (err) {
         alert(err.message);
@@ -1496,7 +1545,7 @@ async function renderGpaImport(container) {
       <!-- GPA TOP 20% -->
       <div class="card">
         <div class="card-header">
-          <h3>📊 GPA Top 20% Talabalar Importi</h3>
+          <h3>${icon('award', 16)} GPA Top 20% Talabalar Importi</h3>
         </div>
         <div class="card-body">
           <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
@@ -1507,7 +1556,7 @@ async function renderGpaImport(container) {
             <input type="file" id="gpa-file-input" class="form-control" accept=".xlsx,.xls">
           </div>
           <button id="btn-upload-gpa" class="btn btn-primary" style="width: 100%;">
-            📥 GPA Ma'lumotlarini Qayta Ishlash
+            ${icon('upload', 14)} GPA Ma'lumotlarini Qayta Ishlash
           </button>
         </div>
       </div>
@@ -1515,7 +1564,7 @@ async function renderGpaImport(container) {
       <!-- 100% DAVOMAT -->
       <div class="card">
         <div class="card-header">
-          <h3>🕒 100% Namumali Davomat Importi</h3>
+          <h3>${icon('clock', 16)} 100% Namunali Davomat Importi</h3>
         </div>
         <div class="card-body">
           <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
@@ -1526,7 +1575,7 @@ async function renderGpaImport(container) {
             <input type="file" id="att-file-input" class="form-control" accept=".xlsx,.xls">
           </div>
           <button id="btn-upload-att" class="btn btn-primary" style="width: 100%;">
-            📥 Davomat Ma'lumotlarini Qayta Ishlash
+            ${icon('upload', 14)} Davomat Ma'lumotlarini Qayta Ishlash
           </button>
         </div>
       </div>
@@ -1547,7 +1596,7 @@ async function renderGpaImport(container) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert(`✅ Muvaffaqiyatli import qilindi! Yangilanganlar: ${data.created}`);
+      alert(`Muvaffaqiyatli import qilindi! Yangilanganlar: ${data.created}`);
     } catch (e) {
       alert(`Xato: ${e.message}`);
     }
@@ -1566,7 +1615,7 @@ async function renderGpaImport(container) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert(`✅ Muvaffaqiyatli import qilindi! Yangilanganlar: ${data.created}`);
+      alert(`Muvaffaqiyatli import qilindi! Yangilanganlar: ${data.created}`);
     } catch (e) {
       alert(`Xato: ${e.message}`);
     }
@@ -1612,21 +1661,21 @@ async function renderProrektorQueue(container) {
 
               <div class="card-body">
                 <p style="font-size: 13px; margin-bottom: 8px;">
-                  📅 <strong>Sana:</strong> ${e.event_date} &nbsp;|&nbsp; 
-                  📝 <strong>Izoh:</strong> ${e.note || 'Ko\'rsatilmagan'}
+                  ${icon('calendar', 13)} <strong>Sana:</strong> ${e.event_date} &nbsp;|&nbsp; 
+                  ${icon('fileText', 13)} <strong>Izoh:</strong> ${e.note || 'Ko\'rsatilmagan'}
                 </p>
                 ${e.evidence_url ? `
                   <p style="font-size: 13px; margin-bottom: 12px;">
-                    📎 <strong>Dalil:</strong> <a href="${e.evidence_url}" target="_blank" style="color: #2563EB;">${e.evidence_url}</a>
+                    ${icon('link', 13)} <strong>Dalil:</strong> <a href="${e.evidence_url}" target="_blank" style="color: #2563EB;">${e.evidence_url}</a>
                   </p>
                 ` : ''}
 
                 <div style="display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 12px;">
                   <button class="btn btn-outline text-danger btn-sm" onclick="showRejectModal('${e.id}')">
-                    ❌ Rad Etish
+                    ${icon('x', 13)} Rad Etish
                   </button>
                   <button class="btn btn-primary btn-sm" onclick="approveEntryAction('${e.id}')">
-                    ⚖️ Yakuniy Tasdiq (PV)
+                    ${icon('checkCircle', 14)} Yakuniy Tasdiq (PV)
                   </button>
                 </div>
               </div>
@@ -1662,7 +1711,7 @@ async function renderProrektorRisks(container) {
               Tyutor bergan ballarning 40% dan ortig'i faqat 5 nafar talabaga to'g'ri kelsa xavf bayrog'i yoqiladi.
             </p>
             ${flags.tutor_concentration.length === 0 ? `
-              <p class="text-success" style="font-size: 13px;">✅ Tyutorlar bo'yicha og'ishlar aniqlanmadi.</p>
+              <p class="text-success" style="font-size: 13px;">${icon('checkCircle', 13)} Tyutorlar bo'yicha og'ishlar aniqlanmadi.</p>
             ` : `
               <div class="table-responsive">
                 <table class="table">
@@ -1695,7 +1744,7 @@ async function renderProrektorRisks(container) {
               Talaba barcha ballarining 70% dan ortig'ini faqat bitta banddan olgan bo'lsa.
             </p>
             ${flags.student_single_source.length === 0 ? `
-              <p class="text-success" style="font-size: 13px;">✅ Bir manbaga bog'lanib qolgan talabalar yo'q.</p>
+              <p class="text-success" style="font-size: 13px;">${icon('checkCircle', 13)} Bir manbaga bog'lanib qolgan talabalar yo'q.</p>
             ` : `
               <div class="table-responsive">
                 <table class="table">
@@ -1759,7 +1808,7 @@ async function renderProrektorAppeals(container) {
               </div>
               <div class="card-body">
                 <p style="background: var(--bg-main); padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px;">
-                  💬 <em>"${a.text}"</em>
+                  <em>"${a.text}"</em>
                 </p>
                 <div style="display: flex; gap: 8px; justify-content: flex-end;">
                   <button class="btn btn-outline text-danger btn-sm" onclick="decideAppealAction('${a.id}', 'declined')">
@@ -1986,7 +2035,7 @@ async function showStudentModal(studentId) {
           <p><strong>Mavsum Balli:</strong> <strong style="color: #2563EB; font-size: 18px;">${st.season || 0}</strong></p>
           <p><strong>Jami Ball:</strong> <strong>${st.total || 0}</strong></p>
           <p><strong>Reytingdagi O'rni:</strong> <span class="badge badge-primary">#${st.rank_cohort || 1}</span></p>
-          <p><strong>Telegram:</strong> ${st.telegram_user_id ? '✅ Bog\'langan' : '❌ Bog\'lanmagan'}</p>
+          <p><strong>Telegram:</strong> ${st.telegram_user_id ? ' Bog\'langan' : ' Bog\'lanmagan'}</p>
         </div>
       </div>
 
@@ -2109,77 +2158,95 @@ const StudentMgmtState = {
   totalStudents: 0
 };
 
+
+// ====================================================================
+// SAHIFA: TALABALAR BOSHQARUVI & IMPORT (SUPERADMIN / REGISTRATOR)
+// ====================================================================
+let adminStudentsState = {
+  search: '',
+  group: '',
+  course: '',
+  gender: '',
+  status: '',
+  limit: 50,
+  offset: 0,
+  total: 0,
+  items: []
+};
+
 async function renderStudentsManagement(container, roleTitle = 'Registrator') {
   container.innerHTML = `
-    <!-- YUQORI SOHAVIY BLOK -->
-    <div class="card mb-4" style="background: linear-gradient(135deg, #1E293B, #0F172A); color: white; border: none;">
-      <div class="card-body" style="padding: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <span style="font-size: 24px;">🎓</span>
-              <h2 style="font-size: 20px; font-weight: 700; color: #fff;">Talabalar Ro'yxati & Boshqaruvi (${roleTitle})</h2>
-              <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid #3B82F6;">1-bosqich Integratsiya</span>
-            </div>
-            <p style="color: #94A3B8; font-size: 13px; max-width: 700px; margin: 0;">
-              Universitet talabalarining yagona manbasi (Registrator). Kunlik yoki davriy Excel/CSV import orqali bazani yangilang, 
-              yangi talabalarni qo'lda kiriting yoki holatini boshqaring.
-            </p>
+    <!-- RASMIY SOHAVIY HERO BANNER -->
+    <div class="admin-hero-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <div class="admin-hero-title">
+            <span style="color: #60A5FA;">${icon('cap', 22)}</span>
+            <span>Talabalar Reyestri & Boshqaruv Markazi</span>
+            <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 11px;">
+              ${roleTitle}
+            </span>
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn btn-outline" style="color: #F8FAFC; border-color: rgba(255,255,255,0.25); display: flex; align-items: center; gap: 6px;">
-              <span>📥</span> Excel Shablon Yuklab Olish
-            </a>
-            <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: flex; align-items: center; gap: 6px;">
-              <span>📊</span> Excel / CSV Import
+          <p class="admin-hero-desc">
+            Al-Xorazmiy Universiteti talabalarining yagona rasmiy bazasi. Excel/CSV orqali ommaviy yuklash, 
+            yangi talabalarni ro'yxatga olish, kurs va guruh ma'lumotlarini boshqarish hamda ballar monitoringi.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn btn-outline" style="color: #F8FAFC; border-color: rgba(255,255,255,0.25); display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('download', 14)} <span>Excel Shablon</span>
+          </a>
+          <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('fileSpreadsheet', 14)} <span>Excel Import</span>
+          </button>
+          <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #059669; border-color: #059669;">
+            ${icon('userPlus', 14)} <span>Yangi Talaba</span>
+          </button>
+          ${roleTitle === 'Superadmin' ? `
+            <button class="btn btn-outline" onclick="handleClearAllStudents()" style="color: #F87171; border-color: rgba(239, 68, 68, 0.5); display: inline-flex; align-items: center; gap: 6px;" title="Barcha talabalarni tozalash">
+              ${icon('trash', 14)} <span>Tozalash</span>
             </button>
-            <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: flex; align-items: center; gap: 6px; background: #10B981; border-color: #10B981;">
-              <span>➕</span> Yangi Talaba Qo'shish
-            </button>
-            <button class="btn btn-outline" onclick="handleClearAllStudents()" style="color: #F87171; border-color: rgba(239, 68, 68, 0.5); display: flex; align-items: center; gap: 6px;" title="Barcha talabalarni tozalash">
-              <span>🗑️</span> Barchasini Tozalash
-            </button>
-          </div>
+          ` : ''}
         </div>
       </div>
     </div>
 
-    <!-- EXCEL IMPORT PANEL (YASHIRIN / OCHILADI) -->
-    <div id="student-import-panel" class="card mb-4" style="display: none; border: 2px dashed #3B82F6; background: #F8FAFC;">
-      <div class="card-header" style="background: #EFF6FF; border-bottom: 1px solid #DBEAFE;">
-        <h3 style="font-size: 15px; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-          <span>📤</span> Talabalar Ro'yxatini Ommaviy Import Qilish (.xlsx / .xls / .csv)
+    <!-- EXCEL IMPORT PANEL (TOGGLEABLE) -->
+    <div id="student-import-panel" class="card mb-4" style="display: none; border: 1px solid #BFDBFE; background: #F8FAFC; box-shadow: var(--shadow-sm);">
+      <div class="card-header" style="background: #EFF6FF; border-bottom: 1px solid #DBEAFE; display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 14px; color: #1E3A8A; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+          ${icon('upload', 16)} Talabalar Ro'yxatini Ommaviy Import Qilish (.xlsx / .xls / .csv)
         </h3>
-        <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="toggleImportPanel()">Yopish</button>
+        <button class="btn btn-outline btn-sm" onclick="toggleImportPanel()">Yopish</button>
       </div>
       <div class="card-body">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+        <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; align-items: start;">
           <div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-              Fayldagi ustunlar tartibi va sarlavhalari (aniq 8 ta ustun):
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px; font-weight: 600;">
+              Excel fayldagi talab qilinadigan 8 ta ustun tartibi:
             </p>
-            <ul style="font-size: 12px; color: var(--text-muted); padding-left: 20px; line-height: 1.8;">
-              <li><strong>1. ID:</strong> Talaba ID kodi (masalan, <code>AE1126333</code>)</li>
-              <li><strong>2. Ism:</strong> Ismi (masalan, <code>AYGUL</code>)</li>
-              <li><strong>3. Familiya:</strong> Familiyasi (masalan, <code>SHADIMURATOVA</code>)</li>
-              <li><strong>4. yo'nalishi:</strong> Ta'lim yo'nalishi (masalan, <code>Sun'iy intellekt</code>)</li>
-              <li><strong>5. guruh:</strong> Guruh kodi (masalan, <code>FMC04</code>)</li>
-              <li><strong>6. telefon raqami:</strong> Telefon raqami (masalan, <code>+998-93-374-19-80</code>)</li>
-              <li><strong>7. jinsi:</strong> Jinsi (<code>Ayol</code> yoki <code>Erkak</code>)</li>
-              <li><strong>8. kursi:</strong> Bosqichi (<code>1</code>, <code>2</code>, <code>3</code>, <code>4</code>)</li>
-            </ul>
-            <div style="margin-top: 12px; font-size: 12px; color: #2563EB;">
-              💡 <em>Eslatma: ID bo'yicha mavjud talabalar yangilanadi, yangilari esa qo'shiladi va boshlang'ich 0 ball beriladi.</em>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 12px;">
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>1. ID</strong> (masalan, AE1126333)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>2. Ism</strong> (masalan, AYGUL)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>3. Familiya</strong> (SHADIMURATOVA)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>4. yo'nalishi</strong> (Sun'iy intellekt)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>5. guruh</strong> (masalan, FMC04)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>6. telefon raqami</strong> (+998...)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>7. jinsi</strong> (Ayol / Erkak)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>8. kursi</strong> (1, 2, 3, 4)</div>
             </div>
+            <p style="font-size: 11.5px; color: #2563EB; display: flex; align-items: center; gap: 6px;">
+              ${icon('info', 14)} <span>ID mavjud bo'lsa yangilanadi, yangilari esa avtomatik qo'shiladi va tegishli tyutor biriktiriladi.</span>
+            </p>
           </div>
 
-          <div style="background: white; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+          <div style="background: white; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
             <div class="form-group mb-3">
-              <label class="form-label" style="font-weight: 600;">Excel / CSV faylini tanlang:</label>
+              <label class="form-label">Excel / CSV faylini tanlang:</label>
               <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" class="form-control" style="padding: 8px;">
             </div>
             <button id="btn-do-import" class="btn btn-primary w-100" onclick="handleStudentExcelUpload()" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
-              <span>🚀</span> Importni Boshlash
+              ${icon('upload', 15)} <span>Importni Boshlash</span>
             </button>
             <div id="import-result-box" style="margin-top: 14px; display: none;"></div>
           </div>
@@ -2187,10 +2254,10 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
       </div>
     </div>
 
-    <!-- METRIKA KARTALARI -->
+    <!-- METRIKA STATISTIKALARI -->
     <div id="students-metrics-cards" class="metrics-grid mb-4">
       <div class="stat-card">
-        <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">👥</div>
+        <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
         <div class="stat-data">
           <span class="stat-label">Jami Ro'yxatdagi</span>
           <h3 class="stat-val" id="stat-total-students">-</h3>
@@ -2198,450 +2265,425 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon" style="background:#ECFDF5; color:#059669;">✅</div>
+        <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('checkCircle', 20)}</div>
         <div class="stat-data">
           <span class="stat-label">Faol Talabalar</span>
           <h3 class="stat-val" id="stat-active-students">-</h3>
-          <span class="stat-sub">Reytingda ishtirok etadi</span>
+          <span class="stat-sub">Ta'lim jarayonida</span>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon" style="background:#FEF2F2; color:#DC2626;">🚫</div>
+        <div class="stat-icon" style="background:#FEF2F2; color:#DC2626;">${icon('xCircle', 20)}</div>
         <div class="stat-data">
-          <span class="stat-label">Chiqarilganlar (Left)</span>
-          <h3 class="stat-val" id="stat-left-students">-</h3>
-          <span class="stat-sub">Ballari saqlanadi</span>
+          <span class="stat-label">Nofaol / Chetlashtirilgan</span>
+          <h3 class="stat-val" id="stat-inactive-students">-</h3>
+          <span class="stat-sub">Akademik ta'tilda</span>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">🏫</div>
+        <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">${icon('building', 20)}</div>
         <div class="stat-data">
           <span class="stat-label">Guruhlar Soni</span>
-          <h3 class="stat-val" id="stat-total-groups">-</h3>
+          <h3 class="stat-val" id="stat-groups-count">-</h3>
           <span class="stat-sub">Akademik guruhlar</span>
         </div>
       </div>
     </div>
 
-    <!-- FILTRLAR VA JADVAL -->
+    <!-- FILTR VA QIDIRUV BOSHQARUV PANELI -->
+    <div class="admin-toolbar">
+      <div class="admin-search-box">
+        ${icon('search', 16)}
+        <input type="text" id="filter-student-search" class="admin-search-input" placeholder="ID, F.I.Sh, guruh yoki telefon bo'yicha tezkor qidiruv...">
+      </div>
+      <div class="admin-filters-group">
+        <select id="filter-student-course" class="admin-filter-select">
+          <option value="">Barcha kurslar</option>
+          <option value="1">1-kurs</option>
+          <option value="2">2-kurs</option>
+          <option value="3">3-kurs</option>
+          <option value="4">4-kurs</option>
+        </select>
+        <select id="filter-student-gender" class="admin-filter-select">
+          <option value="">Barcha jinslar</option>
+          <option value="m">Erkak (O'g'il bola)</option>
+          <option value="f">Ayol (Qiz bola)</option>
+        </select>
+        <select id="filter-student-status" class="admin-filter-select">
+          <option value="">Barcha holatlar</option>
+          <option value="active">Faol (Active)</option>
+          <option value="left">Nofaol (Left)</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="resetStudentFilters()" title="Filtrlarni tozalash" style="display: inline-flex; align-items: center; gap: 4px;">
+          ${icon('refresh', 13)} Tozalash
+        </button>
+      </div>
+    </div>
+
+    <!-- JADVAL KARTASI -->
     <div class="card">
-      <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 280px;">
-          <input type="text" id="filter-student-search" class="form-control" placeholder="Qidirish: ism, familiya, ID kod..." style="max-width: 300px;">
-          <input type="text" id="filter-student-group" class="form-control" placeholder="Guruh (masalan: 210-21)" style="max-width: 160px;">
-          <select id="filter-student-status" class="form-control" style="max-width: 150px;">
-            <option value="">Barcha holatlar</option>
-            <option value="active">Faqat Faol</option>
-            <option value="left">Chiqarilgan (Left)</option>
-          </select>
-          <button class="btn btn-primary" onclick="applyStudentsFilter()">Filtrlash</button>
-          <button class="btn btn-outline" onclick="resetStudentsFilter()">Tozalash</button>
-        </div>
-        <div id="students-pagination-info" style="font-size: 13px; color: var(--text-muted);">
-          Yuklanmoqda...
-        </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 130px;">Talaba ID</th>
+              <th>F.I.Sh</th>
+              <th>Yo'nalish & Guruh</th>
+              <th>Kurs</th>
+              <th>Telefon Raqami</th>
+              <th>Jinsi</th>
+              <th>Ball</th>
+              <th>Holati</th>
+              <th>Tyutor</th>
+              <th style="text-align: right; width: 130px;">Amallar</th>
+            </tr>
+          </thead>
+          <tbody id="admin-students-table-body">
+            <tr>
+              <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <div class="spinner" style="margin-bottom: 10px;"></div>
+                <p>Talabalar ro'yxati yuklanmoqda...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <div class="card-body" style="padding: 0;">
-        <div class="table-container">
-          <table class="data-table" id="students-data-table">
-            <thead>
-              <tr>
-                <th style="width: 110px;">ID Kod</th>
-                <th>Talaba F.I.Sh</th>
-                <th>Guruh</th>
-                <th>Fakultet / Kurs</th>
-                <th>Aloqa (Tel / Email)</th>
-                <th>Ball (Mavsum / Jami)</th>
-                <th>Holat</th>
-                <th style="text-align: right; width: 140px;">Amallar</th>
-              </tr>
-            </thead>
-            <tbody id="students-table-body">
-              <tr><td colspan="8" style="text-align:center; padding: 24px;">Talabalar yuklanmoqda...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- PAGINATION BAR -->
-      <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
-        <div style="font-size: 13px; color: var(--text-muted);" id="students-page-counter">
-          Sahifa 1
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button id="btn-prev-page" class="btn btn-outline" style="padding: 6px 14px;" onclick="changeStudentsPage(-1)" disabled>◀ Oldingi</button>
-          <button id="btn-next-page" class="btn btn-outline" style="padding: 6px 14px;" onclick="changeStudentsPage(1)">Keyingi ▶</button>
+      <!-- PAGINATION -->
+      <div class="pagination-bar" id="students-pagination-bar">
+        <span id="students-pagination-info">0 ta ma'lumot</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn btn-outline btn-sm" id="btn-prev-page" onclick="prevStudentPage()" disabled>Oldingi</button>
+          <span id="students-page-number" style="font-weight: 600; padding: 0 6px;">1</span>
+          <button class="btn btn-outline btn-sm" id="btn-next-page" onclick="nextStudentPage()" disabled>Keyingi</button>
         </div>
       </div>
     </div>
   `;
 
-  // Qidiruv inputlariga Enter tinglovchisi
-  document.getElementById('filter-student-search')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') applyStudentsFilter();
-  });
-  document.getElementById('filter-student-group')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') applyStudentsFilter();
+  // Filter hodisalarini ulash
+  const searchInput = document.getElementById('filter-student-search');
+  let searchTimer;
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      adminStudentsState.search = e.target.value.trim();
+      adminStudentsState.offset = 0;
+      loadAdminStudentsList();
+    }, 350);
   });
 
-  await loadStudentsData();
+  document.getElementById('filter-student-course').addEventListener('change', (e) => {
+    adminStudentsState.course = e.target.value;
+    adminStudentsState.offset = 0;
+    loadAdminStudentsList();
+  });
+
+  document.getElementById('filter-student-gender').addEventListener('change', (e) => {
+    adminStudentsState.gender = e.target.value;
+    adminStudentsState.offset = 0;
+    loadAdminStudentsList();
+  });
+
+  document.getElementById('filter-student-status').addEventListener('change', (e) => {
+    adminStudentsState.status = e.target.value;
+    adminStudentsState.offset = 0;
+    loadAdminStudentsList();
+  });
+
+  await loadAdminStudentsList();
+}
+
+function resetStudentFilters() {
+  adminStudentsState.search = '';
+  adminStudentsState.course = '';
+  adminStudentsState.gender = '';
+  adminStudentsState.status = '';
+  adminStudentsState.offset = 0;
+
+  const s = document.getElementById('filter-student-search');
+  if (s) s.value = '';
+  const c = document.getElementById('filter-student-course');
+  if (c) c.value = '';
+  const g = document.getElementById('filter-student-gender');
+  if (g) g.value = '';
+  const st = document.getElementById('filter-student-status');
+  if (st) st.value = '';
+
+  loadAdminStudentsList();
+}
+
+function prevStudentPage() {
+  if (adminStudentsState.offset >= adminStudentsState.limit) {
+    adminStudentsState.offset -= adminStudentsState.limit;
+    loadAdminStudentsList();
+  }
+}
+
+function nextStudentPage() {
+  if (adminStudentsState.offset + adminStudentsState.limit < adminStudentsState.total) {
+    adminStudentsState.offset += adminStudentsState.limit;
+    loadAdminStudentsList();
+  }
 }
 
 function toggleImportPanel() {
   const panel = document.getElementById('student-import-panel');
-  if (panel) {
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-  }
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 
-async function loadStudentsData() {
-  const tbody = document.getElementById('students-table-body');
+async function loadAdminStudentsList() {
+  const tbody = document.getElementById('admin-students-table-body');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px;"><div class="spinner"></div></td></tr>';
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div class="spinner" style="margin-bottom: 8px;"></div>
+        <p>Ma'lumotlar yangilanmoqda...</p>
+      </td>
+    </tr>
+  `;
 
   try {
     const params = new URLSearchParams({
-      page: StudentMgmtState.page,
-      limit: StudentMgmtState.limit,
-      q: StudentMgmtState.q,
-      group: StudentMgmtState.group,
-      status: StudentMgmtState.status
+      limit: adminStudentsState.limit,
+      offset: adminStudentsState.offset
     });
+    if (adminStudentsState.search) params.append('search', adminStudentsState.search);
+    if (adminStudentsState.course) params.append('course', adminStudentsState.course);
+    if (adminStudentsState.status) params.append('status', adminStudentsState.status);
 
     const res = await apiFetch(`/api/admin/students?${params.toString()}`);
-    StudentMgmtState.totalPages = res.totalPages || 1;
-    StudentMgmtState.totalStudents = res.total || 0;
+    let students = res.students || [];
+
+    // Jins bo'yicha frontend filtri (agar tanlangan bo'lsa)
+    if (adminStudentsState.gender) {
+      students = students.filter(s => s.gender === adminStudentsState.gender);
+    }
+
+    adminStudentsState.items = students;
+    adminStudentsState.total = res.total || students.length;
 
     // Metrikalarni yangilash
     const statTotal = document.getElementById('stat-total-students');
     const statActive = document.getElementById('stat-active-students');
-    const statLeft = document.getElementById('stat-left-students');
-    const statGroups = document.getElementById('stat-total-groups');
+    const statInactive = document.getElementById('stat-inactive-students');
+    const statGroups = document.getElementById('stat-groups-count');
 
-    if (statTotal) statTotal.textContent = `${res.total} nafar`;
+    if (statTotal) statTotal.textContent = res.total || 0;
     
-    // Guruhlar va statuslar hisobi
-    const activeCount = res.students.filter(s => s.status === 'active').length;
-    const leftCount = res.students.filter(s => s.status === 'left').length;
-    const uniqueGroups = new Set(res.students.map(s => s.group_code)).size;
+    // Guruhlar va statuslarni aniqlash
+    const allGroups = new Set();
+    let activeCount = 0;
+    let inactiveCount = 0;
+    students.forEach(s => {
+      if (s.group_code) allGroups.add(s.group_code);
+      if (s.status === 'active') activeCount++; else inactiveCount++;
+    });
 
-    if (statActive) statActive.textContent = `${activeCount}`;
-    if (statLeft) statLeft.textContent = `${leftCount}`;
-    if (statGroups) statGroups.textContent = `${uniqueGroups} ta`;
+    if (statActive) statActive.textContent = activeCount;
+    if (statInactive) statInactive.textContent = inactiveCount;
+    if (statGroups) statGroups.textContent = allGroups.size;
 
-    // Pagination info
-    const infoEl = document.getElementById('students-pagination-info');
-    const counterEl = document.getElementById('students-page-counter');
-    const prevBtn = document.getElementById('btn-prev-page');
-    const nextBtn = document.getElementById('btn-next-page');
+    // Pagination update
+    const pageInfo = document.getElementById('students-pagination-info');
+    const pageNum = document.getElementById('students-page-number');
+    const btnPrev = document.getElementById('btn-prev-page');
+    const btnNext = document.getElementById('btn-next-page');
 
-    if (infoEl) infoEl.textContent = `Jami: ${res.total} ta talaba (${res.page}-sahifa / ${res.totalPages})`;
-    if (counterEl) counterEl.textContent = `Sahifa ${res.page} / ${res.totalPages}`;
-    if (prevBtn) prevBtn.disabled = res.page <= 1;
-    if (nextBtn) nextBtn.disabled = res.page >= res.totalPages;
+    const startIdx = adminStudentsState.total === 0 ? 0 : adminStudentsState.offset + 1;
+    const endIdx = Math.min(adminStudentsState.offset + students.length, adminStudentsState.total);
+    if (pageInfo) pageInfo.textContent = `${startIdx}-${endIdx} dan ${adminStudentsState.total} ta`;
+    if (pageNum) pageNum.textContent = Math.floor(adminStudentsState.offset / adminStudentsState.limit) + 1;
+    if (btnPrev) btnPrev.disabled = adminStudentsState.offset <= 0;
+    if (btnNext) btnNext.disabled = endIdx >= adminStudentsState.total;
 
-    if (!res.students || res.students.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--text-muted);">Talabalar topilmadi</td></tr>';
+    if (students.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" style="text-align: center; padding: 48px; color: var(--text-muted);">
+            <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('users', 32)}</div>
+            <p style="font-size: 14px; font-weight: 600; color: var(--text-main);">Talabalar topilmadi</p>
+            <p style="font-size: 12px; margin-top: 4px;">Qidiruv yoki filtr mezonlarini o'zgartiring, yoki Excel orqali yangi talabalarni yuklang.</p>
+          </td>
+        </tr>
+      `;
       return;
     }
 
-    tbody.innerHTML = res.students.map(st => `
+    tbody.innerHTML = students.map(st => {
+      const isFemale = st.gender === 'female' || st.gender === 'f';
+      const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+      const isActive = st.status === 'active';
+
+      return `
+        <tr>
+          <td>
+            <span class="badge badge-group" style="letter-spacing: 0.5px;">${st.external_id || '-'}</span>
+          </td>
+          <td>
+            <div class="table-student-name">
+              <span class="avatar-badge ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>
+              <div>
+                <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${st.first_name} ${st.last_name}</div>
+                <div class="table-sub-text">${st.email || 'Email biriktirilmagan'}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div style="font-weight: 600; font-size: 12px;">${st.group_code || '-'}</div>
+            <div class="table-sub-text">${st.program_code || 'IT'}</div>
+          </td>
+          <td>
+            <span class="badge badge-course">${st.course || 1}-kurs</span>
+          </td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
+              <span style="color: #64748B;">${icon('phone', 12)}</span>
+              <span>${st.phone || '-'}</span>
+            </div>
+          </td>
+          <td>
+            <span style="font-size: 12px; color: ${isFemale ? '#DB2777' : '#2563EB'}; font-weight: 600;">
+              ${isFemale ? 'Ayol' : 'Erkak'}
+            </span>
+          </td>
+          <td>
+            <div style="font-weight: 700; color: #1E3A8A; font-size: 13px;">${st.season || st.total || 0}</div>
+            <div class="table-sub-text">Jami: ${st.total || 0}</div>
+          </td>
+          <td>
+            <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
+              ${isActive ? 'Faol' : 'Nofaol'}
+            </span>
+          </td>
+          <td>
+            <span style="font-size: 12px; color: var(--text-secondary);">${st.tutor_name || '<em style="color:#94A3B8;">Biriktirilmagan</em>'}</span>
+          </td>
+          <td style="text-align: right;">
+            <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+              <button class="btn-action btn-action-primary" onclick="showEditStudentModal('${st.id}')" title="Tahrirlash">
+                ${icon('edit', 14)}
+              </button>
+              <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStudentStatus('${st.id}', '${st.status}')" title="${isActive ? 'Nofaol qilish' : 'Faollashtirish'}">
+                ${isActive ? icon('pause', 13) : icon('play', 13)}
+              </button>
+              <button class="btn-action" onclick="showStudentDetailsModal('${st.id}')" title="Profilni ko'rish">
+                ${icon('eye', 14)}
+              </button>
+              <button class="btn-action btn-action-danger" onclick="deleteStudentConfirm('${st.id}', '${st.first_name} ${st.last_name}')" title="O'chirish">
+                ${icon('trash', 14)}
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (err) {
+    tbody.innerHTML = `
       <tr>
-        <td>
-          <code style="background: #F1F5F9; padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #1E293B;">
-            ${st.external_id || st.id.slice(0, 8)}
-          </code>
-        </td>
-        <td>
-          <div style="font-weight: 600; color: var(--text-main);">${st.last_name || ''} ${st.first_name || ''}</div>
-          <small style="color: var(--text-muted);">${st.gender === 'female' ? '👩 Qiz' : '👨 O\'g\'il'}</small>
-        </td>
-        <td>
-          <span class="badge" style="background: #EFF6FF; color: #1D4ED8; font-weight: 600;">${st.group_code}</span>
-        </td>
-        <td>
-          <div style="font-size: 13px;">${st.faculty || '—'}</div>
-          <small style="color: var(--text-muted);">${st.course ? st.course + '-kurs' : ''}</small>
-        </td>
-        <td>
-          <div style="font-size: 12px;">${st.phone || '—'}</div>
-          <div style="font-size: 11px; color: var(--text-muted);">${st.email || '—'}</div>
-        </td>
-        <td>
-          <strong style="color: #2563EB;">${st.season_points || 0}</strong>
-          <span style="color: var(--text-muted); font-size: 12px;"> / ${st.total_points || 0}</span>
-        </td>
-        <td>
-          ${st.status === 'active' 
-            ? '<span class="status-badge" style="background:#ECFDF5; color:#059669; border: 1px solid #10B981;">Faol</span>'
-            : '<span class="status-badge" style="background:#FEF2F2; color:#DC2626; border: 1px solid #EF4444;">Left</span>'
-          }
-        </td>
-        <td style="text-align: right;">
-          <div style="display: flex; gap: 6px; justify-content: flex-end;">
-            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Tahrirlash" onclick="showEditStudentModal('${st.id}')">
-              ✏️
-            </button>
-            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: ${st.status === 'active' ? '#F59E0B' : '#059669'};" 
-                    title="${st.status === 'active' ? 'Left qilish' : 'Faollashtirish'}"
-                    onclick="toggleStudentStatus('${st.id}', '${st.status}')">
-              ${st.status === 'active' ? '⏸️' : '▶️'}
-            </button>
-            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: #EF4444;" 
-                    title="Butunlay o'chirish"
-                    onclick="deleteStudent('${st.id}', '${st.first_name} ${st.last_name}')">
-              🗑️
-            </button>
-            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Batafsil profil" onclick="showStudentModal('${st.id}')">
-              👁️
-            </button>
-          </div>
+        <td colspan="10" style="text-align: center; padding: 24px; color: var(--danger);">
+          Xatolik yuz berdi: ${err.message}
         </td>
       </tr>
-    `).join('');
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align:center; padding: 20px;">Xatolik: ${err.message}</td></tr>`;
-  }
-}
-
-function applyStudentsFilter() {
-  StudentMgmtState.q = document.getElementById('filter-student-search')?.value.trim() || '';
-  StudentMgmtState.group = document.getElementById('filter-student-group')?.value.trim() || '';
-  StudentMgmtState.status = document.getElementById('filter-student-status')?.value || '';
-  StudentMgmtState.page = 1;
-  loadStudentsData();
-}
-
-function resetStudentsFilter() {
-  if (document.getElementById('filter-student-search')) document.getElementById('filter-student-search').value = '';
-  if (document.getElementById('filter-student-group')) document.getElementById('filter-student-group').value = '';
-  if (document.getElementById('filter-student-status')) document.getElementById('filter-student-status').value = '';
-  StudentMgmtState.q = '';
-  StudentMgmtState.group = '';
-  StudentMgmtState.status = '';
-  StudentMgmtState.page = 1;
-  loadStudentsData();
-}
-
-function changeStudentsPage(delta) {
-  const newPage = StudentMgmtState.page + delta;
-  if (newPage >= 1 && newPage <= StudentMgmtState.totalPages) {
-    StudentMgmtState.page = newPage;
-    loadStudentsData();
-  }
-}
-
-async function handleStudentExcelUpload() {
-  const fileInput = document.getElementById('import-file-input');
-  const resultBox = document.getElementById('import-result-box');
-  const btn = document.getElementById('btn-do-import');
-
-  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-    alert('Iltimos, avval Excel (.xlsx / .csv) faylini tanlang!');
-    return;
-  }
-
-  const file = fileInput.files[0];
-  const formData = new FormData();
-  formData.append('file', file);
-
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;"></div> Import qilinmoqda...';
-  if (resultBox) {
-    resultBox.style.display = 'block';
-    resultBox.innerHTML = '<p style="color: #2563EB;">Fayl o\'qilmoqda va bazaga yozilmoqda...</p>';
-  }
-
-  try {
-    const res = await fetch('/api/admin/import/students', {
-      method: 'POST',
-      headers: { 'x-user-id': AppState.user.id },
-      body: formData
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Import xatosi');
-
-    resultBox.innerHTML = `
-      <div style="background: #ECFDF5; border: 1px solid #10B981; padding: 12px; border-radius: var(--radius-md); font-size: 13px;">
-        <h4 style="color: #065F46; margin-bottom: 6px; font-weight: 700;">✅ ${data.message}</h4>
-        <ul style="color: #047857; margin: 0; padding-left: 18px;">
-          <li>Fayldagi jami qatorlar: <strong>${data.total} ta</strong></li>
-          <li>Yangi qo'shilgan talabalar: <strong>${data.inserted} ta</strong></li>
-          <li>Yangilangan talabalar: <strong>${data.updated} ta</strong></li>
-          <li>Chiqarilgan (left) talabalar: <strong>${data.left} ta</strong></li>
-          <li>O'tkazib yuborilgan: <strong>${data.skipped} ta</strong></li>
-        </ul>
-        ${data.errors && data.errors.length > 0 ? `
-          <div style="margin-top: 8px; color: #DC2626;">
-            <strong>Xatoliklar (${data.errors.length}):</strong>
-            <div style="max-height: 80px; overflow-y: auto; font-size: 11px; margin-top: 4px;">
-              ${data.errors.map(e => `<div>${e}</div>`).join('')}
-            </div>
-          </div>
-        ` : ''}
-      </div>
     `;
-
-    fileInput.value = '';
-    await loadStudentsData();
-  } catch (err) {
-    if (resultBox) {
-      resultBox.innerHTML = `
-        <div style="background: #FEF2F2; border: 1px solid #EF4444; padding: 12px; border-radius: var(--radius-md); font-size: 13px; color: #991B1B;">
-          <strong>❌ Xatolik yuz berdi:</strong> ${err.message}
-        </div>
-      `;
-    }
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<span>🚀</span> Importni Boshlash';
   }
 }
 
-async function toggleStudentStatus(studentId, currentStatus) {
-  const newStatus = currentStatus === 'active' ? 'left' : 'active';
-  const confirmMsg = newStatus === 'left' 
-    ? 'Talabani "Left" (o\'qishdan ketgan/chiqarilgan) holatiga o\'tkazmoqchimisiz? Uning ballari saqlanadi, lekin ommaviy reytingda ko\'rinmaydi.'
-    : 'Talabani qayta "Faol" holatiga o\'tkazmoqchimisiz?';
-
-  if (!confirm(confirmMsg)) return;
-
-  try {
-    await apiFetch(`/api/admin/students/${studentId}/status`, {
-      method: 'POST',
-      body: JSON.stringify({ status: newStatus })
-    });
-    alert('Talaba holati muvaffaqiyatli o\'zgartirildi');
-    await loadStudentsData();
-  } catch (err) {
-    alert(err.message);
-  }
-}
-
-async function deleteStudent(studentId, name) {
-  if (!confirm(`Talaba "${name}" ni butunlay o'chirib tashlamoqchimisiz? Ushbu talabaning barcha ballari ham o'chiriladi.`)) return;
-
-  try {
-    const res = await apiFetch(`/api/admin/students/${studentId}`, { method: 'DELETE' });
-    alert(res.message || 'Talaba muvaffaqiyatli o\'chirildi');
-    await loadStudentsData();
-  } catch (err) {
-    alert('Xatolik: ' + err.message);
-  }
-}
-
-async function handleClearAllStudents() {
-  if (!confirm('DIQQAT! Barcha talabalar va ularning to\'plagan ballari bazadan butunlay o\'chiriladi!\nDavom etishni xohlaysizmi?')) return;
-  if (!confirm('Tasdiqlash: Ushbu amalni ortga qaytarib bo\'lmaydi. Rozimisiz?')) return;
-
-  try {
-    const res = await apiFetch('/api/admin/students/clear-all', { method: 'POST' });
-    alert(res.message || 'Barcha talabalar muvaffaqiyatli tozalandi');
-    await loadStudentsData();
-  } catch (err) {
-    alert('Xatolik: ' + err.message);
-  }
-}
-
+// YANGI TALABA QO'SHISH MODALI
 function showCreateStudentModal() {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = 'Yangi Talaba Qo\'shish (Registrator / Superadmin)';
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('userPlus', 18)} Yangi Talaba Qo'shish</span>`;
   modalBody.innerHTML = `
     <form id="create-student-form">
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">ID Kod (external_id) *:</label>
-          <input type="text" id="new-stud-id" class="form-control" placeholder="Masalan: STD-2026-001" required>
+          <label class="form-label">Talaba ID (External ID) *</label>
+          <input type="text" id="new-std-external-id" class="form-control" placeholder="Masalan: AE1126333" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Guruh kodi *:</label>
-          <input type="text" id="new-stud-group" class="form-control" placeholder="Masalan: 210-21" required>
+          <label class="form-label">Guruh Kodi *</label>
+          <input type="text" id="new-std-group" class="form-control" placeholder="Masalan: FMC04" required>
         </div>
       </div>
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Ismi *:</label>
-          <input type="text" id="new-stud-first-name" class="form-control" placeholder="Ism" required>
+          <label class="form-label">Ismi *</label>
+          <input type="text" id="new-std-first-name" class="form-control" placeholder="Ismi" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Familiyasi *:</label>
-          <input type="text" id="new-stud-last-name" class="form-control" placeholder="Familiya" required>
+          <label class="form-label">Familiyasi *</label>
+          <input type="text" id="new-std-last-name" class="form-control" placeholder="Familiyasi" required>
         </div>
       </div>
 
-      <div class="grid grid-3 mb-3">
+      <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Fakultet / Yo'nalish:</label>
-          <input type="text" id="new-stud-faculty" class="form-control" placeholder="Dasturiy injiniring">
+          <label class="form-label">Ta'lim Yo'nalishi</label>
+          <input type="text" id="new-std-program" class="form-control" placeholder="Masalan: Sun'iy intellekt">
         </div>
         <div class="form-group">
-          <label class="form-label">Kurs (bosqich):</label>
-          <select id="new-stud-course" class="form-control">
+          <label class="form-label">Kursi (Bosqich)</label>
+          <select id="new-std-course" class="form-select">
             <option value="1">1-kurs</option>
             <option value="2">2-kurs</option>
             <option value="3">3-kurs</option>
             <option value="4">4-kurs</option>
           </select>
         </div>
-        <div class="form-group">
-          <label class="form-label">Jinsi:</label>
-          <select id="new-stud-gender" class="form-control">
-            <option value="male">Erkak (Yigit)</option>
-            <option value="female">Ayol (Qiz)</option>
-          </select>
-        </div>
       </div>
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Telefon raqami:</label>
-          <input type="tel" id="new-stud-phone" class="form-control" placeholder="+998901234567">
+          <label class="form-label">Jinsi</label>
+          <select id="new-std-gender" class="form-select">
+            <option value="m">Erkak (O'g'il bola)</option>
+            <option value="f">Ayol (Qiz bola)</option>
+          </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Email manzili:</label>
-          <input type="email" id="new-stud-email" class="form-control" placeholder="talaba@akhu.uz">
+          <label class="form-label">Telefon Raqami</label>
+          <input type="text" id="new-std-phone" class="form-control" placeholder="+998901234567">
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Boshlang'ich holat:</label>
-        <select id="new-stud-status" class="form-control">
-          <option value="active">Faol (Active - Reytingda qatnashadi)</option>
-          <option value="left">Chiqarilgan (Left - Reytingda ko'rinmaydi)</option>
-        </select>
+      <div class="form-group mb-2">
+        <label class="form-label">Email Manzili (Ixtiyoriy)</label>
+        <input type="email" id="new-std-email" class="form-control" placeholder="student@akhu.uz">
       </div>
     </form>
   `;
 
   modalFooter.innerHTML = `
-    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-    <button class="btn btn-primary" onclick="submitCreateStudent()">Saqlash</button>
+    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+    <button class="btn btn-primary" onclick="handleCreateStudentSubmit()" style="display:inline-flex; align-items:center; gap:6px;">
+      ${icon('check', 14)} Saqlash
+    </button>
   `;
 
   openModal();
 }
 
-async function submitCreateStudent() {
-  const external_id = document.getElementById('new-stud-id')?.value.trim();
-  const group_code = document.getElementById('new-stud-group')?.value.trim();
-  const first_name = document.getElementById('new-stud-first-name')?.value.trim();
-  const last_name = document.getElementById('new-stud-last-name')?.value.trim();
-  const faculty = document.getElementById('new-stud-faculty')?.value.trim();
-  const course = Number(document.getElementById('new-stud-course')?.value) || 1;
-  const gender = document.getElementById('new-stud-gender')?.value || 'male';
-  const phone = document.getElementById('new-stud-phone')?.value.trim();
-  const email = document.getElementById('new-stud-email')?.value.trim();
-  const status = document.getElementById('new-stud-status')?.value || 'active';
+async function handleCreateStudentSubmit() {
+  const external_id = document.getElementById('new-std-external-id')?.value.trim();
+  const group_code = document.getElementById('new-std-group')?.value.trim();
+  const first_name = document.getElementById('new-std-first-name')?.value.trim();
+  const last_name = document.getElementById('new-std-last-name')?.value.trim();
+  const program_code = document.getElementById('new-std-program')?.value.trim() || 'IT';
+  const course = Number(document.getElementById('new-std-course')?.value || 1);
+  const gender = document.getElementById('new-std-gender')?.value || 'm';
+  const phone = document.getElementById('new-std-phone')?.value.trim();
+  const email = document.getElementById('new-std-email')?.value.trim();
 
-  if (!external_id || !first_name || !last_name || !group_code) {
-    alert('Iltimos, barcha majburiy maydonlarni (ID, Guruh, Ism, Familiya) to\'ldiring!');
+  if (!external_id || !group_code || !first_name || !last_name) {
+    alert("Talaba ID, Guruh, Ism va Familiya to'ldirilishi shart!");
     return;
   }
 
@@ -2650,416 +2692,714 @@ async function submitCreateStudent() {
       method: 'POST',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
-        faculty, course, gender, phone, email, status
+        program_code, course, gender, phone, email
       })
     });
 
     closeModal();
-    alert('Talaba muvaffaqiyatli qo\'shildi!');
-    await loadStudentsData();
+    alert('Talaba muvaffaqiyatli saqlandi!');
+    await loadAdminStudentsList();
   } catch (err) {
     alert(err.message);
   }
 }
 
+// TAHRIRLASH MODALI
 async function showEditStudentModal(studentId) {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = 'Talaba Ma\'lumotlarini Tahrirlash';
-  modalBody.innerHTML = '<div class="spinner"></div>';
-  modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Talaba Ma'lumotlarini Tahrirlash</span>`;
+  modalBody.innerHTML = `<div style="text-align:center; padding:30px;"><div class="spinner"></div><p style="margin-top:8px;">Yuklanmoqda...</p></div>`;
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
   openModal();
 
   try {
-    const data = await apiFetch(`/api/observe/students/${studentId}`);
+    const data = await apiFetch(`/api/admin/students/${studentId}`);
     const st = data.student;
 
     modalBody.innerHTML = `
       <form id="edit-student-form">
         <div class="grid grid-2 mb-3">
           <div class="form-group">
-            <label class="form-label">ID Kod (external_id):</label>
-            <input type="text" id="edit-stud-id" class="form-control" value="${st.external_id || ''}" required>
+            <label class="form-label">Talaba ID (External ID) *</label>
+            <input type="text" id="edit-std-external-id" class="form-control" value="${st.external_id || ''}" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Guruh kodi:</label>
-            <input type="text" id="edit-stud-group" class="form-control" value="${st.group_code || ''}" required>
+            <label class="form-label">Guruh Kodi *</label>
+            <input type="text" id="edit-std-group" class="form-control" value="${st.group_code || ''}" required>
           </div>
         </div>
 
         <div class="grid grid-2 mb-3">
           <div class="form-group">
-            <label class="form-label">Ismi:</label>
-            <input type="text" id="edit-stud-first-name" class="form-control" value="${st.first_name || ''}" required>
+            <label class="form-label">Ismi *</label>
+            <input type="text" id="edit-std-first-name" class="form-control" value="${st.first_name || ''}" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Familiyasi:</label>
-            <input type="text" id="edit-stud-last-name" class="form-control" value="${st.last_name || ''}" required>
+            <label class="form-label">Familiyasi *</label>
+            <input type="text" id="edit-std-last-name" class="form-control" value="${st.last_name || ''}" required>
           </div>
         </div>
 
-        <div class="grid grid-3 mb-3">
+        <div class="grid grid-2 mb-3">
           <div class="form-group">
-            <label class="form-label">Fakultet / Yo'nalish:</label>
-            <input type="text" id="edit-stud-faculty" class="form-control" value="${st.faculty || ''}">
+            <label class="form-label">Ta'lim Yo'nalishi</label>
+            <input type="text" id="edit-std-program" class="form-control" value="${st.program_code || ''}">
           </div>
           <div class="form-group">
-            <label class="form-label">Kurs:</label>
-            <select id="edit-stud-course" class="form-control">
-              <option value="1" ${st.course === 1 ? 'selected' : ''}>1-kurs</option>
-              <option value="2" ${st.course === 2 ? 'selected' : ''}>2-kurs</option>
-              <option value="3" ${st.course === 3 ? 'selected' : ''}>3-kurs</option>
-              <option value="4" ${st.course === 4 ? 'selected' : ''}>4-kurs</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Jinsi:</label>
-            <select id="edit-stud-gender" class="form-control">
-              <option value="male" ${st.gender === 'male' ? 'selected' : ''}>Erkak</option>
-              <option value="female" ${st.gender === 'female' ? 'selected' : ''}>Ayol</option>
+            <label class="form-label">Kursi (Bosqich)</label>
+            <select id="edit-std-course" class="form-select">
+              <option value="1" ${st.course == 1 ? 'selected' : ''}>1-kurs</option>
+              <option value="2" ${st.course == 2 ? 'selected' : ''}>2-kurs</option>
+              <option value="3" ${st.course == 3 ? 'selected' : ''}>3-kurs</option>
+              <option value="4" ${st.course == 4 ? 'selected' : ''}>4-kurs</option>
             </select>
           </div>
         </div>
 
         <div class="grid grid-2 mb-3">
           <div class="form-group">
-            <label class="form-label">Telefon:</label>
-            <input type="tel" id="edit-stud-phone" class="form-control" value="${st.phone || ''}">
+            <label class="form-label">Jinsi</label>
+            <select id="edit-std-gender" class="form-select">
+              <option value="m" ${(st.gender === 'm' || st.gender === 'male') ? 'selected' : ''}>Erkak</option>
+              <option value="f" ${(st.gender === 'f' || st.gender === 'female') ? 'selected' : ''}>Ayol</option>
+            </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Email:</label>
-            <input type="email" id="edit-stud-email" class="form-control" value="${st.email || ''}">
+            <label class="form-label">Telefon Raqami</label>
+            <input type="text" id="edit-std-phone" class="form-control" value="${st.phone || ''}">
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Holat:</label>
-          <select id="edit-stud-status" class="form-control">
-            <option value="active" ${st.status === 'active' ? 'selected' : ''}>Faol (Active)</option>
-            <option value="left" ${st.status === 'left' ? 'selected' : ''}>Chiqarilgan (Left)</option>
-          </select>
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">Holati</label>
+            <select id="edit-std-status" class="form-select">
+              <option value="active" ${st.status === 'active' ? 'selected' : ''}>Faol (Active)</option>
+              <option value="left" ${st.status === 'left' ? 'selected' : ''}>Nofaol (Left)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Manzili</label>
+            <input type="email" id="edit-std-email" class="form-control" value="${st.email || ''}">
+          </div>
         </div>
       </form>
     `;
 
     modalFooter.innerHTML = `
-      <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-      <button class="btn btn-primary" onclick="submitEditStudent('${studentId}')">O'zgarishlarni Saqlash</button>
+      <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+      <button class="btn btn-primary" onclick="handleEditStudentSubmit('${st.id}')" style="display:inline-flex; align-items:center; gap:6px;">
+        ${icon('check', 14)} Saqlash
+      </button>
     `;
+
   } catch (err) {
     modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
   }
 }
 
-async function submitEditStudent(studentId) {
-  const external_id = document.getElementById('edit-stud-id')?.value.trim();
-  const group_code = document.getElementById('edit-stud-group')?.value.trim();
-  const first_name = document.getElementById('edit-stud-first-name')?.value.trim();
-  const last_name = document.getElementById('edit-stud-last-name')?.value.trim();
-  const faculty = document.getElementById('edit-stud-faculty')?.value.trim();
-  const course = Number(document.getElementById('edit-stud-course')?.value) || 1;
-  const gender = document.getElementById('edit-stud-gender')?.value || 'male';
-  const phone = document.getElementById('edit-stud-phone')?.value.trim();
-  const email = document.getElementById('edit-stud-email')?.value.trim();
-  const status = document.getElementById('edit-stud-status')?.value || 'active';
+async function handleEditStudentSubmit(studentId) {
+  const external_id = document.getElementById('edit-std-external-id')?.value.trim();
+  const group_code = document.getElementById('edit-std-group')?.value.trim();
+  const first_name = document.getElementById('edit-std-first-name')?.value.trim();
+  const last_name = document.getElementById('edit-std-last-name')?.value.trim();
+  const program_code = document.getElementById('edit-std-program')?.value.trim();
+  const course = Number(document.getElementById('edit-std-course')?.value || 1);
+  const gender = document.getElementById('edit-std-gender')?.value;
+  const phone = document.getElementById('edit-std-phone')?.value.trim();
+  const email = document.getElementById('edit-std-email')?.value.trim();
+  const status = document.getElementById('edit-std-status')?.value;
 
   try {
     await apiFetch(`/api/admin/students/${studentId}`, {
       method: 'PUT',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
-        faculty, course, gender, phone, email, status
+        program_code, course, gender, phone, email, status
       })
     });
 
     closeModal();
-    alert('Talaba ma\'lumotlari yangilandi!');
-    await loadStudentsData();
+    alert("Talaba ma'lumotlari muvaffaqiyatli yangilandi!");
+    await loadAdminStudentsList();
   } catch (err) {
     alert(err.message);
   }
 }
 
-// ====================================================================
-// 9. XODIMLAR & TIZIM ROLLARI BOSHQARUVI (SUPERADMIN FULL ACCESS)
-// ====================================================================
+// TALABA HOLATINI O'ZGARTIRISH (TOGGLE)
+async function toggleStudentStatus(studentId, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'left' : 'active';
+  const label = newStatus === 'active' ? 'faollashtirilsinmi' : 'nofaol qilinsinmi';
 
-const ALL_ROLES_META = [
-  { role: 'superadmin', name: 'Superadmin (Full Access)', color: '#DC2626', desc: 'Barcha tizim boshqaruvi, xodimlar va konfiguratsiya' },
-  { role: 'dep_ob', name: 'O\'quv bo\'limi (Registrator)', color: '#2563EB', desc: 'Talabalar bazasi, Excel import, GPA va davomat nazorati' },
-  { role: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', color: '#D97706', desc: 'Yoshlar siyosati, tadbirlar, arizalarni tasdiqlash' },
-  { role: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', color: '#7C3AED', desc: 'Ma\'naviy tadbirlar, teatr, kitobxonlik tasdiqlari' },
-  { role: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', color: '#059669', desc: 'Maqolalar, patentlar, ilmiy yutuqlarni tasdiqlash' },
-  { role: 'dep_sb', name: 'Sanoat bilan hamkorlik bo\'limi', color: '#0D9488', desc: 'Amaliyot, innovatsion loyihalar, sanoat sertifikatlari' },
-  { role: 'dep_pb', name: 'Matbuot xizmati (PR)', color: '#DB2777', desc: 'Ijtimoiy tarmoqlar, media-kontent, universitet imiji' },
-  { role: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', color: '#4F46E5', desc: '2-bosqich tasdiqlari (PV: 25+ ball, -30 jarimalar), xavf nazorati' },
-  { role: 'tutor', name: 'Guruh Tyutori', color: '#10B981', desc: 'Guruh talabalariga dalil asosida ball kiritish' },
-  { role: 'observer', name: 'Kuzatuvchi (Rektorat / Dekanat)', color: '#64748B', desc: 'Faqat statistikani kuzatish va hisobotlarni ko\'rish' }
-];
+  if (!confirm(`Talaba holati ${label}?`)) return;
+
+  try {
+    await apiFetch(`/api/admin/students/${studentId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status: newStatus })
+    });
+    await loadAdminStudentsList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// TALABANI O'CHIRISH
+async function deleteStudentConfirm(studentId, fullName) {
+  if (!confirm(`Haqiqatan ham talaba "${fullName}" bazadan o'chirilsinmi?\nUning barcha ballari va yozuvlari tozalanadi!`)) {
+    return;
+  }
+
+  try {
+    await apiFetch(`/api/admin/students/${studentId}`, {
+      method: 'DELETE'
+    });
+    alert("Talaba muvaffaqiyatli o'chirildi");
+    await loadAdminStudentsList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// BARCHA TALABALARNI TOZALASH
+async function handleClearAllStudents() {
+  const confirmText = prompt('DIQQAT! Barcha talabalarni va ularning ballarini tozalash uchun "TOZALASH" deb yozing:');
+  if (confirmText !== 'TOZALASH') {
+    if (confirmText !== null) alert("Tasdiqlash so'zi noto'g'ri kiritildi. Operatsiya bekor qilindi.");
+    return;
+  }
+
+  try {
+    const res = await apiFetch('/api/admin/students/clear-all', {
+      method: 'POST'
+    });
+    alert(res.message || 'Barcha talabalar bazasi tozalandi!');
+    await loadAdminStudentsList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// TALABA BATAFSIL PROFILINI KO'RISH
+async function showStudentDetailsModal(studentId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('user', 18)} Talaba Profili</span>`;
+  modalBody.innerHTML = `<div style="text-align:center; padding:30px;"><div class="spinner"></div><p style="margin-top:8px;">Yuklanmoqda...</p></div>`;
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  openModal();
+
+  try {
+    const data = await apiFetch(`/api/admin/students/${studentId}`);
+    const st = data.student;
+    const entries = data.entries || [];
+
+    const isFemale = st.gender === 'female' || st.gender === 'f';
+    const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+
+    modalBody.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-light); margin-bottom: 16px;">
+        <span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 52px; height: 52px; font-size: 18px;">${initials}</span>
+        <div>
+          <h3 style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">${st.first_name} ${st.last_name}</h3>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span class="badge badge-group">${st.external_id}</span>
+            <span class="badge badge-course">${st.course}-kurs • ${st.group_code}</span>
+            <span class="status-badge ${st.status === 'active' ? 'badge-active' : 'badge-inactive'}">${st.status === 'active' ? 'Faol' : 'Nofaol'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3" style="font-size: 13px;">
+        <div>
+          <p style="margin-bottom: 6px;"><strong>Yo'nalishi:</strong> ${st.program_code || '-'}</p>
+          <p style="margin-bottom: 6px;"><strong>Tyutor:</strong> ${st.tutor_name || 'Biriktirilmagan'}</p>
+          <p style="margin-bottom: 6px;"><strong>Jinsi:</strong> ${isFemale ? 'Ayol' : 'Erkak'}</p>
+        </div>
+        <div>
+          <p style="margin-bottom: 6px;"><strong>Telefon:</strong> ${st.phone || '-'}</p>
+          <p style="margin-bottom: 6px;"><strong>Telegram:</strong> ${st.telegram_user_id ? '<span class="text-success">Ulangan</span>' : '<span class="text-muted">Ulanmagan</span>'}</p>
+          <p style="margin-bottom: 6px;"><strong>Mavsumiy Ball:</strong> <strong style="color: #2563EB; font-size: 16px;">${st.season || st.total || 0}</strong></p>
+        </div>
+      </div>
+
+      <h4 style="font-size: 14px; font-weight: 700; margin: 16px 0 10px; color: var(--text-main);">
+        Ballar va Faollik Tarixi (${entries.length} ta yozuv)
+      </h4>
+      <div style="max-height: 240px; overflow-y: auto;">
+        ${entries.length === 0 ? '<p style="color:var(--text-muted); font-size:12px;">Hozircha ball yozuvlari mavjud emas.</p>' : `
+          <table class="data-table" style="font-size: 12px;">
+            <thead>
+              <tr><th>Sana</th><th>Tadbir / Mezon</th><th>Ball</th><th>Holat</th></tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td>${e.event_date || (e.created_at || '').substring(0, 10)}</td>
+                  <td>${e.catalog_title || '-'}</td>
+                  <td><strong>+${e.points}</strong></td>
+                  <td><span class="status-badge status-${e.status}">${e.status}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `}
+      </div>
+    `;
+  } catch (err) {
+    modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+  }
+}
+
+// EXCEL YUKLASH TUGMASI HODISASI
+async function handleStudentExcelUpload() {
+  const fileInput = document.getElementById('import-file-input');
+  const resultBox = document.getElementById('import-result-box');
+  const btn = document.getElementById('btn-do-import');
+
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert('Iltimos, avval Excel yoki CSV faylini tanlang!');
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner"></div> <span>Import qilinmoqda...</span>`;
+  resultBox.style.display = 'block';
+  resultBox.innerHTML = `
+    <div style="padding: 12px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--radius-md); font-size: 13px; color: #1E3A8A;">
+      Fayl serverda tahlil qilinmoqda, iltimos kuting...
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/admin/import/students', {
+      method: 'POST',
+      headers: {
+        'x-user-id': AppState.user.id
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Import qilishda server xatosi yuz berdi');
+
+    resultBox.innerHTML = `
+      <div style="padding: 16px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: var(--radius-md);">
+        <h4 style="color: #065F46; margin-bottom: 6px; font-weight: 700; display:flex; align-items:center; gap:6px;">
+          ${icon('checkCircle', 16)} ${data.message}
+        </h4>
+        <div style="font-size: 13px; color: #047857; line-height: 1.6;">
+          <div>Jami o'qilgan qatorlar: <strong>${data.total_rows || 0}</strong></div>
+          <div>Yangi qo'shilgan talabalar: <strong>${data.inserted || 0}</strong></div>
+          <div>Yangilangan talabalar: <strong>${data.updated || 0}</strong></div>
+          ${data.errors && data.errors.length > 0 ? `
+            <div style="margin-top: 8px; color: #DC2626; font-size: 12px;">
+              <strong>Ogohlantirishlar (${data.errors.length} ta):</strong>
+              <ul style="padding-left: 18px; margin-top: 4px;">
+                ${data.errors.slice(0, 5).map(e => `<li>${e}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    fileInput.value = '';
+    await loadAdminStudentsList();
+  } catch (err) {
+    resultBox.innerHTML = `
+      <div style="padding: 14px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--radius-md); font-size: 13px; color: #991B1B;">
+        <strong>Xatolik yuz berdi:</strong> ${err.message}
+      </div>
+    `;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `${icon('upload', 15)} <span>Importni Boshlash</span>`;
+  }
+}
+
+
+
+// ====================================================================
+// SAHIFA: XODIMLAR & ROLLAR BOSHQARUVI (SUPERADMIN FULL ACCESS)
+// ====================================================================
+let adminStaffState = {
+  search: '',
+  role: '',
+  users: []
+};
 
 async function renderStaffUsersManagement(container) {
   container.innerHTML = `
-    <!-- HEADER -->
-    <div class="card mb-4" style="background: linear-gradient(135deg, #1E1B4B, #0F172A); color: white; border: none;">
-      <div class="card-body" style="padding: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <span style="font-size: 26px;">🛡️</span>
-              <h2 style="font-size: 20px; font-weight: 700; color: #fff;">Xodimlar & Rollar Boshqaruvi (Superadmin Full Access)</h2>
-              <span class="badge" style="background: rgba(220, 38, 38, 0.2); color: #F87171; border: 1px solid #EF4444;">To'liq Ruxsat</span>
-            </div>
-            <p style="color: #94A3B8; font-size: 13px; max-width: 750px; margin: 0;">
-              Superadmin sifatida istalgan bo'lim xodimlarini tizimga kiritishingiz, ularga bir yoki bir nechta rollarni 
-              (Tyutor, Registrator, Bo'limlar, Prorektor) biriktirishingiz yoki istalgan paytda olib tashlashingiz mumkin.
-            </p>
+    <!-- HERO BANNER -->
+    <div class="admin-hero-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <div class="admin-hero-title">
+            <span style="color: #F87171;">${icon('shield', 22)}</span>
+            <span>Universitet Xodimlari & Tizim Rollari Boshqaruvi</span>
+            <span class="badge" style="background: rgba(248, 113, 113, 0.2); color: #FCA5A5; border: 1px solid rgba(248, 113, 113, 0.4); font-size: 11px;">
+              Superadmin Full Access
+            </span>
           </div>
-          <button class="btn btn-primary" onclick="showCreateStaffModal()" style="display: flex; align-items: center; gap: 8px; background: #2563EB; border-color: #2563EB; font-weight: 600;">
-            <span>➕</span> Yangi Xodim Qo'shish
+          <p class="admin-hero-desc">
+            Barcha tizim foydalanuvchilari (Tyutorlar, Bo'lim xodimlari, Registratorlar, Prorektor) reyestri. 
+            Ixtiyoriy xodimga rollarni biriktirish, yangi xodimlarni ro'yxatdan o'tkazish yoki faollik holatini boshqarish.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <button class="btn btn-primary" onclick="showCreateStaffModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${icon('userPlus', 14)} <span>Yangi Xodim Qo'shish</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ROLLAR SHIFRI VA TAVSIFI -->
-    <div class="card mb-4">
-      <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border);">
-        <h3 style="font-size: 14px; color: var(--text-main); font-weight: 600; display: flex; align-items: center; gap: 8px;">
-          <span>📋</span> Tizimdagi Mavjud Bo'limlar va Rollar Ro'yxati (10 ta rol)
-        </h3>
+    <!-- METRIKALAR -->
+    <div class="metrics-grid mb-4">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Jami Xodimlar</span>
+          <h3 class="stat-val" id="stat-staff-total">-</h3>
+          <span class="stat-sub">Barcha ro'yxatdagi</span>
+        </div>
       </div>
-      <div class="card-body" style="padding: 16px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;">
-          ${ALL_ROLES_META.map(r => `
-            <div style="background: #F8FAFC; border-left: 3px solid ${r.color}; padding: 10px 12px; border-radius: var(--radius-sm);">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                <code style="font-size: 11px; font-weight: 700; color: ${r.color};">${r.role}</code>
-                <span style="font-size: 11px; font-weight: 600; color: var(--text-main);">${r.name.split(' (')[0]}</span>
-              </div>
-              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;">${r.desc}</div>
-            </div>
-          `).join('')}
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('checkCircle', 20)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Faol Xodimlar</span>
+          <h3 class="stat-val" id="stat-staff-active">-</h3>
+          <span class="stat-sub">Tizimga kirish huquqiga ega</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">${icon('cap', 20)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Tyutorlar</span>
+          <h3 class="stat-val" id="stat-staff-tutors">-</h3>
+          <span class="stat-sub">Guruhlarga biriktirilgan</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#F3E8FF; color:#9333EA;">${icon('building', 20)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Bo'lim Mas'ullari</span>
+          <h3 class="stat-val" id="stat-staff-depts">-</h3>
+          <span class="stat-sub">Yoshlar, Ilmiy, Ma'naviyat va b.</span>
         </div>
       </div>
     </div>
 
-    <!-- XODIMLAR JADVALI -->
-    <div class="card">
-      <div class="card-header" style="justify-content: space-between;">
-        <h3 style="font-size: 15px; font-weight: 600;">Ro'yxatdan O'tgan Xodimlar</h3>
-        <div id="staff-users-count" style="font-size: 13px; color: var(--text-muted);">Yuklanmoqda...</div>
+    <!-- TOOLBAR -->
+    <div class="admin-toolbar">
+      <div class="admin-search-box">
+        ${icon('search', 16)}
+        <input type="text" id="filter-staff-search" class="admin-search-input" placeholder="Ism, login yoki email bo'yicha qidiruv...">
       </div>
-      <div class="card-body" style="padding: 0;">
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 140px;">Login / ID</th>
-                <th>Xodim F.I.Sh</th>
-                <th>Aloqa (Email / Tel)</th>
-                <th>Telegram ID</th>
-                <th>Biriktirilgan Rollar</th>
-                <th>Tyutor Guruhlari</th>
-                <th>Holat</th>
-                <th style="text-align: right; width: 130px;">Amallar</th>
-              </tr>
-            </thead>
-            <tbody id="staff-users-tbody">
-              <tr><td colspan="8" style="text-align:center; padding: 24px;"><div class="spinner"></div></td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="admin-filters-group">
+        <select id="filter-staff-role" class="admin-filter-select">
+          <option value="">Barcha rollar</option>
+          <option value="superadmin">Superadmin</option>
+          <option value="prorektor">Prorektor</option>
+          <option value="tutor">Tyutor</option>
+          <option value="dep_yb">Yoshlar bilan ishlash</option>
+          <option value="dep_ob">O'quv bo'limi</option>
+          <option value="dep_mb">Ma'naviyat bo'limi</option>
+          <option value="dep_ib">Ilmiy bo'lim</option>
+          <option value="observer">Kuzatuvchi</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="resetStaffFilters()" title="Tozalash" style="display:inline-flex; align-items:center; gap:4px;">
+          ${icon('refresh', 13)} Tozalash
+        </button>
+      </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="card">
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Xodim (F.I.Sh & Login)</th>
+              <th>Biriktirilgan Rollar</th>
+              <th>Tyutor Guruhlari</th>
+              <th>Aloqa (Email / Tel)</th>
+              <th>Holati</th>
+              <th style="text-align: right; width: 120px;">Amallar</th>
+            </tr>
+          </thead>
+          <tbody id="admin-staff-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <div class="spinner"></div>
+                <p style="margin-top: 8px;">Xodimlar yuklanmoqda...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   `;
 
+  // Qidiruv va filtrlar
+  const searchInput = document.getElementById('filter-staff-search');
+  let searchTimer;
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      adminStaffState.search = e.target.value.trim().toLowerCase();
+      renderStaffTableRows();
+    }, 300);
+  });
+
+  document.getElementById('filter-staff-role').addEventListener('change', (e) => {
+    adminStaffState.role = e.target.value;
+    renderStaffTableRows();
+  });
+
   await loadStaffUsersList();
 }
 
+function resetStaffFilters() {
+  adminStaffState.search = '';
+  adminStaffState.role = '';
+  const s = document.getElementById('filter-staff-search');
+  if (s) s.value = '';
+  const r = document.getElementById('filter-staff-role');
+  if (r) r.value = '';
+  renderStaffTableRows();
+}
+
 async function loadStaffUsersList() {
-  const tbody = document.getElementById('staff-users-tbody');
-  const countEl = document.getElementById('staff-users-count');
-  if (!tbody) return;
-
   try {
-    const res = await apiFetch('/api/admin/users');
-    const users = res.users || [];
+    const users = await apiFetch('/api/admin/users');
+    adminStaffState.users = users || [];
 
-    if (countEl) countEl.textContent = `Jami xodimlar: ${users.length} nafar`;
+    // Metrikalar
+    const total = adminStaffState.users.length;
+    const active = adminStaffState.users.filter(u => u.is_active).length;
+    const tutors = adminStaffState.users.filter(u => (u.roles || []).includes('tutor')).length;
+    const depts = adminStaffState.users.filter(u => (u.roles || []).some(r => r.startsWith('dep_'))).length;
 
-    if (users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 24px;">Xodimlar mavjud emas</td></tr>';
-      return;
-    }
+    const elTotal = document.getElementById('stat-staff-total');
+    const elActive = document.getElementById('stat-staff-active');
+    const elTutors = document.getElementById('stat-staff-tutors');
+    const elDepts = document.getElementById('stat-staff-depts');
 
-    tbody.innerHTML = users.map(u => {
-      const roleBadges = (u.roles || []).map(r => {
-        const meta = ALL_ROLES_META.find(m => m.role === r) || { name: r, color: '#64748B' };
-        return `<span class="badge" style="background: ${meta.color}15; color: ${meta.color}; border: 1px solid ${meta.color}40; margin: 2px; font-size: 11px;">${r}</span>`;
-      }).join(' ');
+    if (elTotal) elTotal.textContent = total;
+    if (elActive) elActive.textContent = active;
+    if (elTutors) elTutors.textContent = tutors;
+    if (elDepts) elDepts.textContent = depts;
 
-      const tutorGroups = ((u.tutor_groups || u.groups) && (u.tutor_groups || u.groups).length > 0)
-        ? (u.tutor_groups || u.groups).map(g => `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size: 11px;">${g}</span>`).join(' ')
-        : '<span style="color: var(--text-muted); font-size: 11px;">—</span>';
-
-      return `
-        <tr>
-          <td>
-            <code style="font-weight: 700; color: #1E293B;">${u.username || u.id}</code>
-          </td>
-          <td>
-            <div style="font-weight: 600; color: var(--text-main);">${u.full_name}</div>
-          </td>
-          <td>
-            <div style="font-size: 12px;">${u.email || '—'}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">${u.phone || '—'}</div>
-          </td>
-          <td>
-            ${u.telegram_id 
-              ? `<code style="font-size: 12px; background: #E0F2FE; color: #0284C7; padding: 2px 6px; border-radius: 4px;">${u.telegram_id}</code>`
-              : '<span style="color: var(--text-muted); font-size: 11px;">Ulanmagan</span>'
-            }
-          </td>
-          <td>
-            <div style="display: flex; flex-wrap: wrap; gap: 2px; max-width: 250px;">
-              ${roleBadges || '<span style="color: var(--text-muted);">Rol belgilanmagan</span>'}
-            </div>
-          </td>
-          <td>${tutorGroups}</td>
-          <td>
-            ${u.is_active 
-              ? '<span class="status-badge" style="background:#ECFDF5; color:#059669; border: 1px solid #10B981;">Faol</span>'
-              : '<span class="status-badge" style="background:#FEF2F2; color:#DC2626; border: 1px solid #EF4444;">Nofaol</span>'
-            }
-          </td>
-          <td style="text-align: right;">
-            <div style="display: flex; gap: 6px; justify-content: flex-end;">
-              <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px;" title="Tahrirlash va Rollarni boshqarish" onclick="showEditStaffModal('${u.id}')">
-                ✏️ Rollar
-              </button>
-              <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; color: ${u.is_active ? '#DC2626' : '#059669'};" 
-                      title="${u.is_active ? 'Nofaol qilish' : 'Faollashtirish'}"
-                      onclick="toggleStaffStatus('${u.id}', ${u.is_active})">
-                ${u.is_active ? '🚫' : '✅'}
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+    renderStaffTableRows();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align:center; padding: 24px;">Xatolik: ${err.message}</td></tr>`;
+    const tbody = document.getElementById('admin-staff-table-body');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center; padding:20px;">${err.message}</td></tr>`;
   }
 }
 
-function showCreateStaffModal() {
+function renderStaffTableRows() {
+  const tbody = document.getElementById('admin-staff-table-body');
+  if (!tbody) return;
+
+  let filtered = adminStaffState.users;
+
+  if (adminStaffState.search) {
+    const q = adminStaffState.search;
+    filtered = filtered.filter(u =>
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (adminStaffState.role) {
+    filtered = filtered.filter(u => (u.roles || []).includes(adminStaffState.role));
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <div style="font-size: 28px; margin-bottom: 8px;">${icon('shield', 28)}</div>
+          <p style="font-weight: 600;">Xodimlar topilmadi</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(u => {
+    const initials = (u.full_name || '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    const isActive = Boolean(u.is_active);
+
+    const roleBadges = (u.roles || []).map(r => {
+      let bg = '#F1F5F9', color = '#475569', label = r;
+      if (r === 'superadmin') { bg = '#FEF2F2'; color = '#DC2626'; label = 'Superadmin'; }
+      else if (r === 'prorektor') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Prorektor'; }
+      else if (r === 'tutor') { bg = '#ECFDF5'; color = '#059669'; label = 'Tyutor'; }
+      else if (r.startsWith('dep_')) { bg = '#EFF6FF'; color = '#2563EB'; label = r; }
+      return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.06);">${label}</span>`;
+    }).join('');
+
+    const groupBadges = (u.tutor_groups || []).map(g => `<span class="badge badge-group" style="margin-right:4px;">${g}</span>`).join('') || '<span style="color:#94A3B8; font-size:11px;">-</span>';
+
+    return `
+      <tr>
+        <td>
+          <div class="table-student-name">
+            <span class="avatar-badge">${initials || 'X'}</span>
+            <div>
+              <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${u.full_name}</div>
+              <div class="table-sub-text">@${u.username}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style="display: flex; flex-wrap: wrap; max-width: 280px;">${roleBadges || '<span class="text-muted">Rollar mavjud emas</span>'}</div>
+        </td>
+        <td>${groupBadges}</td>
+        <td>
+          <div style="font-size: 12px; color: var(--text-main);">${u.email || '-'}</div>
+          <div class="table-sub-text">${u.phone || ''}</div>
+        </td>
+        <td>
+          <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
+            ${isActive ? 'Faol' : 'Bloklangan'}
+          </span>
+        </td>
+        <td style="text-align: right;">
+          <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+            <button class="btn-action btn-action-primary" onclick="showEditStaffModal('${u.id}')" title="Tahrirlash / Rollar">
+              ${icon('edit', 14)}
+            </button>
+            <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStaffStatus('${u.id}', ${isActive ? 1 : 0})" title="${isActive ? 'Bloklash' : 'Faollashtirish'}">
+              ${isActive ? icon('pause', 13) : icon('play', 13)}
+            </button>
+            <button class="btn-action btn-action-danger" onclick="deleteStaffUser('${u.id}', '${u.full_name}')" title="O'chirish">
+              ${icon('trash', 14)}
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// YANGI XODIM QO'SHISH
+async function showCreateStaffModal() {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = 'Yangi Xodim Qo\'shish & Rollar Biriktirish (Superadmin)';
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('userPlus', 18)} Yangi Xodim Qo'shish</span>`;
+
+  let rolesList = [];
+  try {
+    const rolesRes = await apiFetch('/api/admin/roles-list');
+    rolesList = rolesRes.roles || [];
+  } catch (e) {
+    rolesList = [
+      { key: 'tutor', name: 'Tyutor' },
+      { key: 'prorektor', name: "Yoshlar bo'yicha Prorektor" },
+      { key: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi" },
+      { key: 'dep_ob', name: "O'quv bo'limi (Registrator)" },
+      { key: 'dep_mb', name: "Ma'naviyat va ma'rifat bo'limi" },
+      { key: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi" },
+      { key: 'observer', name: 'Kuzatuvchi (Rektorat)' },
+      { key: 'superadmin', name: 'Superadmin' }
+    ];
+  }
+
   modalBody.innerHTML = `
     <form id="create-staff-form">
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Tizim Logini (username) *:</label>
-          <input type="text" id="new-staff-username" class="form-control" placeholder="masalan: jasur_m yoki dep_math" required>
+          <label class="form-label">Foydalanuvchi Nomi (Login) *</label>
+          <input type="text" id="new-staff-username" class="form-control" placeholder="masalan: jasur_m" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Parol *:</label>
-          <input type="password" id="new-staff-password" class="form-control" placeholder="Kamida 6 belgi" required>
+          <label class="form-label">Parol *</label>
+          <input type="password" id="new-staff-password" class="form-control" placeholder="Kamida 6 ta belgi" required>
         </div>
       </div>
 
       <div class="form-group mb-3">
-        <label class="form-label">Xodim F.I.Sh *:</label>
-        <input type="text" id="new-staff-fullname" class="form-control" placeholder="To'liq ismi va familiyasi" required>
+        <label class="form-label">F.I.Sh (To'liq ismi) *</label>
+        <input type="text" id="new-staff-fullname" class="form-control" placeholder="Familiya Ism Sharif" required>
       </div>
 
-      <div class="grid grid-3 mb-3">
+      <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Email:</label>
-          <input type="email" id="new-staff-email" class="form-control" placeholder="xodim@akhu.uz">
+          <label class="form-label">Email</label>
+          <input type="email" id="new-staff-email" class="form-control" placeholder="staff@akhu.uz">
         </div>
         <div class="form-group">
-          <label class="form-label">Telefon:</label>
-          <input type="tel" id="new-staff-phone" class="form-control" placeholder="+998901234567">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Telegram Chat ID:</label>
-          <input type="number" id="new-staff-tgid" class="form-control" placeholder="123456789">
+          <label class="form-label">Telefon Raqami</label>
+          <input type="text" id="new-staff-phone" class="form-control" placeholder="+998901234567">
         </div>
       </div>
 
       <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 700; color: #1E3A8A; display: block; margin-bottom: 8px;">
-          Biriktiriladigan Rollar (Ixtiyoriy kombinatsiya tanlanishi mumkin):
-        </label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border);">
-          ${ALL_ROLES_META.map(r => `
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
-              <input type="checkbox" name="staff-roles-checkbox" value="${r.role}" onchange="checkTutorSelection('create')">
-              <span style="font-weight: 600; color: ${r.color};">${r.role}</span>
-              <span style="font-size: 11px; color: var(--text-muted);">- ${r.name.split(' (')[0]}</span>
+        <label class="form-label" style="font-weight: 600;">Biriktiriladigan Rollar (Tanlang):</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 180px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          ${rolesList.map(r => `
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+              <input type="checkbox" name="new-staff-roles-checkbox" value="${r.key}">
+              <span>${r.name}</span>
             </label>
           `).join('')}
         </div>
       </div>
 
-      <div id="create-tutor-group-box" class="form-group mb-3" style="display: none; background: #EFF6FF; padding: 12px; border-radius: var(--radius-md); border: 1px solid #BFDBFE;">
-        <label class="form-label" style="color: #1E3A8A; font-weight: 600;">Tyutor Guruhlari (vergul bilan ajrating):</label>
-        <input type="text" id="new-staff-tutor-groups" class="form-control" placeholder="Masalan: 210-21, 210-22, 210-23">
-        <small style="color: #2563EB; font-size: 11px; display: block; margin-top: 4px;">Ushbu tyutor faqat belgilangan guruh talabalariga ball kirita oladi.</small>
-      </div>
-
-      <div class="form-group">
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-          <input type="checkbox" id="new-staff-active" checked>
-          <span style="font-weight: 600;">Hisob faol (tizimga kira oladi)</span>
-        </label>
+      <div class="form-group mb-2">
+        <label class="form-label">Tyutor Guruhlari (vergul bilan, faqat tyutorlar uchun):</label>
+        <input type="text" id="new-staff-tutor-groups" class="form-control" placeholder="FMC01, FMC02">
       </div>
     </form>
   `;
 
   modalFooter.innerHTML = `
-    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-    <button class="btn btn-primary" onclick="submitCreateStaff()">Xodimni Yaratish</button>
+    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+    <button class="btn btn-primary" onclick="handleCreateStaffSubmit()" style="display:inline-flex; align-items:center; gap:6px;">
+      ${icon('check', 14)} Yaratish
+    </button>
   `;
 
   openModal();
 }
 
-function checkTutorSelection(prefix) {
-  const isChecked = Array.from(document.querySelectorAll(`input[name="staff-roles-checkbox"]:checked`))
-    .some(cb => cb.value === 'tutor');
-  const box = document.getElementById(`${prefix}-tutor-group-box`);
-  if (box) box.style.display = isChecked ? 'block' : 'none';
-}
-
-async function submitCreateStaff() {
+async function handleCreateStaffSubmit() {
   const username = document.getElementById('new-staff-username')?.value.trim();
   const password = document.getElementById('new-staff-password')?.value;
   const full_name = document.getElementById('new-staff-fullname')?.value.trim();
   const email = document.getElementById('new-staff-email')?.value.trim();
   const phone = document.getElementById('new-staff-phone')?.value.trim();
-  const telegram_id = document.getElementById('new-staff-tgid')?.value.trim();
-  const is_active = document.getElementById('new-staff-active')?.checked ? 1 : 0;
 
-  const roles = Array.from(document.querySelectorAll(`input[name="staff-roles-checkbox"]:checked`))
+  const roles = Array.from(document.querySelectorAll(`input[name="new-staff-roles-checkbox"]:checked`))
     .map(cb => cb.value);
 
   const rawGroups = document.getElementById('new-staff-tutor-groups')?.value.trim();
   const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
 
   if (!username || !password || !full_name) {
-    alert('Iltimos, Login, Parol va F.I.Sh maydonlarini to\'ldiring!');
+    alert("Login, Parol va F.I.Sh kiritilishi shart!");
     return;
   }
 
   if (roles.length === 0) {
-    alert('Iltimos, kamida bitta rol tanlang!');
+    alert("Kamida bitta rol tanlanishi shart!");
     return;
   }
 
@@ -3067,114 +3407,113 @@ async function submitCreateStaff() {
     await apiFetch('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify({
-        username, password, full_name, email, phone,
-        telegram_id: telegram_id ? Number(telegram_id) : null,
-        is_active, roles, tutor_groups
+        username, password, full_name, email, phone, roles, tutor_groups
       })
     });
 
     closeModal();
-    alert('Yangi xodim muvaffaqiyatli saqlandi!');
+    alert('Xodim muvaffaqiyatli yaratildi!');
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
   }
 }
 
+// XODIMNI TAHRIRLASH
 async function showEditStaffModal(userId) {
+  const user = adminStaffState.users.find(u => u.id === userId);
+  if (!user) return;
+
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = 'Xodimni Tahrirlash va Rollarni O\'zgartirish';
-  modalBody.innerHTML = '<div class="spinner"></div>';
-  modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
-  openModal();
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Xodimni Tahrirlash: ${user.full_name}</span>`;
 
+  let rolesList = [];
   try {
-    const res = await apiFetch('/api/admin/users');
-    const u = (res.users || []).find(x => x.id === userId);
-    if (!u) throw new Error('Xodim topilmadi');
-
-    modalBody.innerHTML = `
-      <form id="edit-staff-form">
-        <div class="grid grid-2 mb-3">
-          <div class="form-group">
-            <label class="form-label">Login (O'zgartirib bo'lmaydi):</label>
-            <input type="text" class="form-control" value="${u.username || u.id}" disabled style="background:#F1F5F9;">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Yangi Parol (ixtiyoriy):</label>
-            <input type="password" id="edit-staff-password" class="form-control" placeholder="Bo'sh qoldirilsa o'zgarmaydi">
-          </div>
-        </div>
-
-        <div class="form-group mb-3">
-          <label class="form-label">Xodim F.I.Sh *:</label>
-          <input type="text" id="edit-staff-fullname" class="form-control" value="${u.full_name || ''}" required>
-        </div>
-
-        <div class="grid grid-3 mb-3">
-          <div class="form-group">
-            <label class="form-label">Email:</label>
-            <input type="email" id="edit-staff-email" class="form-control" value="${u.email || ''}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Telefon:</label>
-            <input type="tel" id="edit-staff-phone" class="form-control" value="${u.phone || ''}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Telegram Chat ID:</label>
-            <input type="number" id="edit-staff-tgid" class="form-control" value="${u.telegram_id || ''}">
-          </div>
-        </div>
-
-        <div class="form-group mb-3">
-          <label class="form-label" style="font-weight: 700; color: #1E3A8A; display: block; margin-bottom: 8px;">
-            Biriktirilgan Rollar (Ixtiyoriy qo'shish yoki olib tashlash):
-          </label>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border);">
-            ${ALL_ROLES_META.map(r => `
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
-                <input type="checkbox" name="edit-staff-roles-checkbox" value="${r.role}" 
-                       ${(u.roles || []).includes(r.role) ? 'checked' : ''} 
-                       onchange="checkTutorSelection('edit')">
-                <span style="font-weight: 600; color: ${r.color};">${r.role}</span>
-                <span style="font-size: 11px; color: var(--text-muted);">- ${r.name.split(' (')[0]}</span>
-              </label>
-            `).join('')}
-          </div>
-        </div>
-
-        <div id="edit-tutor-group-box" class="form-group mb-3" style="display: ${(u.roles || []).includes('tutor') ? 'block' : 'none'}; background: #EFF6FF; padding: 12px; border-radius: var(--radius-md); border: 1px solid #BFDBFE;">
-          <label class="form-label" style="color: #1E3A8A; font-weight: 600;">Tyutor Guruhlari (vergul bilan ajrating):</label>
-          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${(u.tutor_groups || u.groups || []).join(', ')}" placeholder="210-21, 210-22">
-        </div>
-
-        <div class="form-group">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="edit-staff-active" ${u.is_active ? 'checked' : ''}>
-            <span style="font-weight: 600;">Hisob faol</span>
-          </label>
-        </div>
-      </form>
-    `;
-
-    modalFooter.innerHTML = `
-      <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-      <button class="btn btn-primary" onclick="submitEditStaff('${userId}')">O'zgarishlarni Saqlash</button>
-    `;
-  } catch (err) {
-    modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+    const rolesRes = await apiFetch('/api/admin/roles-list');
+    rolesList = rolesRes.roles || [];
+  } catch (e) {
+    rolesList = [
+      { key: 'tutor', name: 'Tyutor' },
+      { key: 'prorektor', name: "Yoshlar bo'yicha Prorektor" },
+      { key: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi" },
+      { key: 'dep_ob', name: "O'quv bo'limi (Registrator)" },
+      { key: 'dep_mb', name: "Ma'naviyat va ma'rifat bo'limi" },
+      { key: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi" },
+      { key: 'observer', name: 'Kuzatuvchi (Rektorat)' },
+      { key: 'superadmin', name: 'Superadmin' }
+    ];
   }
+
+  modalBody.innerHTML = `
+    <form id="edit-staff-form">
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">F.I.Sh *</label>
+          <input type="text" id="edit-staff-fullname" class="form-control" value="${user.full_name || ''}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Yangi Parol (ixtiyoriy)</label>
+          <input type="password" id="edit-staff-password" class="form-control" placeholder="O'zgartirish uchun kiriting">
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" id="edit-staff-email" class="form-control" value="${user.email || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon Raqami</label>
+          <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}">
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight: 600;">Biriktirilgan Rollar:</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 180px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          ${rolesList.map(r => `
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+              <input type="checkbox" name="edit-staff-roles-checkbox" value="${r.key}" ${(user.roles || []).includes(r.key) ? 'checked' : ''}>
+              <span>${r.name}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-2">
+        <div class="form-group">
+          <label class="form-label">Tyutor Guruhlari:</label>
+          <input type="text" id="edit-staff-tutor-groups" class="form-control" value="${(user.tutor_groups || []).join(', ')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Holati</label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer;">
+            <input type="checkbox" id="edit-staff-active" ${user.is_active ? 'checked' : ''}>
+            <span>Faol (Tizimga kirishga ruxsat)</span>
+          </label>
+        </div>
+      </div>
+    </form>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+    <button class="btn btn-primary" onclick="handleEditStaffSubmit('${user.id}')" style="display:inline-flex; align-items:center; gap:6px;">
+      ${icon('check', 14)} Saqlash
+    </button>
+  `;
+
+  openModal();
 }
 
-async function submitEditStaff(userId) {
+async function handleEditStaffSubmit(userId) {
   const full_name = document.getElementById('edit-staff-fullname')?.value.trim();
   const password = document.getElementById('edit-staff-password')?.value;
   const email = document.getElementById('edit-staff-email')?.value.trim();
   const phone = document.getElementById('edit-staff-phone')?.value.trim();
-  const telegram_id = document.getElementById('edit-staff-tgid')?.value.trim();
   const is_active = document.getElementById('edit-staff-active')?.checked ? 1 : 0;
 
   const roles = Array.from(document.querySelectorAll(`input[name="edit-staff-roles-checkbox"]:checked`))
@@ -3184,20 +3523,18 @@ async function submitEditStaff(userId) {
   const tutor_groups = rawGroups ? rawGroups.split(',').map(g => g.trim()).filter(Boolean) : [];
 
   if (!full_name) {
-    alert('F.I.Sh kiritilishi shart!');
+    alert("F.I.Sh kiritilishi shart!");
     return;
   }
 
   if (roles.length === 0) {
-    alert('Kamida bitta rol tanlanishi shart!');
+    alert("Kamida bitta rol tanlanishi shart!");
     return;
   }
 
   try {
     const payload = {
-      full_name, email, phone,
-      telegram_id: telegram_id ? Number(telegram_id) : null,
-      is_active, roles, tutor_groups
+      full_name, email, phone, is_active, roles, tutor_groups
     };
     if (password) payload.password = password;
 
@@ -3207,7 +3544,7 @@ async function submitEditStaff(userId) {
     });
 
     closeModal();
-    alert('Xodim ma\'lumotlari va rollari yangilandi!');
+    alert("Xodim ma'lumotlari va rollari yangilandi!");
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
@@ -3216,19 +3553,31 @@ async function submitEditStaff(userId) {
 
 async function toggleStaffStatus(userId, currentActive) {
   const newActive = currentActive ? 0 : 1;
-  const actionText = newActive ? 'faollashtirmoqchimisiz' : 'bloklamoqchimisiz (nofaol)';
+  const actionText = newActive ? 'faollashtirilsinmi' : 'bloklansinmi';
 
-  if (!confirm(`Xodimni ${actionText}?`)) return;
+  if (!confirm(`Xodim ${actionText}?`)) return;
 
   try {
     await apiFetch(`/api/admin/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify({ is_active: newActive })
     });
-    alert('Xodim holati yangilandi');
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
   }
 }
 
+async function deleteStaffUser(userId, fullName) {
+  if (!confirm(`Haqiqatan ham "${fullName}" xodimi tizimdan o'chirilsinmi?`)) return;
+
+  try {
+    await apiFetch(`/api/admin/users/${userId}`, {
+      method: 'DELETE'
+    });
+    alert("Xodim o'chirildi");
+    await loadStaffUsersList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
