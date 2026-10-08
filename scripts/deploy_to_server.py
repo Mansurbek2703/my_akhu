@@ -36,7 +36,7 @@ const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;
 console.log('SERVER BAZASIDAGI TALABALAR SONI:', count);
 
 const { awardWelcomeBonus } = require('./src/services/pointService');
-const linkedStudents = db.prepare("SELECT id FROM student WHERE telegram_user_id IS NOT NULL").all();
+const linkedStudents = db.prepare('SELECT id FROM student WHERE telegram_user_id IS NOT NULL').all();
 for (const s of linkedStudents) {
   awardWelcomeBonus(s.id);
 }
