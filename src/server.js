@@ -54,8 +54,12 @@ app.get('/tv', (req, res) => {
 });
 
 // Brauzerdan tadbir check-in ga kirishga urinishlarni butunlay to'sish (hech narsa ochilmasligi kerak)
-app.all(['/checkin', '/event/checkin', '/events/:id/checkin', '/qr-checkin', '/qr/*'], (req, res) => {
-  return res.status(403).send('Kirish taqiqlangan! Tadbir QR kodini faqat Telegram Mini App ichidagi skaner orqali o\'qish mumkin.');
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase();
+  if (p === '/checkin' || p === '/event/checkin' || p === '/qr-checkin' || (p.startsWith('/events/') && p.endsWith('/checkin'))) {
+    return res.status(403).send('Kirish taqiqlangan! Tadbir QR kodini faqat Telegram Mini App ichidagi skaner orqali o\'qish mumkin.');
+  }
+  next();
 });
 
 // SPA Fallback to index.html (Express 5 compatible)
