@@ -893,43 +893,54 @@ async function renderObserveDashboard(container) {
         </div>
 
         <!-- GURUHLAR VA YO'NALISHLAR REYTINGI -->
-        <div class="card">
-          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="card" style="box-shadow: 0 4px 18px rgba(0,0,0,0.04); border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background:#F8FAFC; padding: 16px 20px; border-bottom: 1px solid #E2E8F0;">
             <div>
-              <h3 style="display:flex; align-items:center; gap:8px;">
+              <h3 style="display:flex; align-items:center; gap:8px; margin:0 0 3px; font-size:15px; font-weight:700; color:#0F172A;">
                 <span style="color:#2563EB;">${icon('shield', 16)}</span> Akademik Guruhlar Reytingi
               </h3>
               <span style="font-size:12px; color:#64748B;">Universitet guruhlarining o'rtacha ko'rsatkichi</span>
             </div>
-            <span class="badge badge-light" style="font-size:12px;">Top 10 Guruh</span>
+            <span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:4px 10px; border-radius:12px;">Top 10 Guruh</span>
           </div>
           <div class="card-body p-0">
             ${topGroups.length > 0 ? `
               <div class="table-responsive">
-                <table class="table" style="margin-bottom:0;">
+                <table class="table observe-table" style="margin-bottom:0; width:100%;">
                   <thead>
-                    <tr>
-                      <th style="width: 50px;">O'rin</th>
-                      <th>Guruh</th>
-                      <th>Yo'nalishi</th>
-                      <th style="text-align:center;">Talabalar</th>
+                    <tr style="background:#F8FAFC;">
+                      <th style="width: 70px; text-align:center;">O'rin</th>
+                      <th>Guruh Kodi</th>
+                      <th>Ta'lim Yo'nalishi</th>
+                      <th style="text-align:center;">Talabalar Soni</th>
                       <th style="text-align:right;">O'rtacha Ball</th>
                     </tr>
                   </thead>
                   <tbody>
-                    ${topGroups.map((g, idx) => `
-                      <tr>
-                        <td>
-                          <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}" style="width:26px; height:26px; font-size:12px;">
-                            ${idx + 1}
-                          </span>
-                        </td>
-                        <td><strong style="color:#0F172A;">${g.group_code}</strong></td>
-                        <td style="font-size:13px; color:#475569;">${g.program_code || 'IT'}</td>
-                        <td style="text-align:center;"><span class="badge badge-light">${g.students_count} nafar</span></td>
-                        <td style="text-align:right;"><strong style="color:#2563EB; font-size:14px;">${g.avg_score} ball</strong></td>
-                      </tr>
-                    `).join('')}
+                    ${topGroups.map((g, idx) => {
+                      const isTop3 = idx < 3;
+                      return `
+                        <tr style="${isTop3 ? 'background:#FCFDFE;' : ''}">
+                          <td style="text-align:center;">
+                            <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">
+                              ${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : idx + 1))}
+                            </span>
+                          </td>
+                          <td>
+                            <span class="group-code-pill" style="font-weight:800; font-size:12.5px; color:#0F172A; padding:4px 10px;">${g.group_code}</span>
+                          </td>
+                          <td style="font-size:13px; color:#334155; font-weight:500;">${g.program_code || 'IT'}</td>
+                          <td style="text-align:center;">
+                            <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:12px; padding:4px 10px; border-radius:12px;">
+                              ${g.students_count} nafar
+                            </span>
+                          </td>
+                          <td style="text-align:right;">
+                            <span class="score-pill-blue">${g.avg_score} ball</span>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
                   </tbody>
                 </table>
               </div>
@@ -1056,47 +1067,78 @@ async function renderObserveRating(container) {
         ${buildPodium(list)}
 
         <!-- TOP 10 JADVALI -->
-        <div class="card mb-4">
-          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="card mb-4" style="box-shadow: 0 4px 18px rgba(0,0,0,0.04); border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background:#F8FAFC; padding: 16px 20px; border-bottom: 1px solid #E2E8F0;">
             <div>
-              <h3 style="font-size:16px;">🏆 ${currentLevel === 'bak' ? 'Bakalavriyat' : 'Magistratura'} — Top 10 Yetakchilar Safi</h3>
-              <span style="font-size:12px; color:#64748B;">Mavsumiy jamg'arilgan eng yuqori ballar</span>
+              <h3 style="font-size:15px; margin:0 0 3px; font-weight:700; color:#0F172A; display:flex; align-items:center; gap:8px;">
+                <span>🏆</span> ${currentLevel === 'bak' ? 'Bakalavriyat' : 'Magistratura'} — Top 10 Yetakchilar Safi
+              </h3>
+              <span style="font-size:12px; color:#64748B;">Mavsumiy jamg'arilgan eng yuqori e'tirof ballari</span>
             </div>
-            <span class="badge badge-light">10 nafar yetakchi</span>
+            <span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:4px 10px; border-radius:12px;">10 nafar yetakchi</span>
           </div>
           <div class="card-body p-0">
             ${list.length > 0 ? `
               <div class="table-responsive">
-                <table class="table" style="margin-bottom:0;">
+                <table class="table observe-table" style="margin-bottom:0; width:100%;">
                   <thead>
-                    <tr>
-                      <th style="width: 60px;">O'rin</th>
-                      <th>Talaba</th>
-                      <th>Guruh</th>
-                      <th>Ta'lim Yo'nalishi</th>
-                      <th style="text-align:right;">Mavsum Balli</th>
-                      <th style="text-align:right;">Jami Ball</th>
+                    <tr style="background:#F8FAFC;">
+                      <th style="width: 70px; text-align:center;">O'rin</th>
+                      <th>Talaba F.I.Sh</th>
+                      <th>Akademik Guruh</th>
+                      <th>Ta'lim Yo'nalishi & Bosqich</th>
+                      <th style="text-align:right;">Mavsumiy Ball</th>
+                      <th style="text-align:right;">Jami Jamg'arma</th>
                       <th style="text-align:right;">Haftalik</th>
                     </tr>
                   </thead>
                   <tbody>
-                    ${list.map((s, idx) => `
-                      <tr>
-                        <td>
-                          <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">
-                            ${idx + 1}
-                          </span>
-                        </td>
-                        <td>
-                          <strong style="color:#0F172A; font-size:14px;">${s.first_name} ${s.last_name}</strong>
-                        </td>
-                        <td><span class="badge badge-light">${s.group_code}</span></td>
-                        <td style="font-size:13px; color:#475569;">${s.program_code || 'IT'} (${s.course}-kurs)</td>
-                        <td style="text-align:right;"><strong style="color:#2563EB; font-size:15px;">${s.season} ball</strong></td>
-                        <td style="text-align:right; color:#475569;">${s.total} ball</td>
-                        <td style="text-align:right;"><span style="color:#059669; font-weight:700;">+${s.week_cur || 0}</span></td>
-                      </tr>
-                    `).join('')}
+                    ${list.map((s, idx) => {
+                      const initials = `${(s.first_name || '').charAt(0)}${(s.last_name || '').charAt(0)}`.toUpperCase();
+                      const isTop3 = idx < 3;
+                      return `
+                        <tr style="${isTop3 ? 'background:#FCFDFE;' : ''}">
+                          <td style="text-align:center;">
+                            <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">
+                              ${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : idx + 1))}
+                            </span>
+                          </td>
+                          <td>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                              <div style="width:34px; height:34px; border-radius:50%; background:${idx === 0 ? '#FEF3C7' : (idx === 1 ? '#F1F5F9' : (idx === 2 ? '#FFEDD5' : '#EFF6FF'))}; color:${idx === 0 ? '#92400E' : (idx === 1 ? '#334155' : (idx === 2 ? '#9A3412' : '#2563EB'))}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; border:1.5px solid ${idx === 0 ? '#FDE68A' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#FED7AA' : '#DBEAFE'))}; flex-shrink:0;">
+                                ${initials || 'ST'}
+                              </div>
+                              <div>
+                                <div style="font-weight:700; color:#0F172A; font-size:13.5px; letter-spacing:-0.2px;">
+                                  ${s.first_name} ${s.last_name}
+                                </div>
+                                <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
+                                  ID: <span style="font-weight:600; color:#475569;">${s.external_id || '-'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span class="group-code-pill" style="font-weight:700; font-size:12.5px;">${s.group_code || '—'}</span>
+                          </td>
+                          <td>
+                            <div style="font-size:13px; color:#1E293B; font-weight:600;">${s.program_code || 'IT'}</div>
+                            <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
+                              <span class="badge badge-course" style="font-size:11px; padding:2px 7px;">${s.course || 1}-kurs</span>
+                            </div>
+                          </td>
+                          <td style="text-align:right;">
+                            <span class="score-pill-blue" style="font-size:13.5px; padding:4px 13px;">${s.season || 0} ball</span>
+                          </td>
+                          <td style="text-align:right;">
+                            <strong style="color:#0F172A; font-size:13.5px;">${s.total || 0} ball</strong>
+                          </td>
+                          <td style="text-align:right;">
+                            <span class="score-pill-green" style="font-size:12px; padding:3px 9px;">+${s.week_cur || 0}</span>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
                   </tbody>
                 </table>
               </div>
@@ -1107,36 +1149,55 @@ async function renderObserveRating(container) {
         </div>
 
         <!-- GURUHLAR LIGASI -->
-        <div class="card mb-4">
-          <div class="card-header">
-            <h3>🏢 Akademik Guruhlar O'rtasidagi Musobaqa Jadvali</h3>
+        <div class="card mb-4" style="box-shadow: 0 4px 18px rgba(0,0,0,0.04); border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden;">
+          <div class="card-header" style="background:#F8FAFC; padding: 16px 20px; border-bottom: 1px solid #E2E8F0;">
+            <h3 style="font-size:15px; margin:0 0 3px; font-weight:700; color:#0F172A; display:flex; align-items:center; gap:8px;">
+              <span>🏢</span> Akademik Guruhlar O'rtasidagi Musobaqa Jadvali
+            </h3>
             <span style="font-size:12px; color:#64748B;">Guruhdagi talabalar o'rtacha balli va jami jamg'armasi</span>
           </div>
           <div class="card-body p-0">
             ${groups.length > 0 ? `
               <div class="table-responsive">
-                <table class="table" style="margin-bottom:0;">
+                <table class="table observe-table" style="margin-bottom:0; width:100%;">
                   <thead>
-                    <tr>
-                      <th style="width: 60px;">O'rin</th>
+                    <tr style="background:#F8FAFC;">
+                      <th style="width: 70px; text-align:center;">O'rin</th>
                       <th>Guruh Kodi</th>
-                      <th>Yo'nalishi</th>
+                      <th>Ta'lim Yo'nalishi</th>
                       <th style="text-align:center;">Talabalar Soni</th>
                       <th style="text-align:right;">O'rtacha Ball</th>
                       <th style="text-align:right;">Jami Ball</th>
                     </tr>
                   </thead>
                   <tbody>
-                    ${groups.map((g, idx) => `
-                      <tr>
-                        <td><span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">${idx + 1}</span></td>
-                        <td><strong style="color:#0F172A;">${g.group_code}</strong></td>
-                        <td style="font-size:13px; color:#475569;">${g.program_code || 'IT'}</td>
-                        <td style="text-align:center;"><span class="badge badge-light">${g.count} nafar</span></td>
-                        <td style="text-align:right;"><strong style="color:#2563EB; font-size:14px;">${g.avg_score} ball</strong></td>
-                        <td style="text-align:right; font-weight:600; color:#475569;">${g.total_score} ball</td>
-                      </tr>
-                    `).join('')}
+                    ${groups.map((g, idx) => {
+                      const isTop3 = idx < 3;
+                      return `
+                        <tr style="${isTop3 ? 'background:#FCFDFE;' : ''}">
+                          <td style="text-align:center;">
+                            <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">
+                              ${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : idx + 1))}
+                            </span>
+                          </td>
+                          <td>
+                            <span class="group-code-pill" style="font-weight:800; font-size:13px; color:#0F172A; padding:4px 12px;">${g.group_code}</span>
+                          </td>
+                          <td style="font-size:13.5px; color:#334155; font-weight:600;">${g.program_code || 'IT'}</td>
+                          <td style="text-align:center;">
+                            <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:12px; padding:4px 11px; border-radius:12px;">
+                              ${g.count || 0} nafar
+                            </span>
+                          </td>
+                          <td style="text-align:right;">
+                            <span class="score-pill-blue">${g.avg_score} ball</span>
+                          </td>
+                          <td style="text-align:right;">
+                            <strong style="color:#0F172A; font-size:13.5px;">${g.total_score || 0} ball</strong>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
                   </tbody>
                 </table>
               </div>
