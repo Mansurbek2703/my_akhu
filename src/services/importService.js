@@ -3,6 +3,7 @@ const xlsx = require('xlsx');
 const { db } = require('../db/database');
 const { recalculateStudentScores } = require('./ratingService');
 const { logAudit } = require('./pointService');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 /**
  * Matnli kalitni normallashtirish: bo'sh joylar, tire va apostroflarni tozalash
@@ -12,6 +13,7 @@ function normalizeKey(str) {
     .trim()
     .toLowerCase()
     .replace(/[\'‘’`ʻʼ]/g, '')
+    .replace(/[/\\.,:;]/g, '')
     .replace(/[_\s-]+/g, '');
 }
 
@@ -27,30 +29,32 @@ function parseStudentsFromWorkbook(filePath) {
 
   if (!sheet) return [];
 
-  // 1. Sarlavhali obyektlar massivi
-  const rawRows = xlsx.utils.sheet_to_json(sheet, { defval: '', raw: false });
-  // 2. 2D qatorlar massivi (ustun tartibi bo'yicha zaxira tahlil)
+  // 1. 2D qatorlar massivi (ustun tartibi bo'yicha tahlil)
   const rawGrid = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
 
-  // Sarlavha qatori indeksini aniqlash (odatda 0)
+  // Sarlavha qatori indeksini aniqlash (0-10 qatorlar orasidan)
   let headerRowIndex = 0;
-  for (let i = 0; i < Math.min(rawGrid.length, 5); i++) {
+  for (let i = 0; i < Math.min(rawGrid.length, 10); i++) {
     const row = rawGrid[i];
     if (Array.isArray(row)) {
-      const hasId = row.some(cell => {
-        const c = normalizeKey(cell);
-        return c === 'id' || c === 'talabaid' || c === 'externalid';
-      });
-      const hasName = row.some(cell => {
-        const c = normalizeKey(cell);
-        return c === 'ism' || c === 'name' || c === 'firstname';
-      });
-      if (hasId && hasName) {
+      const rowKeys = row.map(cell => normalizeKey(cell));
+      const hasName = rowKeys.some(c => 
+        c === 'ism' || c.includes('ism') || c.includes('familiya') || c.includes('fish') || c.includes('fio') || c.includes('name')
+      );
+      const hasOther = rowKeys.some(c => 
+        c.includes('guruh') || c.includes('group') || c.includes('telefon') || c.includes('phone') || c.includes('yonalish') || c === 'id' || c === 'n' || c === 'tr'
+      );
+      if (hasName && hasOther) {
         headerRowIndex = i;
         break;
       }
     }
   }
+
+  // Sarlavhali obyektlar massivi
+  const rawRows = headerRowIndex > 0
+    ? xlsx.utils.sheet_to_json(sheet, { range: headerRowIndex, defval: '', raw: false })
+    : xlsx.utils.sheet_to_json(sheet, { defval: '', raw: false });
 
   const parsedStudents = [];
 
@@ -62,25 +66,56 @@ function parseStudentsFromWorkbook(filePath) {
     }
 
     const getVal = (...keys) => {
+      // 1. Aniq moslik
       for (const k of keys) {
         const cleaned = normalizeKey(k);
-        if (normMap[cleaned] && normMap[cleaned] !== '') return normMap[cleaned];
+        if (normMap[cleaned] !== undefined && normMap[cleaned] !== '') return normMap[cleaned];
+      }
+      // 2. Qisman moslik (faqat fullName ustunlari bo'lmagan ustunlar uchun)
+      for (const k of keys) {
+        const cleaned = normalizeKey(k);
+        if (cleaned.length >= 4) {
+          for (const [colKey, colVal] of Object.entries(normMap)) {
+            if (colKey.includes('toliq') || colKey.includes('fish') || colKey.includes('fio')) continue;
+            if (colVal !== '' && colKey.includes(cleaned)) return colVal;
+          }
+        }
       }
       return '';
     };
 
-    let extId = getVal('id', 'externalid', 'talabaid', 'studentid', 'kod');
+    let extId = getVal('id', 'externalid', 'talabaid', 'studentid', 'kod', 'hemisid', 'hemis_id', 'idraqam', 'idraqami', 'n', 'tr', 'tartib', 'raqam', 'no');
     let firstName = getVal('ism', 'firstname', 'name', 'talabaismi');
     let lastName = getVal('familiya', 'lastname', 'surname', 'talabafamiliyasi');
-    let programCode = getVal('yonalishi', 'yonalish', 'fakultet', 'mutaxassislik', 'programcode', 'program');
-    let groupCode = getVal('guruh', 'groupcode', 'group', 'guruhkodi');
-    let phone = getVal('telefonraqami', 'telefon', 'phone', 'tel', 'aloqa', 'phonenumber');
+    const fullName = getVal('toliqismifamiliyasharifi', 'toliqismi', 'toliqism', 'fish', 'fio', 'fullname', 'ismfamiliya', 'familiyaism', 'talaba', 'talabafish');
+
+    // Agar F.I.Sh bitta ustunda bo'lsa (Screenshot 1 dagi kabi: "Abdullayeva Mohira Xudoybergan qizi")
+    if (fullName || (!firstName || !lastName)) {
+      const srcName = fullName || (firstName && lastName ? `${lastName} ${firstName}` : (firstName || lastName));
+      if (srcName && (fullName || !firstName || !lastName || firstName === lastName)) {
+        const parts = srcName.trim().split(/\s+/);
+        if (parts.length === 1) {
+          lastName = parts[0];
+          firstName = parts[0];
+        } else if (parts.length === 2) {
+          lastName = parts[0];
+          firstName = parts[1];
+        } else {
+          lastName = parts[0];
+          firstName = parts.slice(1).join(' ');
+        }
+      }
+    }
+
+    let programCode = getVal('yonalishi', 'yonalish', 'fakultet', 'mutaxassislik', 'programcode', 'program', 'yonalishkodi');
+    let groupCode = getVal('guruhi', 'guruh', 'groupcode', 'group', 'guruhkodi', 'gruppa');
+    let phone = getVal('telegramtelefonraqami', 'telegramtelefon', 'telegramtel', 'telefonraqami', 'telefonraqam', 'telefon', 'phone', 'phonenumber', 'tel', 'aloqa', 'aloqaraqami', 'aloqauchun', 'tgphone', 'tgtelefon');
     let genderRaw = getVal('jinsi', 'jins', 'gender', 'pol');
     let courseRaw = getVal('kursi', 'kurs', 'course', 'bosqich');
 
-    // Ustunlar pozitsiyasi bo'yicha zaxira tahlil (A-H: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi)
+    // Ustunlar pozitsiyasi bo'yicha zaxira tahlil
     const gridRowIndex = headerRowIndex + 1 + rIndex;
-    if ((!extId || !firstName || !lastName) && rawGrid[gridRowIndex] && rawGrid[gridRowIndex].length >= 3) {
+    if ((!firstName || !lastName) && !fullName && rawGrid[gridRowIndex] && rawGrid[gridRowIndex].length >= 3) {
       const rowArr = rawGrid[gridRowIndex];
       if (!extId && rowArr[0] !== undefined) extId = String(rowArr[0]).trim();
       if (!firstName && rowArr[1] !== undefined) firstName = String(rowArr[1]).trim();
@@ -92,37 +127,74 @@ function parseStudentsFromWorkbook(filePath) {
       if (!courseRaw && rowArr[7] !== undefined) courseRaw = String(rowArr[7]).trim();
     }
 
+    // Telefon va guruh qidirish zaxirasi
+    if (!phone) {
+      for (const [k, v] of Object.entries(normMap)) {
+        if (v && (k.includes('telefon') || k.includes('phone') || k.includes('aloqa'))) {
+          phone = v;
+          break;
+        }
+      }
+    }
+    if (!groupCode) {
+      for (const [k, v] of Object.entries(normMap)) {
+        if (v && (k.includes('guruh') || k.includes('group'))) {
+          groupCode = v;
+          break;
+        }
+      }
+    }
+    if (!programCode) {
+      for (const [k, v] of Object.entries(normMap)) {
+        if (v && (k.includes('yonalish') || k.includes('program') || k.includes('fakultet'))) {
+          programCode = v;
+          break;
+        }
+      }
+    }
+
     // Sarlavha qatorining o'zini o'tkazib yuborish
-    if (normalizeKey(extId) === 'id' && normalizeKey(firstName) === 'ism') {
+    if ((normalizeKey(extId) === 'id' || normalizeKey(extId) === 'tr' || normalizeKey(extId) === 'n') && (normalizeKey(firstName) === 'ism' || normalizeKey(lastName) === 'familiya')) {
       continue;
     }
 
-    if (!extId || !firstName || !lastName) {
+    if (!firstName || !lastName) {
       continue;
     }
 
     // Jinsni normallashtirish: Ayol / Female / Qiz -> 'f', Erkak / Male -> 'm'
-    const genLower = genderRaw.toLowerCase();
+    const genLower = (genderRaw || '').toLowerCase();
     const gender = (genLower.startsWith('ay') || genLower.startsWith('q') || genLower.startsWith('f') || genLower === 'woman' || genLower === 'female') ? 'f' : 'm';
 
-    // Kurs: 1, 2, 3, 4
-    let course = parseInt(courseRaw, 10);
-    if (isNaN(course) || course < 1 || course > 4) course = 1;
+    // Kurs: 1, 2, 3, 4 (masalan '2-kurs' -> 2)
+    let course = 1;
+    if (courseRaw) {
+      const match = String(courseRaw).match(/\d+/);
+      if (match) {
+        const c = parseInt(match[0], 10);
+        if (c >= 1 && c <= 4) course = c;
+      }
+    }
 
     // Yo'nalish va Guruh
-    if (!programCode) programCode = 'Sun\'iy intellekt';
-    if (!groupCode) groupCode = 'FMC01';
+    if (!programCode) programCode = 'Dasturiy ta\'minot muhandisligi';
+    if (!groupCode) groupCode = 'SS01';
 
     // Level: magistr yoki bakalavr
     const level = (programCode.toLowerCase().includes('mag') || groupCode.toLowerCase().includes('mag') || groupCode.toLowerCase().startsWith('m-')) ? 'mag' : 'bak';
 
-    // Telefon raqami: tozalash va standart formatga keltirish
-    if (phone) {
-      phone = phone.replace(/[\s\-\(\)]/g, '');
-      if (!phone.startsWith('+')) {
-        phone = '+' + phone;
+    // External ID unikalligini ta'minlash
+    if (!extId) {
+      extId = `${groupCode}_${String(rIndex + 1).padStart(3, '0')}`;
+    } else {
+      const isSimpleSeq = /^\d{1,4}$/.test(extId);
+      if (isSimpleSeq && groupCode) {
+        extId = `${groupCode}_${String(extId).padStart(3, '0')}`;
       }
     }
+
+    // Telefon raqami: qat'iy normallashtirish (+ bilan bo'lsa xalqaro affiksga tegmaslik, 9 ta raqam bo'lsa +998 qo'shish)
+    const normalizedPhone = normalizePhoneNumber(phone);
 
     parsedStudents.push({
       external_id: extId,
@@ -130,7 +202,7 @@ function parseStudentsFromWorkbook(filePath) {
       last_name: lastName,
       program_code: programCode,
       group_code: groupCode,
-      phone: phone || null,
+      phone: normalizedPhone,
       gender,
       course,
       level,
@@ -178,11 +250,21 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
         continue;
       }
 
+      // Telefon raqamini qayta normallashtirish
+      const normPhone = normalizePhoneNumber(row.phone);
+
       // Tyutorni guruh orqali avtomatik aniqlash
       const tutorRow = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ? LIMIT 1`).get(row.group_code);
       const tutorId = row.tutor_id || (tutorRow ? tutorRow.tutor_id : null);
 
-      const existing = db.prepare(`SELECT * FROM student WHERE external_id = ?`).get(String(row.external_id));
+      let existing = db.prepare(`SELECT * FROM student WHERE external_id = ?`).get(String(row.external_id));
+      if (!existing && normPhone) {
+        existing = db.prepare(`SELECT * FROM student WHERE phone = ?`).get(normPhone);
+      }
+      if (!existing && row.first_name && row.last_name && row.group_code) {
+        existing = db.prepare(`SELECT * FROM student WHERE LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?) AND LOWER(group_code) = LOWER(?)`).get(row.first_name, row.last_name, row.group_code);
+      }
+
       if (existing) {
         updateStudent.run(
           row.first_name,
@@ -193,10 +275,10 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
           Number(row.course) || existing.course,
           row.gender || existing.gender,
           row.email || existing.email,
-          row.phone || existing.phone,
+          normPhone || existing.phone,
           tutorId,
           now,
-          String(row.external_id)
+          existing.external_id
         );
         insertScore.run(existing.id, now);
         updatedCount++;
@@ -208,12 +290,12 @@ function importStudentsBatch(studentsData, { fileName = 'registrator_sync.xlsx',
           row.first_name,
           row.last_name,
           row.group_code,
-          row.program_code || 'Sun\'iy intellekt',
+          row.program_code || 'Dasturiy ta\'minot muhandisligi',
           row.level || 'bak',
           Number(row.course) || 1,
           row.gender || 'm',
           row.email || null,
-          row.phone || null,
+          normPhone || null,
           tutorId,
           now,
           now

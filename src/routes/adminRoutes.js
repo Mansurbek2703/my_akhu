@@ -12,6 +12,7 @@ const config = require('../config');
 const { logAudit } = require('../services/pointService');
 const { importStudentsBatch, parseStudentsFromWorkbook } = require('../services/importService');
 const { recalculateStudentScores } = require('../services/ratingService');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 // Multer upload sozlamasi (Excel va CSV uchun)
 const uploadDir = config.uploadDir || path.join(__dirname, '../../uploads');
@@ -318,6 +319,7 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
     const now = new Date().toISOString();
 
     const normGender = (gender && (String(gender).toLowerCase().startsWith('f') || String(gender).toLowerCase().startsWith('ay') || String(gender).toLowerCase().startsWith('q'))) ? 'f' : 'm';
+    const normPhone = normalizePhoneNumber(phone);
 
     // Tyutorni guruh bo'yicha avtomatik aniqlash (agar berilmagan bo'lsa)
     let finalTutorId = tutor_id || null;
@@ -342,7 +344,7 @@ router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       Number(course) || 1,
       normGender,
       email || null,
-      phone || null,
+      normPhone || null,
       finalTutorId,
       photo_url || null,
       now,
@@ -400,6 +402,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
     const normGender = gender !== undefined
       ? ((String(gender).toLowerCase().startsWith('f') || String(gender).toLowerCase().startsWith('ay') || String(gender).toLowerCase().startsWith('q')) ? 'f' : 'm')
       : student.gender;
+    const normPhone = phone !== undefined ? normalizePhoneNumber(phone) : student.phone;
 
     let finalTutorId = tutor_id !== undefined ? tutor_id : student.tutor_id;
     if (!finalTutorId && (group_code || student.group_code)) {
@@ -437,7 +440,7 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       course !== undefined ? Number(course) : student.course,
       normGender,
       email !== undefined ? email : student.email,
-      phone !== undefined ? phone : student.phone,
+      normPhone,
       finalTutorId,
       photo_url !== undefined ? photo_url : student.photo_url,
       status !== undefined ? status : student.status,
@@ -1355,6 +1358,106 @@ router.get('/integrations', authenticateSuperadmin, (req, res) => {
       linked_ratio: totalStudents > 0 ? Math.round((telegramLinked / totalStudents) * 100) : 0
     }
   });
+});
+
+/**
+ * GET /api/admin/bot-monitoring/stats
+ * Superadmin: Telegram bot bo'yicha umumiy KPI statistika
+ */
+router.get('/bot-monitoring/stats', authenticateSuperadmin, (req, res) => {
+  const totalStarted = db.prepare(`SELECT COUNT(*) as c FROM telegram_bot_user`).get().c;
+  const linkedStudents = db.prepare(`SELECT COUNT(*) as c FROM telegram_bot_user WHERE student_id IS NOT NULL`).get().c;
+  const unlinkedGuests = Math.max(0, totalStarted - linkedStudents);
+  
+  const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00.000Z';
+  const todayActive = db.prepare(`SELECT COUNT(*) as c FROM telegram_bot_user WHERE last_seen_at >= ?`).get(todayStart).c;
+  const totalActions = db.prepare(`SELECT COUNT(*) as c FROM telegram_bot_log`).get().c;
+  const totalStudents = db.prepare(`SELECT COUNT(*) as c FROM student WHERE status = 'active'`).get().c;
+
+  res.json({
+    total_started: totalStarted,
+    linked_students: linkedStudents,
+    unlinked_guests: unlinkedGuests,
+    today_active: todayActive,
+    total_actions: totalActions,
+    total_students: totalStudents,
+    coverage_ratio: totalStudents > 0 ? Math.round((linkedStudents / totalStudents) * 100) : 0
+  });
+});
+
+/**
+ * GET /api/admin/bot-monitoring/users
+ * Superadmin: Botda start bosgan va faol bo'lgan talabalar / foydalanuvchilar ro'yxati
+ */
+router.get('/bot-monitoring/users', authenticateSuperadmin, (req, res) => {
+  const { q, status } = req.query;
+  let whereClauses = [];
+  let params = [];
+
+  if (status === 'linked') {
+    whereClauses.push('bu.student_id IS NOT NULL');
+  } else if (status === 'unlinked') {
+    whereClauses.push('bu.student_id IS NULL');
+  }
+
+  if (q && q.trim()) {
+    const term = `%${q.trim()}%`;
+    whereClauses.push('(bu.first_name LIKE ? OR bu.last_name LIKE ? OR bu.username LIKE ? OR bu.phone LIKE ? OR st.first_name LIKE ? OR st.last_name LIKE ? OR st.group_code LIKE ? OR bu.telegram_user_id LIKE ?)');
+    params.push(term, term, term, term, term, term, term, term);
+  }
+
+  const whereStr = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+  const users = db.prepare(`
+    SELECT bu.*,
+           st.first_name as st_first_name, st.last_name as st_last_name,
+           st.group_code as st_group_code, st.phone as st_phone,
+           (SELECT COUNT(*) FROM telegram_bot_log WHERE telegram_user_id = bu.telegram_user_id) as total_logs_count
+    FROM telegram_bot_user bu
+    LEFT JOIN student st ON bu.student_id = st.id
+    ${whereStr}
+    ORDER BY bu.last_seen_at DESC
+    LIMIT 200
+  `).all(...params);
+
+  res.json({ users });
+});
+
+/**
+ * GET /api/admin/bot-monitoring/logs
+ * Superadmin: Bot amallari va hodisalari jurnali (Audit trail)
+ */
+router.get('/bot-monitoring/logs', authenticateSuperadmin, (req, res) => {
+  const { q, action_type } = req.query;
+  let whereClauses = [];
+  let params = [];
+
+  if (action_type && action_type.trim()) {
+    whereClauses.push('bl.action_type = ?');
+    params.push(action_type.trim());
+  }
+
+  if (q && q.trim()) {
+    const term = `%${q.trim()}%`;
+    whereClauses.push('(bl.details LIKE ? OR bl.telegram_user_id LIKE ? OR st.first_name LIKE ? OR st.last_name LIKE ? OR st.group_code LIKE ?)');
+    params.push(term, term, term, term, term);
+  }
+
+  const whereStr = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+  const logs = db.prepare(`
+    SELECT bl.*,
+           bu.first_name as tg_first_name, bu.last_name as tg_last_name, bu.username as tg_username,
+           st.first_name as st_first_name, st.last_name as st_last_name, st.group_code as st_group_code
+    FROM telegram_bot_log bl
+    LEFT JOIN telegram_bot_user bu ON bl.telegram_user_id = bu.telegram_user_id
+    LEFT JOIN student st ON bl.student_id = st.id
+    ${whereStr}
+    ORDER BY bl.created_at DESC
+    LIMIT 100
+  `).all(...params);
+
+  res.json({ logs });
 });
 
 module.exports = router;

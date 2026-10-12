@@ -121,6 +121,128 @@ function verifyTelegramInitData(initData) {
 }
 
 /**
+ * Telegram Bot foydalanuvchisi faoliyatini qayd qilish (Audit & Monitoring)
+ */
+function recordBotActivity(telegramUserId, actionType, details, meta = {}) {
+  try {
+    const tgId = String(telegramUserId);
+    const nowIso = new Date().toISOString();
+    const student = meta.studentId 
+      ? db.prepare('SELECT id, phone FROM student WHERE id = ?').get(meta.studentId)
+      : db.prepare('SELECT id, phone FROM student WHERE telegram_user_id = ?').get(tgId);
+    
+    const studentId = student ? student.id : (meta.studentId || null);
+    const phone = meta.phone || (student ? student.phone : null);
+
+    // 1. Foydalanuvchini telegram_bot_user jadvalida saqlash yoki yangilash
+    const existing = db.prepare('SELECT telegram_user_id FROM telegram_bot_user WHERE telegram_user_id = ?').get(tgId);
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO telegram_bot_user (
+          telegram_user_id, username, first_name, last_name, phone, student_id, started_at, last_seen_at, actions_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+      `).run(
+        tgId,
+        meta.username || null,
+        meta.firstName || null,
+        meta.lastName || null,
+        phone,
+        studentId,
+        nowIso,
+        nowIso
+      );
+    } else {
+      db.prepare(`
+        UPDATE telegram_bot_user SET
+          last_seen_at = ?,
+          actions_count = actions_count + 1,
+          username = COALESCE(?, username),
+          first_name = COALESCE(?, first_name),
+          last_name = COALESCE(?, last_name),
+          phone = COALESCE(?, phone),
+          student_id = COALESCE(?, student_id)
+        WHERE telegram_user_id = ?
+      `).run(
+        nowIso,
+        meta.username || null,
+        meta.firstName || null,
+        meta.lastName || null,
+        phone,
+        studentId,
+        tgId
+      );
+    }
+
+    // 2. Amallar jurnaliga kiritish
+    db.prepare(`
+      INSERT INTO telegram_bot_log (telegram_user_id, student_id, action_type, details, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(tgId, studentId, actionType, typeof details === 'object' ? JSON.stringify(details) : String(details), nowIso);
+
+  } catch (err) {
+    console.error('recordBotActivity error:', err.message);
+  }
+}
+
+/**
+ * Yangi tadbir e'lon qilinganda bot orqali barcha talabalarga bildirishnoma tarqatish
+ */
+async function broadcastNewEventToStudents(event) {
+  if (!event) return;
+  try {
+    const students = db.prepare(`
+      SELECT id, first_name, last_name, telegram_user_id
+      FROM student
+      WHERE telegram_user_id IS NOT NULL AND status = 'active'
+    `).all();
+
+    if (!students || students.length === 0) return;
+
+    const startsDate = new Date(event.starts_at);
+    const dateFormatted = startsDate.toLocaleDateString('uz-UZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeFormatted = startsDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const attOpenMin = event.attendance_open_minutes_before ?? 5;
+
+    const text = `📢 <b>YANGI TADBIR E'LON QILINDI!</b> 🎓\n\n` +
+      `🏆 <b>${event.title}</b>\n` +
+      `⭐ Ball: <b>+${event.points} ball</b>\n` +
+      `📍 O'tkazilish joyi: <b>${event.place}</b>\n` +
+      `📅 Sana: <b>${dateFormatted}</b>\n` +
+      `🕒 Boshlanish vaqti: <b>${timeFormatted}</b>\n` +
+      `⏱️ Davomat boshlanadi: <b>Tadbirdan ${attOpenMin} daqiqa oldin</b>\n\n` +
+      `<i>Tadbir boshlanganda Telegram Mini App orqali QR kodni skanerlab ballingizni qo'lga kiriting!</i>`;
+
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          { text: '📱 Tadbirlarni ko\'rish (Mini App)', web_app: { url: `${config.baseUrl}/miniapp` } }
+        ]
+      ]
+    };
+
+    // Orqa fonda xavfsiz asinxron yuborish
+    (async () => {
+      let sentCount = 0;
+      for (const st of students) {
+        try {
+          await sendTelegramMessage(st.telegram_user_id, text, { reply_markup: replyMarkup });
+          sentCount++;
+          await new Promise(r => setTimeout(r, 45)); // Rate-limiting tolerans
+        } catch (e) {
+          console.warn(`Broadcast error to ${st.telegram_user_id}:`, e.message);
+        }
+      }
+      recordBotActivity(SUPERADMIN_TG_ID, 'broadcast_event', `"${event.title}" tadbiri ${sentCount}/${students.length} nafar talabaga yuborildi`, {
+        studentId: null
+      });
+    })();
+
+  } catch (err) {
+    console.error('broadcastNewEventToStudents error:', err.message);
+  }
+}
+
+/**
  * M-01, N-10: Talabaning telefon raqami orqali Telegram akkauntini bog'lash va +5 kirish balli berish
  */
 function linkStudentTelegramAccount(telegramUserId, phoneNumber) {
@@ -265,6 +387,12 @@ async function handleTelegramWebhook(update) {
     const chatId = cb.message.chat.id;
     const data = cb.data;
 
+    recordBotActivity(chatId, 'callback_click', `Tugma bosildi: "${data}"`, {
+      username: cb.from?.username,
+      firstName: cb.from?.first_name,
+      lastName: cb.from?.last_name
+    });
+
     if (data === 'admin_recalc') {
       recalculateStudentScores();
       await answerCallbackQuery(cb.id, '✅ Reytinglar muvaffaqiyatli qayta hisoblandi!', true);
@@ -302,6 +430,12 @@ async function handleTelegramWebhook(update) {
 
   // 1. /start buyrug'i
   if (text.startsWith('/start')) {
+    recordBotActivity(chatId, 'command_start', `/start buyrug'i yuborildi`, {
+      username: msg.from?.username,
+      firstName: msg.from?.first_name,
+      lastName: msg.from?.last_name
+    });
+
     // Agar Superadmin bo'lsa (Mansurbek Qazaqov)
     if (isSuperadmin) {
       // Superadminni bazada telegram_user_id ga bog'lash
@@ -375,6 +509,14 @@ async function handleTelegramWebhook(update) {
   if (msg.contact) {
     const phone = msg.contact.phone_number;
     const result = linkStudentTelegramAccount(chatId, phone);
+
+    recordBotActivity(chatId, 'share_contact', `Telefon yuborildi: ${phone} (${result.success ? 'Muvaffaqiyatli bog\'landi' : 'Topilmadi'})`, {
+      username: msg.from?.username,
+      firstName: msg.from?.first_name,
+      lastName: msg.from?.last_name,
+      phone,
+      studentId: result.student ? result.student.id : null
+    });
 
     if (result.success) {
       await sendTelegramMessage(chatId, `🎉 <b>${result.message}</b>\n\nIsm-familiya: <b>${result.student.first_name} ${result.student.last_name}</b>\nGuruh: <b>${result.student.group_code}</b>\n\nPastdagi tugma orqali kabinetingizga kiring:`, {
@@ -452,5 +594,7 @@ module.exports = {
   notifyStaffDept,
   handleTelegramWebhook,
   startTelegramPolling,
-  stopTelegramPolling
+  stopTelegramPolling,
+  recordBotActivity,
+  broadcastNewEventToStudents
 };

@@ -420,6 +420,7 @@ const PAGE_SECTION_MAP = {
   'admin-users-manage': 'admin-users-manage',
   'admin-catalog': 'admin-users-manage',
   'admin-audit': 'admin-users-manage',
+  'admin-bot-monitoring': 'admin-users-manage',
 
   'staff-my-profile': 'staff-my-profile'
 };
@@ -473,7 +474,8 @@ function renderModuleSubNav(pageName) {
     tabs = [
       { id: 'admin-users-manage', label: 'Xodimlar va Rollar' },
       { id: 'admin-catalog', label: 'Katalog Sozlamalari' },
-      { id: 'admin-audit', label: 'Audit Jurnali' }
+      { id: 'admin-audit', label: 'Audit Jurnali' },
+      { id: 'admin-bot-monitoring', label: '🤖 Bot Monitoringi' }
     ];
   } else if (sectionKey === 'staff-my-profile') {
     tabs = [
@@ -635,6 +637,11 @@ function navigateTo(pageName) {
       pageTitle.textContent = 'Tizim Audit Jurnali (X-05)';
       pageDesc.textContent = 'O\'zgarmas harakatlar tarixi: kim, qachon, nima qildi va IP manzili';
       renderAdminAudit(targetContainer);
+      break;
+    case 'admin-bot-monitoring':
+      pageTitle.textContent = '🤖 Telegram Bot Monitoringi & Faollik Tizimi';
+      pageDesc.textContent = 'Botda start bosganlar, kim, qachon va nima qilgani bo\'yicha jonli monitoring';
+      renderBotMonitoring(targetContainer);
       break;
     case 'staff-my-profile':
       pageTitle.textContent = 'Mening Shaxsiy Profilim';
@@ -2129,15 +2136,29 @@ async function renderDeptEvents(container) {
         <div class="grid grid-2">
           ${events.map(ev => {
             const startsFormatted = new Date(ev.starts_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const canManage = isStaffOrAdmin && (AppState.user.roles.includes('superadmin') || ev.created_by === AppState.user.id || ev.organizer_unit === AppState.user.id);
+            const endsFormatted = new Date(ev.ends_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const isEnded = new Date() > new Date(ev.ends_at);
+            const isCreator = (ev.created_by === AppState.user.id || ev.organizer_unit === AppState.user.id);
+            const isSuperadmin = AppState.user.roles.includes('superadmin');
+            const canManage = isStaffOrAdmin && (isSuperadmin || isCreator);
+            const canEdit = canManage && !isEnded;
+            const attOpenMin = ev.attendance_open_minutes_before ?? 5;
+
             return `
-              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);">
+              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
                 <div>
                   <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
                     <div>
-                      <span class="badge" style="background: ${ev.category_color}20; color: ${ev.category_color}; border: 1px solid ${ev.category_color}40; font-weight: 600;">
-                        ${ev.category_name}
-                      </span>
+                      <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                        <span class="badge" style="background: ${ev.category_color}20; color: ${ev.category_color}; border: 1px solid ${ev.category_color}40; font-weight: 600;">
+                          ${ev.category_name}
+                        </span>
+                        ${isEnded ? `
+                          <span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 700;">⚠️ Yakunlangan (Davomat yopiq)</span>
+                        ` : `
+                          <span class="badge" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; font-weight: 600;">⏱️ Davomat: ${attOpenMin} daq oldin</span>
+                        `}
+                      </div>
                       <h3 style="margin-top: 8px; font-size: 16px; font-weight: 700; color: var(--text-main); line-height: 1.35;">${ev.title}</h3>
                     </div>
                     <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px;">+${ev.points} ball</span>
@@ -2147,7 +2168,7 @@ async function renderDeptEvents(container) {
                       ${icon('mapPin', 14)} <span><strong>O'tkazilish joyi:</strong> ${ev.place}</span>
                     </p>
                     <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                      ${icon('clock', 14)} <span><strong>Vaqti:</strong> ${startsFormatted}</span>
+                      ${icon('clock', 14)} <span><strong>Vaqti:</strong> ${startsFormatted} &mdash; ${endsFormatted}</span>
                     </p>
                     <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
                       ${icon('building', 14)} <span><strong>Tashkilotchi:</strong> ${ev.organizer_unit}</span>
@@ -2161,19 +2182,28 @@ async function renderDeptEvents(container) {
 
                 <div class="card-footer" style="background: #FAFAFA; border-top: 1px solid var(--border-light); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                   <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                    <button class="btn btn-outline btn-sm" onclick="showEventQrModal('${ev.id}')" title="1-Usul: Tadbir QR kodini monitorga chiqarish (talaba scan qiladi)" style="display: inline-flex; align-items: center; gap: 5px;">
-                      ${icon('qrCode', 13)} <span>Tadbir QR (Talaba scan)</span>
-                    </button>
-                    ${isStaffOrAdmin ? `
-                      <button class="btn btn-primary btn-sm" onclick="showStudentCheckinModal('${ev.id}')" title="2-Usul: Talaba QR kodini yoki ID raqamini skanerlab ball berish" style="display: inline-flex; align-items: center; gap: 5px;">
-                        ${icon('checkCircle', 13)} <span>Qabul Qilish (Check-in)</span>
+                    ${!isEnded ? `
+                      <button class="btn btn-outline btn-sm" onclick="showEventQrModal('${ev.id}')" title="1-Usul: Jonli Tadbir QR kodini chiqarish (talaba skanerlaydi, har 5s yangilanadi)" style="display: inline-flex; align-items: center; gap: 5px;">
+                        ${icon('qrCode', 13)} <span>Tadbir QR (5s Dinamik)</span>
                       </button>
-                    ` : ''}
+                      ${isStaffOrAdmin ? `
+                        <button class="btn btn-primary btn-sm" onclick="showStudentCheckinModal('${ev.id}')" title="2-Usul: Talaba QR kodini yoki ID raqamini skanerlab ball berish" style="display: inline-flex; align-items: center; gap: 5px;">
+                          ${icon('checkCircle', 13)} <span>Qabul Qilish</span>
+                        </button>
+                      ` : ''}
+                    ` : `
+                      <span style="font-size: 12px; color: #94A3B8; font-weight: 600; padding: 4px 6px;">Tadbir vaqti tugagan</span>
+                    `}
                   </div>
-                  <div style="display: flex; gap: 6px;">
+                  <div style="display: flex; gap: 6px; align-items: center;">
                     <button class="btn btn-outline btn-sm" onclick="showEventParticipantsModal('${ev.id}')" title="Ishtirokchilar ro'yxati">
                       ${icon('users', 13)}
                     </button>
+                    ${canEdit ? `
+                      <button class="btn btn-outline btn-sm" onclick="openEditEventModal('${ev.id}')" title="Tadbirni tahrirlash (Vaqti tugaguncha tahrirlash mumkin)" style="color: #2563EB; border-color: #BFDBFE; display: inline-flex; align-items: center; gap: 4px;">
+                        ${icon('edit', 13)} <span>Tahrirlash</span>
+                      </button>
+                    ` : ''}
                     ${canManage ? `
                       <button class="btn btn-outline btn-sm text-danger" onclick="deleteEvent('${ev.id}')" title="Tadbirni o'chirish" style="border-color: #FECACA;">
                         ${icon('trash', 13)}
@@ -2194,6 +2224,453 @@ async function renderDeptEvents(container) {
   }
 }
 
+// ====================================================================
+// MAXSUS KALENDAR VA GORIZONTAL VAQT SCROLLER (O'TA SODDA & JAHON STANDARTI)
+// ====================================================================
+
+const eventDtState = {
+  '': {
+    selectedDate: null,
+    selectedStartTime: null,
+    selectedEndTime: null,
+    durationMinutes: 60,
+    calYear: new Date().getFullYear(),
+    calMonth: new Date().getMonth(),
+    confirmed: false
+  },
+  'edit_': {
+    selectedDate: null,
+    selectedStartTime: null,
+    selectedEndTime: null,
+    durationMinutes: 60,
+    calYear: new Date().getFullYear(),
+    calMonth: new Date().getMonth(),
+    confirmed: false
+  }
+};
+
+function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialEndsAt = null) {
+  const now = new Date();
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
+
+  if (initialStartsAt && initialEndsAt) {
+    const sDate = new Date(initialStartsAt);
+    const eDate = new Date(initialEndsAt);
+    st.selectedDate = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
+    st.selectedStartTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
+    st.selectedEndTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
+    st.calYear = sDate.getFullYear();
+    st.calMonth = sDate.getMonth();
+    st.durationMinutes = Math.max(15, Math.round((eDate - sDate) / (60 * 1000)));
+  } else {
+    // Default: Bugun, hozirdan kamida 15 daqiqa keyin
+    const defaultStart = new Date(now.getTime() + 15 * 60 * 1000);
+    defaultStart.setMinutes(Math.ceil(defaultStart.getMinutes() / 5) * 5);
+    const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+
+    st.selectedDate = `${defaultStart.getFullYear()}-${String(defaultStart.getMonth() + 1).padStart(2, '0')}-${String(defaultStart.getDate()).padStart(2, '0')}`;
+    st.selectedStartTime = `${String(defaultStart.getHours()).padStart(2, '0')}:${String(defaultStart.getMinutes()).padStart(2, '0')}`;
+    st.selectedEndTime = `${String(defaultEnd.getHours()).padStart(2, '0')}:${String(defaultEnd.getMinutes()).padStart(2, '0')}`;
+    st.calYear = now.getFullYear();
+    st.calMonth = now.getMonth();
+    st.durationMinutes = 60;
+  }
+  st.confirmed = true;
+
+  renderEventCalendar(prefix);
+  renderEventStartTimeTrack(prefix);
+  renderEventEndTimeTrack(prefix);
+  updateEventDateTimeSummary(prefix);
+}
+
+function renderEventCalendar(prefix = '') {
+  const container = document.getElementById(`${prefix}cal-container`);
+  if (!container) return;
+
+  const st = eventDtState[prefix];
+  const now = new Date();
+  const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const monthNames = [
+    'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+    'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
+  ];
+
+  const year = st.calYear;
+  const month = st.calMonth;
+
+  // Birinchi kun (0=Du, 6=Ya)
+  const firstDayObj = new Date(year, month, 1);
+  let firstDayIndex = firstDayObj.getDay() - 1;
+  if (firstDayIndex === -1) firstDayIndex = 6;
+
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const isCurrentMonthOrPast = (year < now.getFullYear()) || (year === now.getFullYear() && month <= now.getMonth());
+
+  let daysHtml = '';
+  for (let i = 0; i < firstDayIndex; i++) {
+    daysHtml += `<div class="cal-day-cell" style="background:transparent; cursor:default;"></div>`;
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    const dayDate = new Date(year, month, day);
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    const isToday = (dateStr === todayDateStr);
+    const isPast = (dayDate < new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    const isSelected = (dateStr === st.selectedDate);
+
+    if (isPast) {
+      daysHtml += `<div class="cal-day-cell disabled" title="Bugundan oldingi sanalarni tanlash mumkin emas">${day}</div>`;
+    } else {
+      let classes = ['cal-day-cell'];
+      if (isToday) classes.push('today');
+      if (isSelected) classes.push('selected');
+      daysHtml += `
+        <div class="${classes.join(' ')}" onclick="selectEventCalendarDate('${dateStr}', '${prefix}')" title="${dateStr}">
+          ${day}
+        </div>
+      `;
+    }
+  }
+
+  container.innerHTML = `
+    <div class="custom-calendar-header">
+      <button type="button" class="custom-calendar-nav-btn" onclick="changeEventCalendarMonth(-1, '${prefix}')" ${isCurrentMonthOrPast ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+        &larr;
+      </button>
+      <div class="custom-calendar-title">
+        📅 ${monthNames[month]} ${year}
+      </div>
+      <button type="button" class="custom-calendar-nav-btn" onclick="changeEventCalendarMonth(1, '${prefix}')">
+        &rarr;
+      </button>
+    </div>
+    <div class="custom-calendar-weekdays">
+      <span>Du</span><span>Se</span><span>Ch</span><span>Pa</span><span>Ju</span><span>Sh</span><span style="color:#DC2626;">Ya</span>
+    </div>
+    <div class="custom-calendar-days-grid">
+      ${daysHtml}
+    </div>
+  `;
+}
+
+function changeEventCalendarMonth(delta, prefix = '') {
+  const st = eventDtState[prefix];
+  const now = new Date();
+  let newMonth = st.calMonth + delta;
+  let newYear = st.calYear;
+
+  if (newMonth < 0) {
+    newMonth = 11;
+    newYear -= 1;
+  } else if (newMonth > 11) {
+    newMonth = 0;
+    newYear += 1;
+  }
+
+  if (newYear < now.getFullYear() || (newYear === now.getFullYear() && newMonth < now.getMonth())) {
+    return;
+  }
+
+  st.calMonth = newMonth;
+  st.calYear = newYear;
+  renderEventCalendar(prefix);
+}
+
+function selectEventCalendarDate(dateStr, prefix = '') {
+  const st = eventDtState[prefix];
+  st.selectedDate = dateStr;
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  if (dateStr === todayStr) {
+    const minStartMs = now.getTime() + 10 * 60 * 1000;
+    const currentStartDt = new Date(`${dateStr}T${st.selectedStartTime}:00`);
+    if (currentStartDt.getTime() < minStartMs) {
+      const newStartDt = new Date(minStartMs + 5 * 60 * 1000);
+      newStartDt.setMinutes(Math.ceil(newStartDt.getMinutes() / 5) * 5);
+      st.selectedStartTime = `${String(newStartDt.getHours()).padStart(2, '0')}:${String(newStartDt.getMinutes()).padStart(2, '0')}`;
+      recalcEndTime(prefix);
+    }
+  }
+
+  renderEventCalendar(prefix);
+  renderEventStartTimeTrack(prefix);
+  renderEventEndTimeTrack(prefix);
+  updateEventDateTimeSummary(prefix);
+}
+
+function setEventQuickDate(type, prefix = '') {
+  const now = new Date();
+  let target = new Date();
+  if (type === 'today') {
+    target = now;
+  } else if (type === 'tomorrow') {
+    target.setDate(now.getDate() + 1);
+  } else if (type === 'afterTomorrow') {
+    target.setDate(now.getDate() + 2);
+  }
+
+  const dateStr = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+  const st = eventDtState[prefix];
+  st.calYear = target.getFullYear();
+  st.calMonth = target.getMonth();
+  selectEventCalendarDate(dateStr, prefix);
+
+  document.querySelectorAll(`.${prefix}date-quick-btn`).forEach(b => b.classList.remove('btn-primary'));
+  const clicked = document.getElementById(`${prefix}date-btn-${type}`);
+  if (clicked) clicked.classList.add('btn-primary');
+}
+
+function renderEventStartTimeTrack(prefix = '') {
+  const track = document.getElementById(`${prefix}start-time-track`);
+  if (!track) return;
+
+  const st = eventDtState[prefix];
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isToday = (st.selectedDate === todayStr);
+  const minStartMs = now.getTime() + 10 * 60 * 1000;
+
+  let pillsHtml = '';
+  for (let h = 7; h <= 23; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      let isDisabled = false;
+
+      if (isToday) {
+        const slotDt = new Date(`${st.selectedDate}T${timeStr}:00`);
+        if (slotDt.getTime() < minStartMs) {
+          isDisabled = true;
+        }
+      }
+
+      const isSelected = (timeStr === st.selectedStartTime);
+
+      if (isDisabled) {
+        pillsHtml += `<button type="button" class="time-pill disabled" title="Hozirdan kamida 10 daqiqa keyin bo'lishi shart">${timeStr}</button>`;
+      } else {
+        pillsHtml += `
+          <button type="button" id="${prefix}start-pill-${timeStr.replace(':', '-')}" class="time-pill ${isSelected ? 'active' : ''}" onclick="selectEventStartTime('${timeStr}', '${prefix}')">
+            ${timeStr}
+          </button>
+        `;
+      }
+    }
+  }
+
+  track.innerHTML = pillsHtml;
+
+  setTimeout(() => {
+    const activePill = track.querySelector('.time-pill.active');
+    if (activePill) {
+      activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, 50);
+}
+
+function selectEventStartTime(timeStr, prefix = '') {
+  const st = eventDtState[prefix];
+  st.selectedStartTime = timeStr;
+  recalcEndTime(prefix);
+
+  renderEventStartTimeTrack(prefix);
+  renderEventEndTimeTrack(prefix);
+  updateEventDateTimeSummary(prefix);
+}
+
+function recalcEndTime(prefix = '') {
+  const st = eventDtState[prefix];
+  if (!st.selectedDate || !st.selectedStartTime) return;
+
+  const startDt = new Date(`${st.selectedDate}T${st.selectedStartTime}:00`);
+  const endDt = new Date(startDt.getTime() + (st.durationMinutes || 60) * 60 * 1000);
+  st.selectedEndTime = `${String(endDt.getHours()).padStart(2, '0')}:${String(endDt.getMinutes()).padStart(2, '0')}`;
+}
+
+function renderEventEndTimeTrack(prefix = '') {
+  const track = document.getElementById(`${prefix}end-time-track`);
+  if (!track) return;
+
+  const st = eventDtState[prefix];
+  if (!st.selectedStartTime) return;
+
+  const [startH, startM] = st.selectedStartTime.split(':').map(Number);
+  const startTotalMinutes = startH * 60 + startM;
+
+  const durations = [
+    { mins: 30, label: '30 daq' },
+    { mins: 45, label: '45 daq' },
+    { mins: 60, label: '1 soat (Standart)' },
+    { mins: 90, label: '1.5 soat' },
+    { mins: 120, label: '2 soat' },
+    { mins: 180, label: '3 soat' }
+  ];
+
+  let pillsHtml = `
+    <div style="display: flex; gap: 6px; padding-right: 8px; border-right: 1.5px solid #CBD5E1; margin-right: 4px; flex-shrink: 0;">
+  `;
+
+  durations.forEach(d => {
+    const isAct = (st.durationMinutes === d.mins);
+    pillsHtml += `
+      <button type="button" class="time-pill ${isAct ? 'active' : ''}" style="background: ${isAct ? '#2563EB' : '#F1F5F9'}; font-family: inherit; font-size: 12px;" onclick="selectEventDuration(${d.mins}, '${prefix}')">
+        ⏱️ ${d.label}
+      </button>
+    `;
+  });
+  pillsHtml += `</div>`;
+
+  for (let offset = 15; offset <= 360; offset += 15) {
+    const endTotalMinutes = startTotalMinutes + offset;
+    const endH = Math.floor(endTotalMinutes / 60) % 24;
+    const endM = endTotalMinutes % 60;
+    const timeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+    const isSelected = (timeStr === st.selectedEndTime);
+
+    pillsHtml += `
+      <button type="button" class="time-pill ${isSelected ? 'active' : ''}" onclick="selectEventEndTime('${timeStr}', ${offset}, '${prefix}')">
+        ${timeStr}
+      </button>
+    `;
+  }
+
+  track.innerHTML = pillsHtml;
+
+  setTimeout(() => {
+    const activePill = track.querySelector('.time-pill.active');
+    if (activePill) {
+      activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, 50);
+}
+
+function selectEventDuration(mins, prefix = '') {
+  const st = eventDtState[prefix];
+  st.durationMinutes = mins;
+  recalcEndTime(prefix);
+
+  renderEventEndTimeTrack(prefix);
+  updateEventDateTimeSummary(prefix);
+}
+
+function selectEventEndTime(timeStr, offsetMinutes, prefix = '') {
+  const st = eventDtState[prefix];
+  st.selectedEndTime = timeStr;
+  st.durationMinutes = offsetMinutes;
+
+  renderEventEndTimeTrack(prefix);
+  updateEventDateTimeSummary(prefix);
+}
+
+function confirmEventDateTime(prefix = '') {
+  const res = updateEventDateTimeSummary(prefix);
+  if (res.valid) {
+    eventDtState[prefix].confirmed = true;
+    const summaryBox = document.getElementById(`${prefix}ev-datetime-summary`);
+    if (summaryBox) {
+      summaryBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      summaryBox.style.transform = 'scale(1.02)';
+      setTimeout(() => summaryBox.style.transform = 'scale(1)', 200);
+    }
+  } else {
+    alert(res.error || "Iltimos, sana va vaqtni to'g'ri belgilang!");
+  }
+}
+
+function updateEventDateTimeSummary(prefix = '') {
+  const st = eventDtState[prefix] || {};
+  const summaryEl = document.getElementById(`${prefix}ev-datetime-summary`);
+  if (!summaryEl) return { valid: false };
+
+  if (!st.selectedDate || !st.selectedStartTime || !st.selectedEndTime) {
+    summaryEl.style.background = '#FEF2F2';
+    summaryEl.style.border = '1px solid #FECACA';
+    summaryEl.style.color = '#DC2626';
+    summaryEl.innerHTML = `⚠️ Iltimos, sana va vaqtlarni to'liq belgilang!`;
+    return { valid: false, error: "Iltimos, sana va vaqtlarni to'liq belgilang!" };
+  }
+
+  const d = new Date(st.selectedDate);
+  const monthNames = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+  const dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+  const dateFormatted = `${dayNames[d.getDay()]}, ${d.getDate()}-${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
+
+  const now = new Date();
+  const startsAt = new Date(`${st.selectedDate}T${st.selectedStartTime}:00`);
+  let endsAt = new Date(`${st.selectedDate}T${st.selectedEndTime}:00`);
+  if (endsAt <= startsAt) {
+    endsAt = new Date(endsAt.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  const minStartMs = now.getTime() + 10 * 60 * 1000;
+  const durationMs = endsAt.getTime() - startsAt.getTime();
+  const durHours = Math.floor(durationMs / (60 * 60 * 1000));
+  const durMins = Math.floor((durationMs % (60 * 60 * 1000)) / (60 * 1000));
+  let durStr = '';
+  if (durHours > 0) durStr += `${durHours} soat `;
+  if (durMins > 0) durStr += `${durMins} daqiqa`;
+  if (!durStr) durStr = '0 daqiqa';
+
+  // 1. Qoida: kamida 10 daqiqa keyin bo'lishi kerak
+  if (startsAt.getTime() < minStartMs) {
+    const minStartDt = new Date(minStartMs);
+    const minStartStr = `${String(minStartDt.getHours()).padStart(2, '0')}:${String(minStartDt.getMinutes()).padStart(2, '0')}`;
+    summaryEl.style.background = '#FEF2F2';
+    summaryEl.style.border = '1.5px solid #FECACA';
+    summaryEl.style.color = '#B91C1C';
+    summaryEl.innerHTML = `
+      <div style="display:flex; align-items:flex-start; gap:8px;">
+        <span style="font-size:20px;">🚫</span>
+        <div>
+          <strong>Boshlanish vaqti juda erta!</strong> Tadbir boshlanishi hozirgi vaqtdan <strong>kamida 10 daqiqa keyin</strong> bo'lishi shart.<br>
+          <span style="font-size:12px;">Hozirgi vaqt: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} &bull; Eng erta boshlanish vaqti: <strong>${minStartStr}</strong></span>
+        </div>
+      </div>
+    `;
+    return { valid: false, error: `Tadbir boshlanish vaqti hozirdan kamida 10 daqiqa keyin bo'lishi kerak (eng ertasi: ${minStartStr})` };
+  }
+
+  // 2. Qoida: tugash vaqti boshlanishidan keyin bo'lishi kerak
+  if (durationMs <= 0) {
+    summaryEl.style.background = '#FEF2F2';
+    summaryEl.style.border = '1.5px solid #FECACA';
+    summaryEl.style.color = '#B91C1C';
+    summaryEl.innerHTML = `🚫 <strong>Tugash vaqti boshlanish vaqtidan keyin bo'lishi shart!</strong>`;
+    return { valid: false, error: "Tugash vaqti boshlanishidan keyin bo'lishi shart!" };
+  }
+
+  // Muvaffaqiyatli xulosa
+  summaryEl.style.background = '#ECFDF5';
+  summaryEl.style.border = '1.5px solid #A7F3D0';
+  summaryEl.style.color = '#065F46';
+  summaryEl.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:20px;">✅</span>
+        <div>
+          <div style="font-weight:800; font-size:14px; color:#065F46;">
+            ${dateFormatted} | ${st.selectedStartTime} &mdash; ${st.selectedEndTime}
+          </div>
+          <span style="font-size:12px; color:#047857;">Davomiyligi: <strong>${durStr}</strong> &bull; Boshlanishiga <strong>${Math.round((startsAt - now)/(60*1000))} daqiqa</strong> qoldi.</span>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-primary" onclick="confirmEventDateTime('${prefix}')" style="background:#059669; border-color:#059669; padding:5px 12px; font-weight:700;">
+        ✓ OK (Tasdiqlash)
+      </button>
+    </div>
+  `;
+
+  return {
+    valid: true,
+    starts_at: startsAt.toISOString(),
+    ends_at: endsAt.toISOString()
+  };
+}
+
 // Yangi Tadbir Yaratish Modali
 async function openCreateEventModal() {
   const modalTitle = document.getElementById('modal-title');
@@ -2211,21 +2688,54 @@ async function openCreateEventModal() {
   }
 
   modalBody.innerHTML = `
-    <form id="dept-create-event-form">
+    <form id="dept-create-event-form" onsubmit="event.preventDefault(); submitCreateEvent();">
       <div class="form-group mb-3">
         <label class="form-label">Tadbir Nomi *</label>
-        <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026'" required>
+        <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026'" required style="font-size: 15px; font-weight: 600;">
       </div>
 
-      <div class="grid grid-2 mb-3">
-        <div class="form-group">
-          <label class="form-label">Boshlanish vaqti *</label>
-          <input type="datetime-local" id="ev-starts-at" class="form-control" required>
+      <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
+      <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label style="font-weight: 800; font-size: 14px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
+            📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
+          </label>
+          <span style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: 700;">Kamida +10 daqiqa keyin</span>
         </div>
-        <div class="form-group">
-          <label class="form-label">Tugash vaqti *</label>
-          <input type="datetime-local" id="ev-ends-at" class="form-control" required>
+
+        <!-- 1. SANA (KALENDAR KO'RINISHI - O'TGAN KUNLAR BLOKLANGAN) -->
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni (O'tgan kunlar tanlanmaydi):</span>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" id="date-btn-today" class="btn btn-sm btn-outline date-quick-btn btn-primary" onclick="setEventQuickDate('today', '')" style="font-size: 11px; padding: 2px 8px;">Bugun</button>
+              <button type="button" id="date-btn-tomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('tomorrow', '')" style="font-size: 11px; padding: 2px 8px;">Ertaga</button>
+              <button type="button" id="date-btn-afterTomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('afterTomorrow', '')" style="font-size: 11px; padding: 2px 8px;">Indinga</button>
+            </div>
+          </div>
+          <div id="cal-container" class="custom-calendar-widget"></div>
         </div>
+
+        <!-- 2. BOSHLANISH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
+        <div class="time-scroll-track-wrapper">
+          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <span>⏰ 2. Boshlanish vaqti</span>
+            <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
+          </div>
+          <div class="time-scroll-track" id="start-time-track"></div>
+        </div>
+
+        <!-- 3. TUGASH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
+        <div class="time-scroll-track-wrapper">
+          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
+            <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
+          </div>
+          <div class="time-scroll-track" id="end-time-track"></div>
+        </div>
+
+        <!-- 4. TASDIQ XULOSASI VA OK TUGMASI -->
+        <div id="ev-datetime-summary"></div>
       </div>
 
       <div class="form-group mb-3">
@@ -2264,25 +2774,39 @@ async function openCreateEventModal() {
         </div>
       </div>
 
-      <!-- QR KOD YANGILANISH VAQTI (5s - 120s) -->
+      <!-- DAVOMAT BOSHLANISH VAQTI SOZLAMASI (DEFAULT 5 DAQIQA) -->
       <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px;">
         <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px;">
-          ⏱️ QR Kod Yangilanish Oralig'i (Dinamik xavfsizlik) *
+          ⏱️ Davomat Boshlanish Vaqti (Attendance Window) *
         </label>
         <p style="font-size: 12px; color: #64748B; margin-bottom: 8px;">
-          Tadbir ekrandagi QR kodi har necha soniyada yangilanishini belgilang (5 soniyadan 120 soniyagacha):
+          Default holatda davomat tadbirdan 5 daqiqa oldin boshlanadi. Zarurat bo'lsa o'zgartirishingiz mumkin:
         </p>
         <div style="display: flex; gap: 10px; align-items: center;">
-          <input type="number" id="ev-qr-refresh" class="form-control" min="5" max="120" value="30" style="max-width: 140px; font-weight: 700; font-size: 14px;">
-          <span style="font-size: 13px; font-weight: 600; color: #334155;">soniya</span>
+          <input type="number" id="ev-att-open-minutes" class="form-control" min="0" max="180" value="5" style="max-width: 130px; font-weight: 700; font-size: 14px;">
+          <span style="font-size: 13px; font-weight: 600; color: #334155;">daqiqa oldin boshlanadi</span>
         </div>
         <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=15">15 soniya</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=20">20 soniya</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=30">30 soniya</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=45">45 soniya</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-qr-refresh').value=60">60 soniya</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=0">0 daq (Boshlanganda)</button>
+          <button type="button" class="btn btn-sm btn-outline" style="background: #EFF6FF; border-color: #BFDBFE; font-weight: 700; color: #1D4ED8;" onclick="document.getElementById('ev-att-open-minutes').value=5">5 daq (Standart)</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=10">10 daqiqa oldin</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=15">15 daqiqa oldin</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=30">30 daqiqa oldin</button>
         </div>
+        <p style="font-size: 11.5px; color: #DC2626; margin-top: 8px; margin-bottom: 0;">
+          ⚠️ <strong>Muhim:</strong> Tadbir tugashi bilan attendance checking avtomatik yakunlanadi!
+        </p>
+      </div>
+
+      <!-- TELEGRAM BILDIRISHNOMA VA ANTI-FRAUD QR QOIDASI -->
+      <div class="form-group mb-3" style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 12px 14px;">
+        <label class="form-label" style="font-weight: 700; color: #1E40AF; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          📢 Avtomatik Telegram Bildirishnoma & 🛡️ 5s Dinamik QR
+        </label>
+        <p style="font-size: 12px; color: #1E3A8A; margin-bottom: 0; line-height: 1.45;">
+          • Tadbir yaratilishi bilan Telegram botga ulangan <strong>barcha talabalarga avtomatik xabar</strong> boradi.<br>
+          • Skrinshot tarqatishdan himoya uchun QR kod <strong>har 5 sekundda majburiy yangilanadi</strong>.
+        </p>
       </div>
     </form>
   `;
@@ -2290,43 +2814,48 @@ async function openCreateEventModal() {
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
     <button class="btn btn-primary" onclick="submitCreateEvent()" style="display: inline-flex; align-items: center; gap: 6px;">
-      ${icon('check', 14)} E'lon Qilish va QR Yaratish
+      ${icon('check', 14)} E'lon Qilish va Talabalarga Yuborish
     </button>
   `;
 
   openModal();
+  initEventDateTimeControls('');
 }
 
 async function submitCreateEvent() {
   const title = document.getElementById('ev-title')?.value.trim();
-  const starts_at_val = document.getElementById('ev-starts-at')?.value;
-  const ends_at_val = document.getElementById('ev-ends-at')?.value;
   const place = document.getElementById('ev-place')?.value.trim();
   const category_id = document.getElementById('ev-cat-id')?.value;
   const level = document.getElementById('ev-level')?.value;
   const capacity = document.getElementById('ev-capacity')?.value;
   const req_reg = document.getElementById('ev-req-reg')?.checked;
-  const qr_refresh_val = document.getElementById('ev-qr-refresh')?.value;
+  const att_open_val = document.getElementById('ev-att-open-minutes')?.value;
 
-  if (!title || !starts_at_val || !ends_at_val || !place || !category_id || !level) {
+  if (!title || !place || !category_id || !level) {
     alert("Iltimos, barcha majburiy maydonlarni to'ldiring!");
     return;
   }
 
-  const qr_refresh_seconds = Math.min(120, Math.max(5, Number(qr_refresh_val) || 30));
+  const dtResult = updateEventDateTimeSummary('');
+  if (!dtResult.valid) {
+    alert(dtResult.error || "Tadbir sanasi va vaqtini to'g'ri belgilang!");
+    return;
+  }
+
+  const attOpenMinutes = Math.max(0, Number(att_open_val) || 5);
 
   try {
     const payload = {
       title,
-      starts_at: new Date(starts_at_val).toISOString(),
-      ends_at: new Date(ends_at_val).toISOString(),
+      starts_at: dtResult.starts_at,
+      ends_at: dtResult.ends_at,
       place,
       organizer_unit: AppState.user.id || 'dep_yb',
       category_id,
       level,
       capacity: capacity ? Number(capacity) : null,
       requires_registration: Boolean(req_reg),
-      qr_refresh_seconds
+      attendance_open_minutes_before: attOpenMinutes
     };
 
     const res = await apiFetch('/api/events', {
@@ -2335,11 +2864,214 @@ async function submitCreateEvent() {
     });
 
     closeModal();
-    alert(`Tadbir muvaffaqiyatli e'lon qilindi (+${res.points} ball)!`);
+    alert(`🎉 Tadbir muvaffaqiyatli e'lon qilindi (+${res.points} ball)!\nBarcha talabalarga Telegram bot orqali bildirishnoma yuborildi.`);
     renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
     showEventQrModal(res.event_id);
   } catch (err) {
     alert(err.message);
+  }
+}
+
+// Tadbirni Tahrirlash Modali (Faqat yaratuvchi xodim va Superadmin, tadbir tugaguncha)
+async function openEditEventModal(eventId) {
+  try {
+    const data = await apiFetch('/api/events');
+    const event = (data.events || []).find(e => e.id === eventId);
+    if (!event) {
+      alert("Tadbir topilmadi!");
+      return;
+    }
+
+    const now = new Date();
+    const endsAt = new Date(event.ends_at);
+    if (now > endsAt) {
+      alert("Tadbir vaqti tugagan! Tadbir yakunlangandan keyin uni tahrirlash mumkin emas.");
+      return;
+    }
+
+    const isCreator = (event.created_by === AppState.user.id || event.organizer_unit === AppState.user.id);
+    const isSuperadmin = AppState.user.roles.includes('superadmin');
+    if (!isCreator && !isSuperadmin) {
+      alert("Faqat tadbirni yaratgan xodim va Superadmin tadbirni tahrirlashi mumkin!");
+      return;
+    }
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalFooter = document.getElementById('modal-footer');
+
+    modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('edit', 18)} Tadbirni Tahrirlash</span>`;
+
+    let categories = [];
+    try {
+      const catRes = await apiFetch('/api/observe/catalog');
+      categories = catRes.categories || [];
+    } catch (e) {
+      categories = [];
+    }
+
+    const attOpen = event.attendance_open_minutes_before ?? 5;
+    const safeTitle = (event.title || '').replace(/"/g, '&quot;');
+    const safePlace = (event.place || '').replace(/"/g, '&quot;');
+
+    modalBody.innerHTML = `
+      <form id="dept-edit-event-form" onsubmit="event.preventDefault(); submitEditEvent('${eventId}');">
+        <div class="form-group mb-3">
+          <label class="form-label">Tadbir Nomi *</label>
+          <input type="text" id="edit-ev-title" class="form-control" value="${safeTitle}" required style="font-size: 15px; font-weight: 600;">
+        </div>
+
+        <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
+        <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <label style="font-weight: 800; font-size: 14px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
+              📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
+            </label>
+          </div>
+
+          <!-- 1. SANA (KALENDAR KO'RINISHI - O'TGAN KUNLAR BLOKLANGAN) -->
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni (O'tgan kunlar tanlanmaydi):</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" id="edit_date-btn-today" class="btn btn-sm btn-outline edit_date-quick-btn" onclick="setEventQuickDate('today', 'edit_')" style="font-size: 11px; padding: 2px 8px;">Bugun</button>
+                <button type="button" id="edit_date-btn-tomorrow" class="btn btn-sm btn-outline edit_date-quick-btn" onclick="setEventQuickDate('tomorrow', 'edit_')" style="font-size: 11px; padding: 2px 8px;">Ertaga</button>
+                <button type="button" id="edit_date-btn-afterTomorrow" class="btn btn-sm btn-outline edit_date-quick-btn" onclick="setEventQuickDate('afterTomorrow', 'edit_')" style="font-size: 11px; padding: 2px 8px;">Indinga</button>
+              </div>
+            </div>
+            <div id="edit_cal-container" class="custom-calendar-widget"></div>
+          </div>
+
+          <!-- 2. BOSHLANISH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
+          <div class="time-scroll-track-wrapper">
+            <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>⏰ 2. Boshlanish vaqti</span>
+              <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
+            </div>
+            <div class="time-scroll-track" id="edit_start-time-track"></div>
+          </div>
+
+          <!-- 3. TUGASH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
+          <div class="time-scroll-track-wrapper">
+            <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
+              <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
+            </div>
+            <div class="time-scroll-track" id="edit_end-time-track"></div>
+          </div>
+
+          <!-- 4. TASDIQ XULOSASI VA OK TUGMASI -->
+          <div id="edit_ev-datetime-summary"></div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label">O'tkazilish joyi (Bino / Zal) *</label>
+          <input type="text" id="edit-ev-place" class="form-control" value="${safePlace}" required>
+        </div>
+
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">Soha / Kategoriya *</label>
+            <select id="edit-ev-cat-id" class="form-control" required>
+              ${categories.map(c => `<option value="${c.id}" ${c.id === event.category_id ? 'selected' : ''}>${c.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Miqyos / Daraja (Ball avtomatik) *</label>
+            <select id="edit-ev-level" class="form-control" required>
+              <option value="klub" ${event.level === 'klub' ? 'selected' : ''}>Klub miqyosida (+3 ball)</option>
+              <option value="universitet" ${event.level === 'universitet' ? 'selected' : ''}>Universitet miqyosida (+5 ball)</option>
+              <option value="viloyat" ${event.level === 'viloyat' ? 'selected' : ''}>Viloyat miqyosida (+8 ball)</option>
+              <option value="respublika" ${event.level === 'respublika' ? 'selected' : ''}>Respublika miqyosida (+15 ball)</option>
+              <option value="xalqaro" ${event.level === 'xalqaro' ? 'selected' : ''}>Xalqaro miqyosda (+25 ball)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mb-3">
+          <div class="form-group">
+            <label class="form-label">Maksimal sig'im (o'rinlar soni)</label>
+            <input type="number" id="edit-ev-capacity" class="form-control" value="${event.capacity || ''}" placeholder="Cheksiz bo'lsa bo'sh qoldiring">
+          </div>
+          <div class="form-group" style="display: flex; align-items: center; padding-top: 24px;">
+            <label style="cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="edit-ev-req-reg" ${event.requires_registration ? 'checked' : ''}> Oldindan ro'yxatdan o'tish majburiy
+            </label>
+          </div>
+        </div>
+
+        <!-- DAVOMAT BOSHLANISH VAQTI SOZLAMASI -->
+        <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px;">
+          <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px;">
+            ⏱️ Davomat Boshlanish Vaqti (Attendance Window) *
+          </label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="number" id="edit-ev-att-open-minutes" class="form-control" min="0" max="180" value="${attOpen}" style="max-width: 130px; font-weight: 700; font-size: 14px;">
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">daqiqa oldin boshlanadi</span>
+          </div>
+        </div>
+      </form>
+    `;
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+      <button class="btn btn-primary" onclick="submitEditEvent('${eventId}')" style="display: inline-flex; align-items: center; gap: 6px;">
+        ${icon('check', 14)} O'zgarishlarni Saqlash
+      </button>
+    `;
+
+    openModal();
+    initEventDateTimeControls('edit_', event.starts_at, event.ends_at);
+  } catch (err) {
+    alert("Xatolik: " + err.message);
+  }
+}
+
+async function submitEditEvent(eventId) {
+  const title = document.getElementById('edit-ev-title')?.value.trim();
+  const place = document.getElementById('edit-ev-place')?.value.trim();
+  const category_id = document.getElementById('edit-ev-cat-id')?.value;
+  const level = document.getElementById('edit-ev-level')?.value;
+  const capacity = document.getElementById('edit-ev-capacity')?.value;
+  const req_reg = document.getElementById('edit-ev-req-reg')?.checked;
+  const att_open_val = document.getElementById('edit-ev-att-open-minutes')?.value;
+
+  if (!title || !place || !category_id || !level) {
+    alert("Iltimos, barcha majburiy maydonlarni to'ldiring!");
+    return;
+  }
+
+  const dtResult = updateEventDateTimeSummary('edit_');
+  if (!dtResult.valid) {
+    alert(dtResult.error || "Tadbir sanasi va vaqtini to'g'ri belgilang!");
+    return;
+  }
+
+  const attOpenMinutes = Math.max(0, Number(att_open_val) || 5);
+
+  try {
+    const payload = {
+      title,
+      starts_at: dtResult.starts_at,
+      ends_at: dtResult.ends_at,
+      place,
+      category_id,
+      level,
+      capacity: capacity ? Number(capacity) : null,
+      requires_registration: Boolean(req_reg),
+      attendance_open_minutes_before: attOpenMinutes
+    };
+
+    const res = await apiFetch(`/api/events/${eventId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    closeModal();
+    alert("Tadbir muvaffaqiyatli tahrirlandi!");
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    alert("Xatolik: " + err.message);
   }
 }
 
@@ -3945,6 +4677,574 @@ function showAuditDetailModal(logId) {
   openModal();
 }
 
+// ====================================================================
+// SUPERADMIN: TELEGRAM BOT MONITORINGI VA FOYDALANUVCHILAR BOSHQARUVI
+// ====================================================================
+
+const botMonitoringState = {
+  tab: 'users',
+  userSearch: '',
+  userStatus: '',
+  logSearch: '',
+  logAction: '',
+  stats: null,
+  users: [],
+  logs: []
+};
+
+async function renderBotMonitoring(container) {
+  container.innerHTML = `
+    <!-- HERO BANNER -->
+    <div class="admin-hero-card" style="margin-bottom: 20px; background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #172554 100%); border: 1px solid rgba(99, 102, 241, 0.3); box-shadow: 0 10px 25px -5px rgba(30, 27, 75, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div>
+          <div class="admin-hero-title">
+            <span style="font-size: 24px;">🤖</span>
+            <span style="background: linear-gradient(90deg, #FFFFFF, #93C5FD); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Telegram Bot Jonli Monitoringi & Faollik Tahlili</span>
+            <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86EFAC; border: 1px solid rgba(34, 197, 94, 0.4); font-size: 11px; font-weight: 700;">
+              ● Real-time Audit
+            </span>
+          </div>
+          <p class="admin-hero-desc" style="color: #CBD5E1;">
+            Botda kim /start bosgan, qachon bosgan, talabalar bazasi bilan qanday bog'langan va bot ichida qanday amallar bajarganini to'liq nazorat qiling.
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary btn-sm" onclick="loadBotMonitoringData()" style="display: inline-flex; align-items: center; gap: 6px; background: #3B82F6; border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);">
+            ${icon('refresh', 13)} <span>Yangilash</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATISTIKA KPI KARTALARI -->
+    <div class="stats-grid" id="bot-stats-grid" style="margin-bottom: 24px;">
+      <div class="stat-card" style="border-left: 4px solid #3B82F6;">
+        <div class="stat-icon" style="background: #EFF6FF; color: #2563EB;">${icon('users', 22)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Jami Start Bosganlar</span>
+          <div class="stat-val" id="bm-stat-total" style="color: #1D4ED8;">-</div>
+          <span class="stat-sub" id="bm-stat-total-sub">Bot obunachilari soni</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 4px solid #10B981;">
+        <div class="stat-icon" style="background: #ECFDF5; color: #059669;">${icon('checkCircle', 22)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Bog'langan Talabalar</span>
+          <div class="stat-val" id="bm-stat-linked" style="color: #047857;">-</div>
+          <span class="stat-sub" id="bm-stat-linked-sub">Reytingga ulangan</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 4px solid #F59E0B;">
+        <div class="stat-icon" style="background: #FFFBEB; color: #D97706;">${icon('award', 22)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Bog'lanmagan Mehmonlar</span>
+          <div class="stat-val" id="bm-stat-unlinked" style="color: #B45309;">-</div>
+          <span class="stat-sub">Raqamini ulamaganlar</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 4px solid #8B5CF6;">
+        <div class="stat-icon" style="background: #F5F3FF; color: #7C3AED;">${icon('clock', 22)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Bugun Faollar</span>
+          <div class="stat-val" id="bm-stat-today" style="color: #6D28D9;">-</div>
+          <span class="stat-sub">Kunlik faol foydalanuvchilar</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 4px solid #EC4899;">
+        <div class="stat-icon" style="background: #FDF2F8; color: #DB2777;">${icon('fileText', 22)}</div>
+        <div class="stat-data">
+          <span class="stat-label">Jami Bot Amallari</span>
+          <div class="stat-val" id="bm-stat-actions" style="color: #BE185D;">-</div>
+          <span class="stat-sub">Qayd etilgan loglar soni</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS NAVBAR -->
+    <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px;">
+      <button id="bm-tab-btn-users" class="btn btn-sm btn-primary" onclick="switchBotMonitoringTab('users')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px;">
+        ${icon('users', 14)} <span>Bot Foydalanuvchilari & Talabalar (<span id="bm-tab-count-users">0</span>)</span>
+      </button>
+      <button id="bm-tab-btn-logs" class="btn btn-sm btn-outline" onclick="switchBotMonitoringTab('logs')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px;">
+        ${icon('fileText', 14)} <span>Faoliyat Jurnali (Nima qilgan?) (<span id="bm-tab-count-logs">0</span>)</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: USERS SECTION -->
+    <div id="bm-tab-content-users">
+      <div class="admin-toolbar" style="margin-bottom: 16px;">
+        <div class="admin-search-box">
+          ${icon('search', 16)}
+          <input type="text" id="bm-users-search" class="admin-search-input" placeholder="Ism, familiya, username, telefon, guruh yoki Telegram ID..." oninput="handleBotUsersSearch(event)">
+        </div>
+        <div class="admin-filters-group">
+          <div style="display: flex; gap: 4px; background: #F1F5F9; padding: 3px; border-radius: 8px;">
+            <button id="bm-btn-filter-all" class="btn btn-sm btn-primary" onclick="setBotUserStatusFilter('')" style="font-size: 12px; padding: 4px 10px;">Hammasi</button>
+            <button id="bm-btn-filter-linked" class="btn btn-sm btn-outline" onclick="setBotUserStatusFilter('linked')" style="font-size: 12px; padding: 4px 10px;">Talabalar</button>
+            <button id="bm-btn-filter-unlinked" class="btn btn-sm btn-outline" onclick="setBotUserStatusFilter('unlinked')" style="font-size: 12px; padding: 4px 10px;">Mehmonlar</button>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="resetBotUserFilters()" style="display:inline-flex; align-items:center; gap:4px;">
+            ${icon('refresh', 13)} Tozalash
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 240px;">Telegram Foydalanuvchi</th>
+                <th>Bog'langan Talaba (Profil)</th>
+                <th style="width: 150px;">Guruh / Telefon</th>
+                <th style="width: 170px;">Birinchi / Oxirgi Faollik</th>
+                <th style="text-align: center; width: 110px;">Amallar</th>
+                <th style="text-align: right; width: 120px;">Harakat</th>
+              </tr>
+            </thead>
+            <tbody id="bm-users-table-body">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                  <div class="spinner" style="margin-bottom: 8px;"></div>
+                  <p>Bot foydalanuvchilari yuklanmoqda...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: LOGS SECTION -->
+    <div id="bm-tab-content-logs" style="display: none;">
+      <div class="admin-toolbar" style="margin-bottom: 16px;">
+        <div class="admin-search-box">
+          ${icon('search', 16)}
+          <input type="text" id="bm-logs-search" class="admin-search-input" placeholder="Tafsilot, Telegram ID, ism yoki amal bo'yicha qidiruv..." oninput="handleBotLogsSearch(event)">
+        </div>
+        <div class="admin-filters-group">
+          <select id="bm-logs-action-filter" class="admin-filter-select" onchange="handleBotLogsActionFilter(event)">
+            <option value="">Barcha harakatlar</option>
+            <option value="start">🚀 /start (Bot ishga tushirish)</option>
+            <option value="share_contact">📱 Raqam ulashish (Bog'lanish)</option>
+            <option value="callback_click">🔘 Tugma bosish (Menyu)</option>
+            <option value="broadcast_event">📢 Yangi tadbir xabarnomasi</option>
+            <option value="manual_message">💬 Xabar / Buyruq</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="resetBotLogFilters()" style="display:inline-flex; align-items:center; gap:4px;">
+            ${icon('refresh', 13)} Tozalash
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 160px;">Vaqt (Aniq sana)</th>
+                <th style="width: 220px;">Foydalanuvchi / Talaba</th>
+                <th style="width: 160px;">Harakat Turi</th>
+                <th>Tafsilotlar & Izoh</th>
+                <th style="text-align: right; width: 100px;">Tafsilot</th>
+              </tr>
+            </thead>
+            <tbody id="bm-logs-table-body">
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                  <div class="spinner" style="margin-bottom: 8px;"></div>
+                  <p>Bot jurnali yuklanmoqda...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await loadBotMonitoringData();
+}
+
+async function loadBotMonitoringData() {
+  try {
+    const stats = await apiFetch('/api/admin/bot-monitoring/stats');
+    botMonitoringState.stats = stats;
+
+    const elTotal = document.getElementById('bm-stat-total');
+    const elTotalSub = document.getElementById('bm-stat-total-sub');
+    const elLinked = document.getElementById('bm-stat-linked');
+    const elLinkedSub = document.getElementById('bm-stat-linked-sub');
+    const elUnlinked = document.getElementById('bm-stat-unlinked');
+    const elToday = document.getElementById('bm-stat-today');
+    const elActions = document.getElementById('bm-stat-actions');
+
+    if (elTotal) elTotal.textContent = `${stats.total_started || 0} ta`;
+    if (elTotalSub) elTotalSub.textContent = `Mehmonlar: ${stats.unlinked_guests || 0} ta`;
+    if (elLinked) elLinked.textContent = `${stats.linked_students || 0} nafar`;
+    if (elLinkedSub) elLinkedSub.textContent = `Qamrov: ${stats.coverage_ratio || 0}% (jami ${stats.total_students || 0})`;
+    if (elUnlinked) elUnlinked.textContent = `${stats.unlinked_guests || 0} ta`;
+    if (elToday) elToday.textContent = `${stats.today_active || 0} nafar`;
+    if (elActions) elActions.textContent = `${stats.total_actions || 0} ta`;
+  } catch (e) {
+    console.error("Bot stats fetch failed:", e);
+  }
+
+  await Promise.all([
+    loadBotUsers(),
+    loadBotLogs()
+  ]);
+}
+
+async function loadBotUsers() {
+  const tbody = document.getElementById('bm-users-table-body');
+  if (!tbody) return;
+
+  try {
+    const params = new URLSearchParams();
+    if (botMonitoringState.userSearch) params.append('q', botMonitoringState.userSearch);
+    if (botMonitoringState.userStatus) params.append('status', botMonitoringState.userStatus);
+
+    const res = await apiFetch(`/api/admin/bot-monitoring/users?${params.toString()}`);
+    botMonitoringState.users = res.users || [];
+
+    const badgeUsersCount = document.getElementById('bm-tab-count-users');
+    if (badgeUsersCount) badgeUsersCount.textContent = botMonitoringState.users.length;
+
+    renderBotUsersRows();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--danger);">Xatolik: ${err.message}</td></tr>`;
+  }
+}
+
+function renderBotUsersRows() {
+  const tbody = document.getElementById('bm-users-table-body');
+  if (!tbody) return;
+
+  const users = botMonitoringState.users || [];
+
+  if (users.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 48px; color: var(--text-muted);">
+          <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">🤖</div>
+          <p style="font-weight: 600;">Foydalanuvchilar topilmadi</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = users.map(u => {
+    const initial = (u.first_name || u.username || 'U').charAt(0).toUpperCase();
+    const tgFullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Noma\'lum';
+    const isLinked = !!u.student_id;
+    const studentFullName = isLinked ? `${u.st_first_name || ''} ${u.st_last_name || ''}`.trim() : null;
+
+    const firstSeenStr = u.created_at ? new Date(u.created_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+    const lastSeenStr = u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+    return `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: #EFF6FF; color: #2563EB; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; border: 1px solid #BFDBFE;">
+              ${initial}
+            </div>
+            <div>
+              <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">${tgFullName}</div>
+              <div style="font-size: 11.5px; color: #64748B; font-family: monospace;">
+                ${u.username ? '@' + u.username : 'ID: ' + u.telegram_user_id}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td>
+          ${isLinked ? `
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="badge" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px;">🎓 Talaba</span>
+              <strong style="color: #0F172A; font-size: 13px;">${studentFullName}</strong>
+            </div>
+          ` : `
+            <span class="badge" style="background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; font-size: 11px;">
+              👤 Mehmon (Bog'lanmagan)
+            </span>
+          `}
+        </td>
+        <td>
+          ${isLinked ? `
+            <div>
+              <span class="badge badge-group" style="font-size: 11px;">${u.st_group_code || '-'}</span>
+              <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">${u.phone || u.st_phone || '-'}</div>
+            </div>
+          ` : `
+            <span style="font-size: 12px; color: #94A3B8;">${u.phone || 'Raqam yo\'q'}</span>
+          `}
+        </td>
+        <td>
+          <div style="font-size: 12px; color: #334155;">
+            <div><strong>1-start:</strong> ${firstSeenStr}</div>
+            <div style="color: #64748B; font-size: 11.5px;"><strong>Oxirgi:</strong> ${lastSeenStr}</div>
+          </div>
+        </td>
+        <td style="text-align: center;">
+          <span class="badge" style="background: #F1F5F9; color: #334155; font-size: 12px; font-weight: 700;">
+            ${u.total_logs_count || 0} ta
+          </span>
+        </td>
+        <td style="text-align: right;">
+          <button class="btn btn-outline btn-sm" onclick="filterLogsByUser('${u.telegram_user_id}')" style="font-size: 11.5px; padding: 3px 8px; border-color: #BFDBFE; color: #1D4ED8;" title="Ushbu foydalanuvchining barcha harakatlari tarixini ko'rish">
+            ${icon('fileText', 12)} Tarixi
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadBotLogs() {
+  const tbody = document.getElementById('bm-logs-table-body');
+  if (!tbody) return;
+
+  try {
+    const params = new URLSearchParams();
+    if (botMonitoringState.logSearch) params.append('q', botMonitoringState.logSearch);
+    if (botMonitoringState.logAction) params.append('action_type', botMonitoringState.logAction);
+
+    const res = await apiFetch(`/api/admin/bot-monitoring/logs?${params.toString()}`);
+    botMonitoringState.logs = res.logs || [];
+
+    const badgeLogsCount = document.getElementById('bm-tab-count-logs');
+    if (badgeLogsCount) badgeLogsCount.textContent = botMonitoringState.logs.length;
+
+    renderBotLogsRows();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--danger);">Xatolik: ${err.message}</td></tr>`;
+  }
+}
+
+function renderBotLogsRows() {
+  const tbody = document.getElementById('bm-logs-table-body');
+  if (!tbody) return;
+
+  const logs = botMonitoringState.logs || [];
+
+  if (logs.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; padding: 48px; color: var(--text-muted);">
+          <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">📜</div>
+          <p style="font-weight: 600;">Faoliyat jurnali topilmadi</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = logs.map(l => {
+    const dateStr = l.created_at ? new Date(l.created_at).toLocaleString('uz-UZ', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) : '-';
+
+    let actionBadge = `<span class="badge" style="background:#F1F5F9; color:#475569;">${l.action_type}</span>`;
+    if (l.action_type === 'start') {
+      actionBadge = `<span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-weight:700;">🚀 /start bosildi</span>`;
+    } else if (l.action_type === 'share_contact') {
+      actionBadge = `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-weight:700;">📱 Kontakt ulashdi</span>`;
+    } else if (l.action_type === 'callback_click') {
+      actionBadge = `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700;">🔘 Tugma bosildi</span>`;
+    } else if (l.action_type === 'broadcast_event') {
+      actionBadge = `<span class="badge" style="background:#FFFBEB; color:#D97706; border:1px solid #FDE68A; font-weight:700;">📢 Tadbir xabari</span>`;
+    }
+
+    const userName = `${l.tg_first_name || ''} ${l.tg_last_name || ''}`.trim() || (l.tg_username ? '@' + l.tg_username : 'ID: ' + l.telegram_user_id);
+    const studentInfo = l.st_first_name ? `${l.st_first_name} ${l.st_last_name || ''} (${l.st_group_code || ''})` : null;
+
+    return `
+      <tr>
+        <td>
+          <span style="font-family: monospace; font-size: 11.5px; color: var(--text-secondary);">${dateStr}</span>
+        </td>
+        <td>
+          <div style="font-weight: 700; color: #1E293B; font-size: 13px;">${userName}</div>
+          <div style="font-size: 11px; color: #64748B;">
+            ${studentInfo ? `<span style="color:#059669; font-weight:600;">🎓 ${studentInfo}</span>` : `<code>ID: ${l.telegram_user_id}</code>`}
+          </div>
+        </td>
+        <td>${actionBadge}</td>
+        <td>
+          <div style="font-size: 12.5px; color: #334155; line-height: 1.4;">${l.details || '-'}</div>
+        </td>
+        <td style="text-align: right;">
+          <button class="btn btn-outline btn-sm" onclick="showBotLogDetailModal(${l.id})" style="font-size: 11px; padding: 2px 8px;">
+            ${icon('eye', 12)} Ko'rish
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function showBotLogDetailModal(logId) {
+  const log = botMonitoringState.logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">🤖 Bot Harakat Qaydi #${log.id}</span>`;
+
+  let metaFormatted = '-';
+  try {
+    if (log.meta) metaFormatted = JSON.stringify(JSON.parse(log.meta), null, 2);
+  } catch (e) {
+    metaFormatted = log.meta || '-';
+  }
+
+  modalBody.innerHTML = `
+    <div class="grid grid-2 mb-3" style="font-size: 13px; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+      <div>
+        <p style="margin-bottom: 4px;"><strong>Vaqt:</strong> ${new Date(log.created_at).toLocaleString('uz-UZ')}</p>
+        <p style="margin-bottom: 4px;"><strong>Telegram ID:</strong> <code>${log.telegram_user_id}</code></p>
+        <p style="margin-bottom: 4px;"><strong>Foydalanuvchi:</strong> ${log.tg_first_name || ''} ${log.tg_last_name || ''} (@${log.tg_username || '-'})</p>
+      </div>
+      <div>
+        <p style="margin-bottom: 4px;"><strong>Harakat Turi:</strong> <span class="badge badge-group">${log.action_type}</span></p>
+        <p style="margin-bottom: 4px;"><strong>Talaba:</strong> ${log.st_first_name ? `${log.st_first_name} ${log.st_last_name || ''} (${log.st_group_code || ''})` : 'Bog\'lanmagan'}</p>
+      </div>
+    </div>
+
+    <div class="form-group mb-3">
+      <label class="form-label">Tafsilotlar:</label>
+      <div style="background: #FFFFFF; border: 1px solid #E2E8F0; padding: 10px 14px; border-radius: 8px; font-size: 13px; color: #1E293B;">
+        ${log.details || '-'}
+      </div>
+    </div>
+
+    ${log.meta ? `
+      <div class="form-group mb-2">
+        <label class="form-label">Qo'shimcha Metadata (JSON):</label>
+        <pre style="background: #0F172A; color: #38BDF8; padding: 12px; border-radius: var(--radius-md); font-size: 11.5px; max-height: 200px; overflow: auto;">${metaFormatted}</pre>
+      </div>
+    ` : ''}
+  `;
+
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  openModal();
+}
+
+function switchBotMonitoringTab(tab) {
+  botMonitoringState.tab = tab;
+  const btnUsers = document.getElementById('bm-tab-btn-users');
+  const btnLogs = document.getElementById('bm-tab-btn-logs');
+  const contentUsers = document.getElementById('bm-tab-content-users');
+  const contentLogs = document.getElementById('bm-tab-content-logs');
+
+  if (tab === 'users') {
+    if (btnUsers) { btnUsers.classList.add('btn-primary'); btnUsers.classList.remove('btn-outline'); }
+    if (btnLogs) { btnLogs.classList.remove('btn-primary'); btnLogs.classList.add('btn-outline'); }
+    if (contentUsers) contentUsers.style.display = 'block';
+    if (contentLogs) contentLogs.style.display = 'none';
+  } else {
+    if (btnLogs) { btnLogs.classList.add('btn-primary'); btnLogs.classList.remove('btn-outline'); }
+    if (btnUsers) { btnUsers.classList.remove('btn-primary'); btnUsers.classList.add('btn-outline'); }
+    if (contentLogs) contentLogs.style.display = 'block';
+    if (contentUsers) contentUsers.style.display = 'none';
+  }
+}
+
+let botUserSearchTimer;
+function handleBotUsersSearch(event) {
+  clearTimeout(botUserSearchTimer);
+  botUserSearchTimer = setTimeout(() => {
+    botMonitoringState.userSearch = event.target.value.trim();
+    loadBotUsers();
+  }, 300);
+}
+
+function setBotUserStatusFilter(status) {
+  botMonitoringState.userStatus = status;
+  const btnAll = document.getElementById('bm-btn-filter-all');
+  const btnLinked = document.getElementById('bm-btn-filter-linked');
+  const btnUnlinked = document.getElementById('bm-btn-filter-unlinked');
+
+  [btnAll, btnLinked, btnUnlinked].forEach(b => {
+    if (b) { b.classList.remove('btn-primary'); b.classList.add('btn-outline'); }
+  });
+
+  if (status === '' && btnAll) btnAll.classList.replace('btn-outline', 'btn-primary');
+  else if (status === 'linked' && btnLinked) btnLinked.classList.replace('btn-outline', 'btn-primary');
+  else if (status === 'unlinked' && btnUnlinked) btnUnlinked.classList.replace('btn-outline', 'btn-primary');
+
+  loadBotUsers();
+}
+
+function resetBotUserFilters() {
+  botMonitoringState.userSearch = '';
+  botMonitoringState.userStatus = '';
+  const searchInput = document.getElementById('bm-users-search');
+  if (searchInput) searchInput.value = '';
+  setBotUserStatusFilter('');
+}
+
+let botLogSearchTimer;
+function handleBotLogsSearch(event) {
+  clearTimeout(botLogSearchTimer);
+  botLogSearchTimer = setTimeout(() => {
+    botMonitoringState.logSearch = event.target.value.trim();
+    loadBotLogs();
+  }, 300);
+}
+
+function handleBotLogsActionFilter(event) {
+  botMonitoringState.logAction = event.target.value;
+  loadBotLogs();
+}
+
+function resetBotLogFilters() {
+  botMonitoringState.logSearch = '';
+  botMonitoringState.logAction = '';
+  const searchInput = document.getElementById('bm-logs-search');
+  const actionSelect = document.getElementById('bm-logs-action-filter');
+  if (searchInput) searchInput.value = '';
+  if (actionSelect) actionSelect.value = '';
+  loadBotLogs();
+}
+
+function filterLogsByUser(telegramUserId) {
+  switchBotMonitoringTab('logs');
+  botMonitoringState.logSearch = telegramUserId;
+  const searchInput = document.getElementById('bm-logs-search');
+  if (searchInput) searchInput.value = telegramUserId;
+  loadBotLogs();
+}
+
+window.renderBotMonitoring = renderBotMonitoring;
+window.loadBotMonitoringData = loadBotMonitoringData;
+window.switchBotMonitoringTab = switchBotMonitoringTab;
+window.handleBotUsersSearch = handleBotUsersSearch;
+window.setBotUserStatusFilter = setBotUserStatusFilter;
+window.resetBotUserFilters = resetBotUserFilters;
+window.handleBotLogsSearch = handleBotLogsSearch;
+window.handleBotLogsActionFilter = handleBotLogsActionFilter;
+window.resetBotLogFilters = resetBotLogFilters;
+window.filterLogsByUser = filterLogsByUser;
+window.showBotLogDetailModal = showBotLogDetailModal;
+
+window.initEventDateTimeControls = initEventDateTimeControls;
+window.renderEventCalendar = renderEventCalendar;
+window.changeEventCalendarMonth = changeEventCalendarMonth;
+window.selectEventCalendarDate = selectEventCalendarDate;
+window.setEventQuickDate = setEventQuickDate;
+window.renderEventStartTimeTrack = renderEventStartTimeTrack;
+window.selectEventStartTime = selectEventStartTime;
+window.renderEventEndTimeTrack = renderEventEndTimeTrack;
+window.selectEventDuration = selectEventDuration;
+window.selectEventEndTime = selectEventEndTime;
+window.confirmEventDateTime = confirmEventDateTime;
+window.updateEventDateTimeSummary = updateEventDateTimeSummary;
 
 // -------------------------------------------------------------
 // MODALLAR VA YORDAMCHI FUNKSIYALAR
@@ -4059,8 +5359,8 @@ async function showStudentModal(studentId) {
 
 // Tadbir QR kodini ko'rish (Dinamik yangilanish & Boshqariladigan interval)
 window.eventQrTimer = null;
-window.currentQrTtl = 30;
-window.currentQrRemaining = 30;
+window.currentQrTtl = 5;
+window.currentQrRemaining = 5;
 
 async function showEventQrModal(eventId) {
   if (window.eventQrTimer) {
@@ -4072,14 +5372,14 @@ async function showEventQrModal(eventId) {
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = '1-USUL: Jonli Tadbir QR Kodi';
+  modalTitle.textContent = '1-USUL: Jonli Tadbir QR Kodi (Anti-Fraud)';
   modalBody.innerHTML = '<div class="spinner"></div>';
   modalFooter.innerHTML = '<button class="btn btn-outline" onclick="closeModal()">Yopish</button>';
   openModal();
 
   try {
     const res = await apiFetch(`/api/events/${eventId}/qr`);
-    const ttl = res.qr_refresh_seconds || res.ttl || 30;
+    const ttl = 5; // Xavfsizlik talabi: har doim qat'iy 5 soniya
     window.currentQrTtl = ttl;
     window.currentQrRemaining = ttl;
     const qrImg = res.qr_data_url || res.dataUrl;
@@ -4088,38 +5388,27 @@ async function showEventQrModal(eventId) {
       <div style="text-align: center; padding: 12px 16px;">
         <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px; margin-bottom: 6px;">1-USUL: UMUMIY TADBIR QR KODI (TALABA SKANERLAYDI)</span>
         <h3 style="margin: 8px 0 4px 0; font-size: 18px; font-weight: 700;">${res.title || 'Tadbir'}</h3>
-        <p style="color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px; max-width: 460px; margin-left: auto; margin-right: auto;">
+        <p style="color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px; max-width: 480px; margin-left: auto; margin-right: auto;">
           Talabalar Telegram Mini App dagi <strong>"📷 QR Check-in"</strong> orqali ushbu kodni skanerlab darhol <strong>+${res.points || 5} ball</strong> oladilar.
         </p>
 
-        <!-- Dinamik Yangilanish Paneli -->
+        <!-- Dinamik Yangilanish va Anti-Fraud Paneli -->
         <div style="margin-bottom: 12px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
           <div style="text-align: left;">
-            <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #1E40AF; letter-spacing: 0.5px;">🔄 Dinamik Yangilanish</div>
+            <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #1E40AF; letter-spacing: 0.5px;">🛡️ Soxtalashtirishga Qarshi Himoya</div>
             <div style="font-size: 13px; font-weight: 700; color: #1E3A8A; margin-top: 1px;">
-              Yangi kodga: <span id="event-qr-countdown" style="font-family: monospace; font-size: 15px; color: #2563EB;">${ttl}s</span> qoldi
+              Yangi kodga: <span id="event-qr-countdown" style="font-family: monospace; font-size: 16px; color: #2563EB;">5s</span> qoldi
             </div>
           </div>
-          <!-- Intervalni Boshqarish (5s - 120s) -->
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <label for="event-qr-interval-select" style="font-size: 12px; color: #475569; margin: 0; font-weight: 600;">Yangilanish vaqti:</label>
-            <select id="event-qr-interval-select" class="form-control" style="width: auto; padding: 4px 10px; font-size: 12px; font-weight: 700;" onchange="updateEventQrInterval('${eventId}', this.value)">
-              <option value="5" ${ttl === 5 ? 'selected' : ''}>5 soniya</option>
-              <option value="10" ${ttl === 10 ? 'selected' : ''}>10 soniya</option>
-              <option value="15" ${ttl === 15 ? 'selected' : ''}>15 soniya</option>
-              <option value="20" ${ttl === 20 ? 'selected' : ''}>20 soniya</option>
-              <option value="30" ${ttl === 30 ? 'selected' : ''}>30 soniya (standart)</option>
-              <option value="45" ${ttl === 45 ? 'selected' : ''}>45 soniya</option>
-              <option value="60" ${ttl === 60 ? 'selected' : ''}>1 daqiqa (60s)</option>
-              <option value="90" ${ttl === 90 ? 'selected' : ''}>1.5 daqiqa (90s)</option>
-              <option value="120" ${ttl === 120 ? 'selected' : ''}>2 daqiqa (120s)</option>
-            </select>
+          <!-- Qat'iy 5 soniyalik belgi (o'zgartirish taqiqlangan) -->
+          <div style="display: flex; align-items: center; gap: 6px; background: #DBEAFE; padding: 6px 12px; border-radius: 8px; border: 1px solid #BFDBFE;">
+            <span style="font-size: 12px; font-weight: 700; color: #1E40AF;">⏱️ Har 5 soniyada yangilanadi</span>
           </div>
         </div>
 
         <!-- Animated Progress Bar -->
-        <div style="width: 100%; height: 5px; background: #E2E8F0; border-radius: 999px; overflow: hidden; margin-bottom: 14px;">
-          <div id="event-qr-progress" style="width: 100%; height: 100%; background: #2563EB; transition: width 1s linear;"></div>
+        <div style="width: 100%; height: 6px; background: #E2E8F0; border-radius: 999px; overflow: hidden; margin-bottom: 14px;">
+          <div id="event-qr-progress" style="width: 100%; height: 100%; background: #2563EB; transition: width 0.9s linear;"></div>
         </div>
 
         <!-- QR Kod Tasviri -->
@@ -4127,8 +5416,8 @@ async function showEventQrModal(eventId) {
           <img id="event-live-qr-img" src="${qrImg}" alt="Tadbir QR Kod" style="width: 250px; height: 250px; display: block; margin: 0 auto; border-radius: 6px;">
         </div>
 
-        <div id="event-qr-status-msg" style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">
-          🛡️ QR kod har ${ttl} soniyada avtomatik yangilanib, rasmga tushirib uzatishdan (firibgarlikdan) himoyalaydi.
+        <div id="event-qr-status-msg" style="margin-top: 12px; font-size: 12px; color: #475569; line-height: 1.45;">
+          🔒 Skrinshot qilib boshqalarga yuborishning oldini olish uchun QR kod <strong>har 5 soniyada majburiy yangilanadi</strong>. Eski QR kodlar server tomonidan rad etiladi.
         </div>
       </div>
     `;
@@ -4137,14 +5426,19 @@ async function showEventQrModal(eventId) {
       <button class="btn btn-primary" onclick="showStudentCheckinModal('${eventId}')" style="display:inline-flex; align-items:center; gap:6px;">
         ${icon('qrCode', 14)} <span>2-Usul: Talaba QR Skanerlash (Operativ)</span>
       </button>
-      <a id="event-qr-download-btn" href="${qrImg}" download="tadbir_qr_${eventId}.png" class="btn btn-outline">Yuklab Olish (PNG)</a>
       <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
     `;
 
     startEventQrCountdown(eventId);
 
   } catch (e) {
-    modalBody.innerHTML = `<p class="text-danger">${e.message}</p>`;
+    modalBody.innerHTML = `
+      <div style="text-align: center; padding: 24px;">
+        <div style="font-size: 32px; margin-bottom: 10px;">⚠️</div>
+        <h4 style="color: #DC2626; margin-bottom: 8px;">QR Kod ochilmadi</h4>
+        <p style="color: var(--text-muted); font-size: 13px;">${e.message}</p>
+      </div>
+    `;
   }
 }
 
@@ -4152,6 +5446,9 @@ function startEventQrCountdown(eventId) {
   if (window.eventQrTimer) {
     clearInterval(window.eventQrTimer);
   }
+
+  window.currentQrRemaining = 5;
+  window.currentQrTtl = 5;
 
   window.eventQrTimer = setInterval(async () => {
     window.currentQrRemaining--;
@@ -4171,52 +5468,30 @@ function startEventQrCountdown(eventId) {
       try {
         const fresh = await apiFetch(`/api/events/${eventId}/qr`);
         const imgEl = document.getElementById('event-live-qr-img');
-        const dwnBtn = document.getElementById('event-qr-download-btn');
         const newImg = fresh.qr_data_url || fresh.dataUrl;
         if (imgEl && newImg) imgEl.src = newImg;
-        if (dwnBtn && newImg) dwnBtn.href = newImg;
       } catch (err) {
         console.warn('QR auto refresh error:', err);
+        // Agar tadbir vaqti tugagan bo'lsa
+        if (err.message && err.message.includes('tugagan')) {
+          clearInterval(window.eventQrTimer);
+          window.eventQrTimer = null;
+          const statusMsg = document.getElementById('event-qr-status-msg');
+          if (statusMsg) {
+            statusMsg.textContent = '⚠️ Tadbir vaqti tugadi. Davomat tekshiruvi yakunlandi.';
+            statusMsg.style.color = '#DC2626';
+          }
+        }
       }
-      window.currentQrRemaining = window.currentQrTtl;
+      window.currentQrRemaining = 5;
       if (progressEl) progressEl.style.width = '100%';
     }
   }, 1000);
 }
 
-async function updateEventQrInterval(eventId, newSeconds) {
-  const val = Number(newSeconds);
-  if (isNaN(val) || val < 5 || val > 120) return;
-
-  try {
-    await apiFetch(`/api/events/${eventId}/qr-interval`, {
-      method: 'PUT',
-      body: JSON.stringify({ qr_refresh_seconds: val })
-    });
-
-    window.currentQrTtl = val;
-    window.currentQrRemaining = val;
-
-    const statusMsg = document.getElementById('event-qr-status-msg');
-    if (statusMsg) {
-      statusMsg.textContent = `✅ Yangilanish vaqti ${val} soniyaga o'zgartirildi!`;
-      statusMsg.style.color = '#059669';
-    }
-
-    const fresh = await apiFetch(`/api/events/${eventId}/qr`);
-    const imgEl = document.getElementById('event-live-qr-img');
-    const dwnBtn = document.getElementById('event-qr-download-btn');
-    const newImg = fresh.qr_data_url || fresh.dataUrl;
-    if (imgEl && newImg) imgEl.src = newImg;
-    if (dwnBtn && newImg) dwnBtn.href = newImg;
-
-    startEventQrCountdown(eventId);
-  } catch (err) {
-    alert("Xatolik: " + err.message);
-  }
-}
-window.updateEventQrInterval = updateEventQrInterval;
 window.showEventQrModal = showEventQrModal;
+window.openEditEventModal = openEditEventModal;
+window.submitEditEvent = submitEditEvent;
 
 // Qayta topshirish modali
 function showResubmitModal(entryId) {
@@ -4772,7 +6047,7 @@ function showCreateStudentModal() {
         </div>
         <div class="form-group">
           <label class="form-label">Telefon Raqami</label>
-          <input type="text" id="new-std-phone" class="form-control" placeholder="+998901234567">
+          <input type="text" id="new-std-phone" class="form-control" placeholder="+998901234567 yoki 901234567">
         </div>
       </div>
 
@@ -4799,6 +6074,34 @@ function showCreateStudentModal() {
   openModal();
 }
 
+/**
+ * Talaba telefon raqamini tozalash va standart formatga keltirish
+ * 1. '+' bilan kiritilgan raqamlar (O'zbekiston yoki chet el): hech qanday affiks qo'shilmaydi, oraliq belgilar tozalanadi.
+ * 2. 9 ta raqam (+ siz): O'zbekiston kodi +998 qo'shiladi.
+ */
+function normalizeStudentPhone(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (!str) return '';
+  const startsWithPlus = str.startsWith('+');
+  const digitsOnly = str.replace(/\D/g, '');
+  if (!digitsOnly) return '';
+
+  if (startsWithPlus) {
+    return '+' + digitsOnly;
+  }
+  if (digitsOnly.length === 9) {
+    return '+998' + digitsOnly;
+  }
+  if (digitsOnly.length === 12 && digitsOnly.startsWith('998')) {
+    return '+' + digitsOnly;
+  }
+  if (digitsOnly.length > 9) {
+    return '+' + digitsOnly;
+  }
+  return '+' + digitsOnly;
+}
+
 async function handleCreateStudentSubmit() {
   const external_id = document.getElementById('new-std-external-id')?.value.trim();
   const group_code = document.getElementById('new-std-group')?.value.trim();
@@ -4807,7 +6110,8 @@ async function handleCreateStudentSubmit() {
   const program_code = document.getElementById('new-std-program')?.value.trim() || 'IT';
   const course = Number(document.getElementById('new-std-course')?.value || 1);
   const gender = document.getElementById('new-std-gender')?.value || 'm';
-  const phone = document.getElementById('new-std-phone')?.value.trim();
+  const rawPhone = document.getElementById('new-std-phone')?.value.trim();
+  const phone = normalizeStudentPhone(rawPhone);
   const email = document.getElementById('new-std-email')?.value.trim();
 
   if (!external_id || !group_code || !first_name || !last_name) {
@@ -4914,7 +6218,7 @@ async function showEditStudentModal(studentId) {
           </div>
           <div class="form-group">
             <label class="form-label">Telefon Raqami</label>
-            <input type="text" id="edit-std-phone" class="form-control" value="${st.phone || ''}">
+            <input type="text" id="edit-std-phone" class="form-control" value="${st.phone || ''}" placeholder="+998901234567 yoki 901234567">
           </div>
         </div>
 
@@ -4962,7 +6266,8 @@ async function handleEditStudentSubmit(studentId) {
   const program_code = document.getElementById('edit-std-program')?.value.trim();
   const course = Number(document.getElementById('edit-std-course')?.value || 1);
   const gender = document.getElementById('edit-std-gender')?.value;
-  const phone = document.getElementById('edit-std-phone')?.value.trim();
+  const rawPhone = document.getElementById('edit-std-phone')?.value.trim();
+  const phone = normalizeStudentPhone(rawPhone);
   const email = document.getElementById('edit-std-email')?.value.trim();
   const status = document.getElementById('edit-std-status')?.value;
   const tutor_id = document.getElementById('edit-std-tutor')?.value || null;

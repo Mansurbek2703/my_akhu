@@ -164,7 +164,8 @@ CREATE TABLE IF NOT EXISTS event (
     requires_registration INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'published' CHECK(status IN ('draft', 'published', 'closed', 'cancelled')),
     qr_secret TEXT NOT NULL,
-    qr_refresh_seconds INTEGER NOT NULL DEFAULT 30,
+    qr_refresh_seconds INTEGER NOT NULL DEFAULT 5,
+    attendance_open_minutes_before INTEGER NOT NULL DEFAULT 5,
     created_by TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -277,3 +278,30 @@ CREATE TABLE IF NOT EXISTS student_score (
     updated_at TEXT NOT NULL,
     FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE
 );
+
+-- 20. TELEGRAM BOT FOYDALANUVCHILARI (telegram_bot_user)
+CREATE TABLE IF NOT EXISTS telegram_bot_user (
+    telegram_user_id TEXT PRIMARY KEY,
+    username TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    phone TEXT,
+    student_id TEXT,
+    started_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    actions_count INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE SET NULL
+);
+
+-- 21. TELEGRAM BOT AMALLAR JURNALI (telegram_bot_log)
+CREATE TABLE IF NOT EXISTS telegram_bot_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_user_id TEXT NOT NULL,
+    student_id TEXT,
+    action_type TEXT NOT NULL, -- 'start', 'share_contact', 'miniapp_open', 'qr_checkin', 'callback', etc.
+    details TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bot_log_user ON telegram_bot_log(telegram_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_bot_log_created ON telegram_bot_log(created_at);
+
