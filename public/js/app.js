@@ -5815,6 +5815,7 @@ const StudentMgmtState = {
 let adminStudentsState = {
   search: '',
   group: '',
+  level: '',
   course: '',
   gender: '',
   status: '',
@@ -5947,6 +5948,11 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         <input type="text" id="filter-student-search" class="admin-search-input" placeholder="ID, F.I.Sh, guruh yoki telefon bo'yicha tezkor qidiruv...">
       </div>
       <div class="admin-filters-group">
+        <select id="filter-student-level" class="admin-filter-select">
+          <option value="">Barcha bosqichlar</option>
+          <option value="bak">Bakalavriat</option>
+          <option value="mag">Magistratura</option>
+        </select>
         <select id="filter-student-course" class="admin-filter-select">
           <option value="">Barcha kurslar</option>
           <option value="1">1-kurs</option>
@@ -5976,9 +5982,10 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         <table class="data-table">
           <thead>
             <tr>
-              <th style="width: 130px;">Talaba ID</th>
+              <th style="width: 120px;">Talaba ID</th>
               <th>F.I.Sh</th>
               <th>Yo'nalish & Guruh</th>
+              <th style="width: 115px;">Bosqich</th>
               <th>Kurs</th>
               <th>Telefon Raqami</th>
               <th>Jinsi</th>
@@ -5990,7 +5997,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           </thead>
           <tbody id="admin-students-table-body">
             <tr>
-              <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
                 <div class="spinner" style="margin-bottom: 10px;"></div>
                 <p>Talabalar ro'yxati yuklanmoqda...</p>
               </td>
@@ -6023,6 +6030,12 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     }, 350);
   });
 
+  document.getElementById('filter-student-level').addEventListener('change', (e) => {
+    adminStudentsState.level = e.target.value;
+    adminStudentsState.offset = 0;
+    loadAdminStudentsList();
+  });
+
   document.getElementById('filter-student-course').addEventListener('change', (e) => {
     adminStudentsState.course = e.target.value;
     adminStudentsState.offset = 0;
@@ -6046,6 +6059,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
 
 function resetStudentFilters() {
   adminStudentsState.search = '';
+  adminStudentsState.level = '';
   adminStudentsState.course = '';
   adminStudentsState.gender = '';
   adminStudentsState.status = '';
@@ -6053,6 +6067,8 @@ function resetStudentFilters() {
 
   const s = document.getElementById('filter-student-search');
   if (s) s.value = '';
+  const lvl = document.getElementById('filter-student-level');
+  if (lvl) lvl.value = '';
   const c = document.getElementById('filter-student-course');
   if (c) c.value = '';
   const g = document.getElementById('filter-student-gender');
@@ -6102,6 +6118,7 @@ async function loadAdminStudentsList() {
       offset: adminStudentsState.offset
     });
     if (adminStudentsState.search) params.append('search', adminStudentsState.search);
+    if (adminStudentsState.level) params.append('level', adminStudentsState.level);
     if (adminStudentsState.course) params.append('course', adminStudentsState.course);
     if (adminStudentsState.status) params.append('status', adminStudentsState.status);
 
@@ -6150,7 +6167,7 @@ async function loadAdminStudentsList() {
     if (students.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="10" style="text-align: center; padding: 48px; color: var(--text-muted);">
+          <td colspan="11" style="text-align: center; padding: 48px; color: var(--text-muted);">
             <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('users', 32)}</div>
             <p style="font-size: 14px; font-weight: 600; color: var(--text-main);">Talabalar topilmadi</p>
             <p style="font-size: 12px; margin-top: 4px;">Qidiruv yoki filtr mezonlarini o'zgartiring, yoki Excel orqali yangi talabalarni yuklang.</p>
@@ -6164,6 +6181,10 @@ async function loadAdminStudentsList() {
       const isFemale = st.gender === 'female' || st.gender === 'f';
       const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
       const isActive = st.status === 'active';
+      const isMag = st.level === 'mag';
+      const levelBadgeHtml = isMag
+        ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; letter-spacing:0.3px;">Magistratura</span>`
+        : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; letter-spacing:0.3px;">Bakalavr</span>`;
       const photoHtml = st.photo_url
         ? `<img src="${st.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1px solid #CBD5E1; width: 34px; height: 34px; border-radius: 50%;" alt="${st.first_name}">`
         : `<span class="avatar-badge ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>`;
@@ -6185,6 +6206,9 @@ async function loadAdminStudentsList() {
           <td>
             <div style="font-weight: 600; font-size: 12px;">${st.group_code || '-'}</div>
             <div class="table-sub-text">${st.program_code || 'IT'}</div>
+          </td>
+          <td>
+            ${levelBadgeHtml}
           </td>
           <td>
             <span class="badge badge-course">${st.course || 1}-kurs</span>
@@ -6274,13 +6298,20 @@ function showCreateStudentModal() {
         </div>
       </div>
 
-      <div class="grid grid-2 mb-3">
+      <div class="grid grid-3 mb-3">
         <div class="form-group">
           <label class="form-label">Ta'lim Yo'nalishi</label>
           <input type="text" id="new-std-program" class="form-control" placeholder="Masalan: Sun'iy intellekt">
         </div>
         <div class="form-group">
-          <label class="form-label">Kursi (Bosqich)</label>
+          <label class="form-label">Ta'lim Bosqichi</label>
+          <select id="new-std-level" class="form-select">
+            <option value="bak">Bakalavriat</option>
+            <option value="mag">Magistratura</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kursi</label>
           <select id="new-std-course" class="form-select">
             <option value="1">1-kurs</option>
             <option value="2">2-kurs</option>
@@ -6361,6 +6392,7 @@ async function handleCreateStudentSubmit() {
   const first_name = document.getElementById('new-std-first-name')?.value.trim();
   const last_name = document.getElementById('new-std-last-name')?.value.trim();
   const program_code = document.getElementById('new-std-program')?.value.trim() || 'IT';
+  const level = document.getElementById('new-std-level')?.value || 'bak';
   const course = Number(document.getElementById('new-std-course')?.value || 1);
   const gender = document.getElementById('new-std-gender')?.value || 'm';
   const rawPhone = document.getElementById('new-std-phone')?.value.trim();
@@ -6377,7 +6409,7 @@ async function handleCreateStudentSubmit() {
       method: 'POST',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
-        program_code, course, gender, phone, email
+        program_code, level, course, gender, phone, email
       })
     });
 
@@ -6445,13 +6477,20 @@ async function showEditStudentModal(studentId) {
           </div>
         </div>
 
-        <div class="grid grid-2 mb-3">
+        <div class="grid grid-3 mb-3">
           <div class="form-group">
             <label class="form-label">Ta'lim Yo'nalishi</label>
             <input type="text" id="edit-std-program" class="form-control" value="${st.program_code || ''}">
           </div>
           <div class="form-group">
-            <label class="form-label">Kursi (Bosqich)</label>
+            <label class="form-label">Ta'lim Bosqichi</label>
+            <select id="edit-std-level" class="form-select">
+              <option value="bak" ${st.level !== 'mag' ? 'selected' : ''}>Bakalavriat</option>
+              <option value="mag" ${st.level === 'mag' ? 'selected' : ''}>Magistratura</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kursi</label>
             <select id="edit-std-course" class="form-select">
               <option value="1" ${st.course == 1 ? 'selected' : ''}>1-kurs</option>
               <option value="2" ${st.course == 2 ? 'selected' : ''}>2-kurs</option>
@@ -6517,6 +6556,7 @@ async function handleEditStudentSubmit(studentId) {
   const first_name = document.getElementById('edit-std-first-name')?.value.trim();
   const last_name = document.getElementById('edit-std-last-name')?.value.trim();
   const program_code = document.getElementById('edit-std-program')?.value.trim();
+  const level = document.getElementById('edit-std-level')?.value || 'bak';
   const course = Number(document.getElementById('edit-std-course')?.value || 1);
   const gender = document.getElementById('edit-std-gender')?.value;
   const rawPhone = document.getElementById('edit-std-phone')?.value.trim();
@@ -6530,7 +6570,7 @@ async function handleEditStudentSubmit(studentId) {
       method: 'PUT',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
-        program_code, course, gender, phone, email, tutor_id, status
+        program_code, level, course, gender, phone, email, tutor_id, status
       })
     });
 
@@ -6644,6 +6684,7 @@ async function showStudentDetailsModal(studentId) {
           <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 5px;">${st.first_name} ${st.last_name}</h3>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <span class="badge badge-group">${st.external_id}</span>
+            <span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700;">${st.level === 'mag' ? 'Magistratura' : 'Bakalavriat'}</span>
             <span class="badge badge-course">${st.course}-kurs • ${st.group_code}</span>
             <span class="status-badge ${st.status === 'active' ? 'badge-active' : 'badge-inactive'}">${st.status === 'active' ? 'Faol' : 'Nofaol'}</span>
           </div>
