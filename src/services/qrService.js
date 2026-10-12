@@ -142,11 +142,15 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
     throw new Error('Siz ushbu tadbirga allaqachon check-in qilgansiz (Q-04, AT-11)');
   }
 
-  // Q-05: Ro'yxatli tadbirda ro'yxatdan o'tganlik tekshiruvi
+  // Q-05: Ro'yxatli tadbirda ro'yxatdan o'tganlik tekshiruvi (QR scan orqali avtomatik ro'yxatga olib davomat qilinadi)
   if (event.requires_registration) {
     const reg = db.prepare(`SELECT * FROM event_registration WHERE event_id = ? AND student_id = ?`).get(event_id, studentId);
     if (!reg) {
-      throw new Error('Ushbu tadbirga faqat oldindan ro\'yxatdan o\'tgan talabalar check-in qila oladi (Q-05)');
+      try {
+        registerForEvent(studentId, event_id);
+      } catch (regErr) {
+        throw new Error(regErr.message || 'Ushbu tadbirga ro\'yxatdan o\'tish imkoni bo\'lmadi');
+      }
     }
   }
 

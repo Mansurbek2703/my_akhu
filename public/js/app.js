@@ -1961,9 +1961,10 @@ async function renderTutorStudents(container) {
                 <th>Talaba F.I.Sh</th>
                 <th style="width: 110px;">Guruh</th>
                 <th>Kurs & Yo'nalish</th>
-                <th style="width: 130px;">Mavsumiy Ball</th>
-                <th style="width: 110px;">Joriy Hafta</th>
-                <th style="width: 110px;">Holati</th>
+                <th style="width: 120px;">Mavsumiy Ball</th>
+                <th style="width: 100px;">Joriy Hafta</th>
+                <th style="width: 100px;">Holati</th>
+                <th style="width: 150px; text-align: center;">Amallar</th>
               </tr>
             </thead>
             <tbody id="tutor-students-tbody">
@@ -1983,7 +1984,7 @@ function renderTutorTableRowsHtml(list) {
   if (!list || list.length === 0) {
     return `
       <tr>
-        <td colspan="7" style="text-align: center; padding: 36px; color: var(--text-muted);">
+        <td colspan="8" style="text-align: center; padding: 36px; color: var(--text-muted);">
           Talabalar topilmadi
         </td>
       </tr>
@@ -2030,6 +2031,16 @@ function renderTutorTableRowsHtml(list) {
           ${isPassive 
             ? `<span class="status-badge" style="background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A;">Passiv</span>` 
             : `<span class="status-badge badge-active">Faol</span>`}
+        </td>
+        <td style="text-align: center;" onclick="event.stopPropagation()">
+          <div style="display: inline-flex; align-items: center; gap: 6px;">
+            <button class="btn btn-sm btn-outline" onclick="showStudentModal('${s.id}')" title="Batafsil ko'rish" style="padding: 4px 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+              ${icon('eye', 13)}
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="showEditStudentModal('${s.id}')" title="Talabani tahrirlash" style="padding: 4px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; background: #2563EB; border-color: #2563EB;">
+              ${icon('edit', 13)} <span>Tahrirlash</span>
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -5745,6 +5756,13 @@ async function showStudentModal(studentId) {
         </table>
       </div>
     `;
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-primary" onclick="showEditStudentModal('${st.id}')" style="display:inline-flex; align-items:center; gap:6px;">
+        ${icon('edit', 14)} <span>Tahrirlash</span>
+      </button>
+      <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+    `;
   } catch (err) {
     modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
   }
@@ -6716,7 +6734,13 @@ async function handleEditStudentSubmit(studentId) {
 
     closeModal();
     alert("Talaba ma'lumotlari muvaffaqiyatli yangilandi!");
-    await loadAdminStudentsList();
+    if (typeof loadAdminStudentsList === 'function') {
+      try { await loadAdminStudentsList(); } catch (e) {}
+    }
+    const mainContent = document.getElementById('main-content');
+    if (mainContent && (AppState.currentSection === 'tutor-my-students' || AppState.user?.roles?.includes('tutor'))) {
+      try { await renderTutorStudents(mainContent); } catch (e) {}
+    }
   } catch (err) {
     alert(err.message);
   }

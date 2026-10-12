@@ -53,6 +53,11 @@ app.get('/tv', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/tv.html'));
 });
 
+// Brauzerdan tadbir check-in ga kirishga urinishlarni butunlay to'sish (hech narsa ochilmasligi kerak)
+app.all(['/checkin', '/event/checkin', '/events/:id/checkin', '/qr-checkin', '/qr/*'], (req, res) => {
+  return res.status(403).send('Kirish taqiqlangan! Tadbir QR kodini faqat Telegram Mini App ichidagi skaner orqali o\'qish mumkin.');
+});
+
 // SPA Fallback to index.html (Express 5 compatible)
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));

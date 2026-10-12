@@ -28,10 +28,11 @@ router.get('/summary', authenticateStaff, (req, res) => {
   let studentFilter;
   let params = [];
   if (groups.length > 0) {
-    studentFilter = `st.group_code IN (${groups.map(() => '?').join(',')})`;
-    params.push(...groups);
+    studentFilter = `(st.tutor_id = ? OR st.group_code IN (${groups.map(() => '?').join(',')}))`;
+    params.push(tutorId, ...groups);
   } else {
-    studentFilter = `1 = 0`;
+    studentFilter = `st.tutor_id = ?`;
+    params.push(tutorId);
   }
 
   // Talabalar umumiy soni
@@ -41,6 +42,9 @@ router.get('/summary', authenticateStaff, (req, res) => {
     LEFT JOIN student_score sc ON st.id = sc.student_id
     WHERE ${studentFilter} AND st.status = 'active'
   `).all(...params);
+
+  // Guruhlar ro'yxatini to'liq shakllantirish (tutor_group + talabalar guruhlari)
+  const allGroups = Array.from(new Set([...groups, ...students.map(s => s.group_code).filter(Boolean)])).sort();
 
   const totalStudents = students.length;
   const activeStudents = students.filter(s => (s.season || 0) >= 30).length;
@@ -75,13 +79,13 @@ router.get('/summary', authenticateStaff, (req, res) => {
       remaining: Math.max(0, 60 - todayEntriesCount)
     },
     entries_stats: statuses,
-    groups
+    groups: allGroups
   });
 });
 
 /**
  * GET /api/tutor/students
- * T-05: Tyutorning o'z talabalari ro'yxati (jadval)
+ * T-05: Tyutorning o'z talabalari ro'yxati (100% biriktirilgan talabalar)
  */
 router.get('/students', authenticateStaff, (req, res) => {
   const tutorId = req.staffUser.id;
@@ -89,27 +93,27 @@ router.get('/students', authenticateStaff, (req, res) => {
 
   const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
 
-  if (groups.length === 0) {
-    return res.json({ students: [], available_groups: [] });
-  }
+  let whereClauses = [];
+  let params = [];
 
-  let whereClauses = [`st.group_code IN (${groups.map(() => '?').join(',')})`];
-  let params = [...groups];
+  if (groups.length > 0) {
+    whereClauses.push(`(st.tutor_id = ? OR st.group_code IN (${groups.map(() => '?').join(',')}))`);
+    params.push(tutorId, ...groups);
+  } else {
+    whereClauses.push('st.tutor_id = ?');
+    params.push(tutorId);
+  }
 
   whereClauses.push("st.status = 'active'");
 
   if (group) {
-    if (groups.includes(group)) {
-      whereClauses.push('st.group_code = ?');
-      params.push(group);
-    } else {
-      return res.json({ students: [], available_groups: groups });
-    }
+    whereClauses.push('st.group_code = ?');
+    params.push(group);
   }
 
   if (search) {
-    whereClauses.push('(st.first_name LIKE ? OR st.last_name LIKE ? OR st.external_id LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    whereClauses.push('(st.first_name LIKE ? OR st.last_name LIKE ? OR st.external_id LIKE ? OR st.phone LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   const sql = `
@@ -121,8 +125,123 @@ router.get('/students', authenticateStaff, (req, res) => {
   `;
 
   const list = db.prepare(sql).all(...params);
-  res.json({ students: list, available_groups: groups });
+  const allGroups = Array.from(new Set([...groups, ...list.map(s => s.group_code).filter(Boolean)])).sort();
+
+  res.json({ students: list, available_groups: allGroups });
 });
+
+/**
+ * GET /api/tutor/students/:id
+ * Tyutor talaba ma'lumotlarini to'liq ko'rishi
+ */
+router.get('/students/:id', authenticateStaff, (req, res) => {
+  const tutorId = req.staffUser.id;
+  const student = db.prepare(`
+    SELECT st.*, su.full_name as tutor_name, sc.total, sc.season, sc.week_cur, sc.rank_cohort, sc.events_count
+    FROM student st
+    LEFT JOIN staff_user su ON st.tutor_id = su.id
+    LEFT JOIN student_score sc ON st.id = sc.student_id
+    WHERE st.id = ? OR st.external_id = ?
+  `).get(req.params.id, req.params.id);
+
+  if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+  // Huquqni tekshirish
+  const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+  const isOwner = (student.tutor_id === tutorId || (student.group_code && groups.includes(student.group_code)));
+
+  if (!isOwner && !req.staffUser.roles.includes('superadmin')) {
+    return res.status(403).json({ error: 'Siz faqat o\'zingizga biriktirilgan talabalarni ko\'rishingiz mumkin' });
+  }
+
+  const entries = db.prepare(`
+    SELECT pe.*, ci.name as catalog_title, su.full_name as creator_name
+    FROM point_entry pe
+    LEFT JOIN catalog_item ci ON pe.item_id = ci.id
+    LEFT JOIN staff_user su ON pe.created_by = su.id
+    WHERE pe.student_id = ?
+    ORDER BY pe.created_at DESC
+  `).all(student.id);
+
+  res.json({ student, history: entries });
+});
+
+/**
+ * PUT /api/tutor/students/:id
+ * Tyutor o'ziga biriktirilgan talaba ma'lumotlarini 100% tahrirlashi
+ */
+router.put('/students/:id', authenticateStaff, (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const tutorId = req.staffUser.id;
+
+    const student = db.prepare('SELECT * FROM student WHERE id = ?').get(studentId);
+    if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    const groups = db.prepare('SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+    const isOwner = (student.tutor_id === tutorId || (student.group_code && groups.includes(student.group_code)));
+
+    if (!isOwner && !req.staffUser.roles.includes('superadmin')) {
+      return res.status(403).json({ error: 'Siz faqat o\'zingizga biriktirilgan talabalarni tahrirlashingiz mumkin' });
+    }
+
+    const {
+      external_id,
+      first_name,
+      last_name,
+      group_code,
+      program_code,
+      level,
+      course,
+      gender,
+      email,
+      phone,
+      photo_url,
+      status
+    } = req.body;
+
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE student
+      SET external_id = COALESCE(?, external_id),
+          first_name = COALESCE(?, first_name),
+          last_name = COALESCE(?, last_name),
+          group_code = COALESCE(?, group_code),
+          program_code = COALESCE(?, program_code),
+          level = COALESCE(?, level),
+          course = COALESCE(?, course),
+          gender = COALESCE(?, gender),
+          email = COALESCE(?, email),
+          phone = COALESCE(?, phone),
+          photo_url = COALESCE(?, photo_url),
+          status = COALESCE(?, status),
+          updated_at = ?
+      WHERE id = ?
+    `).run(
+      external_id !== undefined ? String(external_id).trim() : student.external_id,
+      first_name !== undefined ? first_name.trim() : student.first_name,
+      last_name !== undefined ? last_name.trim() : student.last_name,
+      group_code !== undefined ? group_code.trim() : student.group_code,
+      program_code !== undefined ? program_code.trim() : student.program_code,
+      level !== undefined ? level : student.level,
+      course !== undefined ? Number(course) : student.course,
+      gender !== undefined ? gender : student.gender,
+      email !== undefined ? email.trim() : student.email,
+      phone !== undefined ? phone.trim() : student.phone,
+      photo_url !== undefined ? photo_url : student.photo_url,
+      status !== undefined ? status : student.status,
+      now,
+      studentId
+    );
+
+    const updated = db.prepare('SELECT * FROM student WHERE id = ?').get(studentId);
+    res.json({ success: true, student: updated, message: "Talaba ma'lumotlari muvaffaqiyatli saqlandi!" });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 
 /**
  * POST /api/tutor/entries

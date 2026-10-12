@@ -200,25 +200,47 @@
 
   <!-- QR SCANNER MODAL -->
   <div class="qr-modal" id="qr-scanner-modal">
-    <div style="text-align: center; color: white; margin-bottom: 14px; width: 100%; max-width: 320px;">
-      <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 4px;">📷 Tadbir QR Kodini Skanerlang</h3>
+    <div style="text-align: center; color: white; margin-bottom: 12px; width: 100%; max-width: 320px;">
+      <h3 id="miniapp-scan-modal-title" style="font-size: 17px; font-weight: 700; margin-bottom: 4px;">📷 Tadbir Davomati (QR Check-in)</h3>
       <p id="miniapp-scan-status" style="font-size: 12px; color: #94A3B8;">Kamerani tadbir ekrani yoki plakatiga qarating</p>
     </div>
 
-    <!-- Kamera oynasi -->
-    <div style="width: 100%; max-width: 290px; border-radius: 20px; overflow: hidden; background: #000; box-shadow: 0 0 30px rgba(56, 189, 248, 0.4); border: 2px solid #38BDF8; position: relative;">
+    <!-- USULLARNI TANLASH (Tugmalar) -->
+    <div style="display: flex; gap: 8px; margin-bottom: 12px; width: 100%; max-width: 290px;">
+      <button id="btn-scan-camera" onclick="switchScanMethod('camera')" style="flex: 1; padding: 9px 6px; border-radius: 10px; border: none; background: #38BDF8; color: #0F172A; font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+        📷 1-Usul: Skanerlash
+      </button>
+      <button id="btn-scan-myqr" onclick="switchScanMethod('myqr')" style="flex: 1; padding: 9px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+        📱 2-Usul: Shaxsiy QR
+      </button>
+    </div>
+
+    <!-- 1-USUL: Kamera oynasi -->
+    <div id="view-scan-camera" style="width: 100%; max-width: 290px; border-radius: 20px; overflow: hidden; background: #000; box-shadow: 0 0 30px rgba(56, 189, 248, 0.4); border: 2px solid #38BDF8; position: relative;">
       <div id="miniapp-camera-view" style="width: 100%; min-height: 260px;"></div>
     </div>
 
-    <!-- Qo'lda kod kiritish va yopish -->
-    <div style="margin-top: 16px; width: 100%; max-width: 290px; display: flex; flex-direction: column; gap: 8px;">
-      <div style="display: flex; gap: 6px;">
-        <input type="text" id="manual-qr-payload" placeholder="QR kod matni yoki tadbir kodi..." style="flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.12); color: white; font-size: 13px; text-align: center; outline: none;">
-        <button onclick="submitManualCheckin()" style="background: #38BDF8; color: #0F172A; font-weight: 700; border: none; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: 13px;">
-          Qabul
-        </button>
+    <!-- 2-USUL: Talabaning shaxsiy QR kodi -->
+    <div id="view-scan-myqr" style="display: none; width: 100%; max-width: 290px; background: white; border-radius: 20px; padding: 18px 14px; text-align: center; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);">
+      <p style="color: #475569; font-size: 12px; margin-bottom: 10px; font-weight: 600; line-height: 1.4;">
+        Tadbir tashkilotchisi yoki mas'ulga ushbu QR kodingizni ko'rsating:
+      </p>
+      <div style="background: #F8FAFC; padding: 10px; border-radius: 14px; display: inline-block; border: 1px solid #E2E8F0;">
+        <img id="modal-qr-student-image" src="" alt="Talaba QR" style="width: 200px; height: 200px; display: block; margin: 0 auto; border-radius: 6px;">
       </div>
-      <button onclick="closeQrScannerModal()" style="width: 100%; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 10px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;">
+      <div style="margin-top: 10px;">
+        <span class="badge" style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 12px;">
+          ⏱️ HMAC Xavfsiz Shaxsiy QR
+        </span>
+      </div>
+      <button onclick="switchScanMethod('camera')" style="margin-top: 12px; width: 100%; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
+        📷 1-Usul: Kameraga qaytish
+      </button>
+    </div>
+
+    <!-- Yopish tugmasi -->
+    <div style="margin-top: 14px; width: 100%; max-width: 290px;">
+      <button onclick="closeQrScannerModal()" style="width: 100%; background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 10px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;">
         ✕ Yopish
       </button>
     </div>
@@ -465,11 +487,11 @@
             </p>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
               <span style="font-size:11px; color:#94A3B8;">
-                ${ev.is_checked_in ? '✅ Ishtirok etdingiz' : (ev.is_registered ? '📝 Ro\'yxatdan o\'tgansiz' : 'Ochiq tadbir')}
+                ${ev.is_checked_in ? '✅ Davomatdan o\'tdingiz (+ball berildi)' : '📷 Davomat faqat QR skanerlash orqali'}
               </span>
-              ${!ev.is_checked_in && !ev.is_registered ? `
-                <button onclick="registerEvent('${ev.id}')" style="background:#2563EB; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;">
-                  Ro'yxatdan o'tish
+              ${!ev.is_checked_in ? `
+                <button onclick="openQrScannerModal('${ev.id}')" style="background:#2563EB; color:white; border:none; padding:8px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                  📷 Davomat / Ro'yxatdan o'tish
                 </button>
               ` : ''}
             </div>
@@ -515,28 +537,54 @@
     let miniAppQrScanner = null;
     let isProcessingScan = false;
 
-    async function openQrScannerModal() {
-      // 1. Agar Telegram mobil mijozida bo'lsa, Telegramning o'z tezkor kamerasini ishga tushirish
-      if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.showScanQrPopup === 'function') {
-        try {
-          window.Telegram.WebApp.showScanQrPopup({
-            text: "Tadbir QR kodini kameraga qarating"
-          }, async (scannedText) => {
-            if (scannedText) {
-              window.Telegram.WebApp.closeScanQrPopup();
-              await executeCheckin(scannedText);
-              return true;
-            }
-          });
-          return;
-        } catch (tgErr) {
-          console.warn("Telegram popup ochilmadi, ichki kameraga o'tilmoqda:", tgErr);
-        }
-      }
-
-      // 2. Aks holda Web modal va Html5Qrcode kamerani ochish
+    async function openQrScannerModal(eventId) {
       document.getElementById('qr-scanner-modal').style.display = 'flex';
-      await startMiniappScanner();
+      await switchScanMethod('camera');
+      loadModalStudentQr();
+    }
+
+    async function switchScanMethod(method) {
+      const btnCam = document.getElementById('btn-scan-camera');
+      const btnMyqr = document.getElementById('btn-scan-myqr');
+      const viewCam = document.getElementById('view-scan-camera');
+      const viewMyqr = document.getElementById('view-scan-myqr');
+      const titleEl = document.getElementById('miniapp-scan-modal-title');
+      const statusEl = document.getElementById('miniapp-scan-status');
+
+      if (method === 'myqr') {
+        if (btnCam) { btnCam.style.background = 'rgba(255,255,255,0.1)'; btnCam.style.color = 'white'; btnCam.style.border = '1px solid rgba(255,255,255,0.3)'; }
+        if (btnMyqr) { btnMyqr.style.background = '#38BDF8'; btnMyqr.style.color = '#0F172A'; btnMyqr.style.border = 'none'; }
+        if (viewCam) viewCam.style.display = 'none';
+        if (viewMyqr) viewMyqr.style.display = 'block';
+        if (titleEl) titleEl.textContent = '📱 2-Usul: Shaxsiy QR Kodi';
+        if (statusEl) statusEl.textContent = 'Tadbir tashkilotchisi ushbu QR kodingizni skanerlaydi';
+        await stopMiniappScanner();
+        await loadModalStudentQr();
+      } else {
+        if (btnCam) { btnCam.style.background = '#38BDF8'; btnCam.style.color = '#0F172A'; btnCam.style.border = 'none'; }
+        if (btnMyqr) { btnMyqr.style.background = 'rgba(255,255,255,0.1)'; btnMyqr.style.color = 'white'; btnMyqr.style.border = '1px solid rgba(255,255,255,0.3)'; }
+        if (viewCam) viewCam.style.display = 'block';
+        if (viewMyqr) viewMyqr.style.display = 'none';
+        if (titleEl) titleEl.textContent = '📷 1-Usul: Tadbir QR Kodini Skanerlang';
+        if (statusEl) statusEl.textContent = 'Kamerani tadbir ekrani yoki plakatiga qarating';
+        await startMiniappScanner();
+      }
+    }
+
+    async function loadModalStudentQr() {
+      try {
+        const res = await fetch('/api/app/my-qr', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const d = await res.json();
+        const qrUrl = d.qr_data_url || d.dataUrl || d.qr_code;
+        if (qrUrl) {
+          const imgEl = document.getElementById('modal-qr-student-image');
+          if (imgEl) imgEl.src = qrUrl;
+        }
+      } catch (e) {
+        console.error('Modal QR yuklanmadi', e);
+      }
     }
 
     async function startMiniappScanner() {
@@ -571,7 +619,7 @@
       } catch (err) {
         console.error('Kamera xatosi:', err);
         if (statusEl) {
-          statusEl.textContent = 'Kamera ochilmadi (ruxsat berilmagan). Quyida kodni qo\'lda kiriting:';
+          statusEl.textContent = 'Kamera ochilmadi. 2-usulga o\'tib, shaxsiy QR kodingizni tashkilotchiga ko\'rsating.';
           statusEl.style.color = '#F87171';
         }
       }
@@ -616,15 +664,6 @@
       } catch (e) {
         alert(`❌ Check-in xatosi: ${e.message}`);
       }
-    }
-
-    async function submitManualCheckin() {
-      const qrPayload = document.getElementById('manual-qr-payload').value.trim();
-      if (!qrPayload) return alert('Iltimos, QR kodni kiriting!');
-
-      await closeQrScannerModal();
-      await executeCheckin(qrPayload);
-      document.getElementById('manual-qr-payload').value = '';
     }
 
   </script>

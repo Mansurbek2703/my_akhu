@@ -47,15 +47,15 @@ function authenticateSuperadmin(req, res, next) {
   next();
 }
 
-// Middleware: Superadmin YOKI Registrator (dep_ob)
+// Middleware: Superadmin, Registrator (dep_ob) YOKI Tyutor
 function authenticateSuperadminOrRegistrator(req, res, next) {
   const userId = req.headers['x-user-id'] || 'superadmin';
   const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
   if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
 
   const roles = JSON.parse(user.roles);
-  if (!roles.includes('superadmin') && !roles.includes('dep_ob')) {
-    return res.status(403).json({ error: 'Faqat Superadmin yoki Registrator (O\'quv bo\'limi) uchun ruxsat berilgan' });
+  if (!roles.includes('superadmin') && !roles.includes('dep_ob') && !roles.includes('tutor')) {
+    return res.status(403).json({ error: 'Faqat Superadmin, Registrator yoki Tyutor uchun ruxsat berilgan' });
   }
 
   req.staffUser = { ...user, roles };
@@ -245,6 +245,16 @@ router.get('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
 
   if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
 
+  // Tyutor faqat o'ziga biriktirilgan talabalarni ko'ra oladi
+  if (req.staffUser.roles.includes('tutor') && !req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('dep_ob')) {
+    const tutorId = req.staffUser.id;
+    const tutorGroups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+    const isAssigned = (student.tutor_id === tutorId || (student.group_code && tutorGroups.includes(student.group_code)));
+    if (!isAssigned) {
+      return res.status(403).json({ error: 'Siz faqat o\'zingizga biriktirilgan talabalar ma\'lumotlarini ko\'rishingiz mumkin' });
+    }
+  }
+
   const entries = db.prepare(`
     SELECT pe.*, ci.name as catalog_title, su.full_name as creator_name
     FROM point_entry pe
@@ -290,6 +300,9 @@ router.get('/tutors', (req, res) => {
  */
 router.post('/students', authenticateSuperadminOrRegistrator, (req, res) => {
   try {
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('dep_ob')) {
+      return res.status(403).json({ error: 'Faqat Superadmin yoki Registrator yangi talaba qo\'sha oladi' });
+    }
     const {
       external_id,
       first_name,
@@ -382,6 +395,16 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
   try {
     const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(req.params.id);
     if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    // Tyutor faqat o'ziga biriktirilgan talabalarni tahrirlashi mumkin
+    if (req.staffUser.roles.includes('tutor') && !req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('dep_ob')) {
+      const tutorId = req.staffUser.id;
+      const tutorGroups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+      const isAssigned = (student.tutor_id === tutorId || (student.group_code && tutorGroups.includes(student.group_code)));
+      if (!isAssigned) {
+        return res.status(403).json({ error: 'Siz faqat o\'zingizga biriktirilgan talabalarni tahrirlashingiz mumkin' });
+      }
+    }
 
     const {
       external_id,
@@ -696,6 +719,9 @@ router.get('/students/template', authenticateSuperadminOrRegistrator, (req, res)
  */
 router.delete('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
   try {
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('dep_ob')) {
+      return res.status(403).json({ error: 'Faqat Superadmin yoki Registrator talabani o\'chira oladi' });
+    }
     const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(req.params.id);
     if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
 
