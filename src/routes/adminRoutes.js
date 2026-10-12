@@ -729,9 +729,10 @@ router.post('/students/clear-all', authenticateSuperadmin, (req, res) => {
       db.prepare('DELETE FROM event_registration').run();
       db.prepare('DELETE FROM appeal').run();
       db.prepare('DELETE FROM student_score').run();
-      db.prepare('DELETE FROM notification WHERE recipient_type = "student"').run();
-      db.prepare('DELETE FROM student').run();
+      db.prepare('DELETE FROM notification WHERE recipient_type = ?').run('student');
+      db.prepare('UPDATE telegram_bot_user SET student_id = NULL').run();
       db.prepare('DELETE FROM weekly_stars').run();
+      db.prepare('DELETE FROM student').run();
     })();
 
     recalculateStudentScores();
