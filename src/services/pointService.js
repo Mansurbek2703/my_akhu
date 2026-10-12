@@ -140,8 +140,8 @@ function createPointEntries({
         throw new Error(`Talaba topilmadi: ${studentId}`);
       }
 
-      // R-01: Tyutor faqat o'z talabasiga
-      const isMyStudent = (student.tutor_id === creator_user.id) || tutorGroups.includes(student.group_code);
+      // R-01: Tyutor faqat o'ziga biriktirilgan faol guruhlardagi talabalarga
+      const isMyStudent = tutorGroups.includes(student.group_code) || (!student.group_code && student.tutor_id === creator_user.id);
       if (!isMyStudent && !creator_user.roles.includes('superadmin')) {
         throw new Error(`R-01 qoidasi: Siz faqat o'zingizga biriktirilgan talabalarga ball kirita olasiz. Talaba: ${student.first_name} ${student.last_name} (${student.group_code})`);
       }

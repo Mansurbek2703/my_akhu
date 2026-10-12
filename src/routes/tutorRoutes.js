@@ -25,13 +25,13 @@ router.get('/summary', authenticateStaff, (req, res) => {
   // Guruhlarni olish
   const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
 
-  let studentFilter = `(st.tutor_id = ?`;
-  let params = [tutorId];
+  let studentFilter;
+  let params = [];
   if (groups.length > 0) {
-    studentFilter += ` OR st.group_code IN (${groups.map(() => '?').join(',')}))`;
+    studentFilter = `st.group_code IN (${groups.map(() => '?').join(',')})`;
     params.push(...groups);
   } else {
-    studentFilter += `)`;
+    studentFilter = `1 = 0`;
   }
 
   // Talabalar umumiy soni
@@ -89,20 +89,22 @@ router.get('/students', authenticateStaff, (req, res) => {
 
   const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
 
-  let whereClauses = [`(st.tutor_id = ?`];
-  let params = [tutorId];
-  if (groups.length > 0) {
-    whereClauses[0] += ` OR st.group_code IN (${groups.map(() => '?').join(',')}))`;
-    params.push(...groups);
-  } else {
-    whereClauses[0] += `)`;
+  if (groups.length === 0) {
+    return res.json({ students: [], available_groups: [] });
   }
+
+  let whereClauses = [`st.group_code IN (${groups.map(() => '?').join(',')})`];
+  let params = [...groups];
 
   whereClauses.push("st.status = 'active'");
 
   if (group) {
-    whereClauses.push('st.group_code = ?');
-    params.push(group);
+    if (groups.includes(group)) {
+      whereClauses.push('st.group_code = ?');
+      params.push(group);
+    } else {
+      return res.json({ students: [], available_groups: groups });
+    }
   }
 
   if (search) {

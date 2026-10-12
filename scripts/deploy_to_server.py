@@ -17,20 +17,27 @@ node -e "
 const { initSchema, db } = require('./src/db/database');
 initSchema();
 
-// FMC guruhlari mavjudligini ta'minlash (mavjud bo'lsa tegilmaydi)
-const fmc = [
-  { t: 'tutor_1', g: 'FMC01' },
-  { t: 'tutor_1', g: 'FMC02' },
-  { t: 'tutor_1', g: 'FMC03' },
-  { t: 'tutor_2', g: 'FMC04' },
-  { t: 'tutor_2', g: 'FMC05' }
-];
-for (const x of fmc) {
-  const tutorExists = db.prepare('SELECT id FROM staff_user WHERE id = ?').get(x.t);
-  if (tutorExists) {
-    db.prepare('INSERT OR IGNORE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)').run(x.t, x.g);
-  }
-}
+// Talabalarning tutor_id sini tutor_group bilan sinxronlashtirish
+db.prepare(`
+  UPDATE student
+  SET tutor_id = (SELECT tg.tutor_id FROM tutor_group tg WHERE tg.group_code = student.group_code LIMIT 1)
+  WHERE group_code IN (SELECT group_code FROM tutor_group)
+`).run();
+
+db.prepare(`
+  UPDATE student
+  SET tutor_id = NULL
+  WHERE tutor_id IS NOT NULL 
+    AND (
+      group_code IS NULL
+      OR group_code NOT IN (
+        SELECT tg.group_code FROM tutor_group tg WHERE tg.tutor_id = student.tutor_id
+      )
+    )
+`).run();
+
+console.log('TUTOR GURUHLARI:', db.prepare('SELECT * FROM tutor_group').all());
+console.log('TALABA-TYUTOR TAQSIMOTI:', db.prepare('SELECT tutor_id, count(*) as count FROM student GROUP BY tutor_id').all());
 
 db.prepare('UPDATE student SET level = ? WHERE level IS NULL OR level = ?').run('bak', '');
 const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;

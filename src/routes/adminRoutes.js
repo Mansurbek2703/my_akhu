@@ -837,6 +837,89 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
 });
 
 /**
+ * Tyutor guruhlarini va unga tegishli talabalarni to'liq sinxronlashtirish
+ */
+function syncTutorGroupsAndStudents(tutorId, rawGroups, isTutorRole = true) {
+  const cleanGroups = Array.isArray(rawGroups)
+    ? [...new Set(rawGroups.map(g => String(g).trim()).filter(Boolean))]
+    : [];
+
+  const activeGroups = isTutorRole ? cleanGroups : [];
+
+  // 1. Ushbu tyutorning mavjud (eski) guruhlarini olish
+  const oldGroups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+
+  // 2. tutor_group jadvalidan ushbu tyutorning barcha eski yozuvlarini tozalash
+  db.prepare(`DELETE FROM tutor_group WHERE tutor_id = ?`).run(tutorId);
+
+  // 3. Yangi guruhlarni tutor_group ga kiritish
+  if (activeGroups.length > 0) {
+    const insertStmt = db.prepare(`INSERT OR REPLACE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
+    for (const g of activeGroups) {
+      insertStmt.run(tutorId, g);
+    }
+  }
+
+  // 4. Yangi guruhlardagi barcha talabalarni ushbu tyutorga biriktirish
+  if (activeGroups.length > 0) {
+    const placeholders = activeGroups.map(() => '?').join(',');
+    db.prepare(`UPDATE student SET tutor_id = ? WHERE group_code IN (${placeholders})`).run(tutorId, ...activeGroups);
+  }
+
+  // 5. Olib tashlangan (eski) guruhlardagi talabalarni yangilash:
+  // Agar boshqa tyutorga biriktirilgan bo'lsa o'sha tyutorga, aks holda NULL
+  const removedGroups = oldGroups.filter(g => !activeGroups.includes(g));
+  for (const g of removedGroups) {
+    const otherTutor = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ? LIMIT 1`).get(g);
+    const newTutorId = otherTutor ? otherTutor.tutor_id : null;
+    db.prepare(`UPDATE student SET tutor_id = ? WHERE group_code = ?`).run(newTutorId, g);
+  }
+
+  // 6. Har qanday adashib qolgan yozuvlarni tozalash:
+  // Agar talabada tutor_id = tutorId bo'lib, uning guruhi hozirgi activeGroups ro'yxatida bo'lmasa:
+  if (activeGroups.length > 0) {
+    const placeholders = activeGroups.map(() => '?').join(',');
+    db.prepare(`
+      UPDATE student 
+      SET tutor_id = (SELECT tg.tutor_id FROM tutor_group tg WHERE tg.group_code = student.group_code LIMIT 1)
+      WHERE tutor_id = ? AND (group_code NOT IN (${placeholders}) OR group_code IS NULL)
+    `).run(tutorId, ...activeGroups);
+  } else {
+    db.prepare(`
+      UPDATE student 
+      SET tutor_id = (SELECT tg.tutor_id FROM tutor_group tg WHERE tg.group_code = student.group_code LIMIT 1)
+      WHERE tutor_id = ?
+    `).run(tutorId);
+  }
+
+  // 7. Butun tizim bo'yicha mustahkam sinxronizatsiya
+  reconcileAllStudentTutors();
+}
+
+/**
+ * Butun tizim bo'yicha talabalarning tutor_id sini tutor_group bilan moslashtirish
+ */
+function reconcileAllStudentTutors() {
+  db.prepare(`
+    UPDATE student
+    SET tutor_id = (SELECT tg.tutor_id FROM tutor_group tg WHERE tg.group_code = student.group_code LIMIT 1)
+    WHERE group_code IN (SELECT group_code FROM tutor_group)
+  `).run();
+
+  db.prepare(`
+    UPDATE student
+    SET tutor_id = NULL
+    WHERE tutor_id IS NOT NULL
+      AND (
+        group_code IS NULL
+        OR group_code NOT IN (
+          SELECT tg.group_code FROM tutor_group tg WHERE tg.tutor_id = student.tutor_id
+        )
+      )
+  `).run();
+}
+
+/**
  * POST /api/admin/users
  * Superadmin tomonidan yangi xodim qo'shish va rollar biriktirish
  */
@@ -902,13 +985,8 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
         now
       );
 
-      // 2. Agar tyutor roli bo'lsa guruhlarini yozish
-      if (cleanRoles.includes('tutor') && Array.isArray(targetGroups)) {
-        const stmtGroup = db.prepare(`INSERT OR REPLACE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
-        for (const g of targetGroups) {
-          if (String(g).trim()) stmtGroup.run(userId, String(g).trim());
-        }
-      }
+      // 2. Agar tyutor roli bo'lsa guruhlarini yozish va talabalarni biriktirish
+      syncTutorGroupsAndStudents(userId, targetGroups, cleanRoles.includes('tutor'));
 
       logAudit({
         actor_id: req.staffUser.id,
@@ -1091,13 +1169,13 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         req.params.id
       );
 
-      // Tyutor guruhlarini yangilash
+      // Tyutor guruhlarini va unga tegishli talabalarni sinxronlashtirish
+      const currentRoles = typeof updatedRoles === 'string' ? JSON.parse(updatedRoles) : updatedRoles;
+      const isTutorRole = Array.isArray(currentRoles) && currentRoles.includes('tutor');
       if (targetGroups !== undefined && Array.isArray(targetGroups)) {
-        db.prepare(`DELETE FROM tutor_group WHERE tutor_id = ?`).run(req.params.id);
-        const stmtGroup = db.prepare(`INSERT OR REPLACE INTO tutor_group (tutor_id, group_code) VALUES (?, ?)`);
-        for (const g of targetGroups) {
-          if (String(g).trim()) stmtGroup.run(req.params.id, String(g).trim());
-        }
+        syncTutorGroupsAndStudents(req.params.id, targetGroups, isTutorRole);
+      } else if (!isTutorRole) {
+        syncTutorGroupsAndStudents(req.params.id, [], false);
       }
 
       logAudit({
@@ -1161,11 +1239,9 @@ router.delete('/users/:id', authenticateSuperadmin, (req, res) => {
     if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
 
     db.transaction(() => {
-      // 1. Tyutor guruhlarini tozalash
-      db.prepare(`DELETE FROM tutor_group WHERE tutor_id = ?`).run(req.params.id);
-      // 2. Talabalardagi tutor_id ni bo'shatish
-      db.prepare(`UPDATE student SET tutor_id = NULL WHERE tutor_id = ?`).run(req.params.id);
-      // 3. Xodimni bazadan butunlay o'chirish
+      // 1. Tyutor guruhlarini tozalash va talabalarni ajratish
+      syncTutorGroupsAndStudents(req.params.id, [], false);
+      // 2. Xodimni bazadan butunlay o'chirish
       db.prepare(`DELETE FROM staff_user WHERE id = ?`).run(req.params.id);
 
       logAudit({

@@ -98,6 +98,25 @@ function initSchema() {
         insertBotUser.run(String(s.telegram_user_id), s.first_name, s.last_name, s.phone, s.id, s.updated_at || new Date().toISOString(), s.updated_at || new Date().toISOString());
       }
     } catch (e) {}
+
+    // Avtomatik sinxronizatsiya: talabalarning tutor_id sini tutor_group bo'yicha to'g'rilash
+    try {
+      db.exec(`
+        UPDATE student
+        SET tutor_id = (SELECT tg.tutor_id FROM tutor_group tg WHERE tg.group_code = student.group_code LIMIT 1)
+        WHERE group_code IN (SELECT group_code FROM tutor_group);
+
+        UPDATE student
+        SET tutor_id = NULL
+        WHERE tutor_id IS NOT NULL 
+          AND (
+            group_code IS NULL
+            OR group_code NOT IN (
+              SELECT tg.group_code FROM tutor_group tg WHERE tg.tutor_id = student.tutor_id
+            )
+          );
+      `);
+    } catch (e) {}
   }
 
 module.exports = {
