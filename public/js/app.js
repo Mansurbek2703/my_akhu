@@ -781,8 +781,9 @@ async function renderObserveDashboard(container) {
             <span class="badge" style="background:rgba(16,185,129,0.2); color:#34D399; border:1px solid #10B981; font-weight:700; padding:6px 14px; font-size:12px; border-radius:20px;">
               🟢 Jonli Hisob-kitob
             </span>
-            <button class="btn btn-outline btn-sm" onclick="navigateTo('observe-catalog')" style="color:#FFFFFF; border-color:rgba(255,255,255,0.3); font-size:12px; display:inline-flex; align-items:center; gap:6px;">
-              ${icon('book', 13)} Mezonlar Nizomi
+            <button class="btn btn-sm" onclick="navigateTo('observe-catalog')" style="background:#FFFFFF; color:#0F172A; border:1px solid #E2E8F0; font-size:12px; font-weight:700; padding:6px 16px; border-radius:20px; display:inline-flex; align-items:center; gap:8px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:all 0.15s ease;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='#FFFFFF'">
+              <span style="color:#2563EB; display:inline-flex;">${icon('book', 14)}</span>
+              <span style="color:#0F172A;">Mezonlar Nizomi</span>
             </button>
           </div>
         </div>
@@ -1041,10 +1042,10 @@ async function renderObserveRating(container) {
             </div>
             <!-- LEVEL TOGGLE -->
             <div style="display:flex; gap:6px; background:rgba(255,255,255,0.08); padding:4px; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
-              <button class="btn btn-sm ${currentLevel === 'bak' ? 'btn-primary' : 'btn-outline'}" id="btn-toggle-bak" style="padding:6px 14px; font-size:12px; font-weight:700;">
+              <button class="btn btn-sm" id="btn-toggle-bak" style="padding:6px 16px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'bak' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
                 Bakalavriyat
               </button>
-              <button class="btn btn-sm ${currentLevel === 'mag' ? 'btn-primary' : 'btn-outline'}" id="btn-toggle-mag" style="padding:6px 14px; font-size:12px; font-weight:700;">
+              <button class="btn btn-sm" id="btn-toggle-mag" style="padding:6px 16px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'mag' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
                 Magistratura
               </button>
             </div>
