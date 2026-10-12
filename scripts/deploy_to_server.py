@@ -32,7 +32,7 @@ for (const x of fmc) {
   }
 }
 
-db.prepare("UPDATE student SET level = 'bak' WHERE level IS NULL OR level = ''").run();
+db.prepare('UPDATE student SET level = ? WHERE level IS NULL OR level = ?').run('bak', '');
 const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;
 console.log('SERVER BAZASIDAGI TALABALAR SONI:', count);
 console.log('TALABALAR BOSQICHLARI:', db.prepare('SELECT level, count(*) as count FROM student GROUP BY level').all());
