@@ -674,8 +674,10 @@ async function renderObserveDashboard(container) {
     const data = await apiFetch('/api/observe/dashboard');
     const m = data.metrics || {};
     const ws = data.weekly_stars || {};
+    const topOverall = data.top_overall || [];
     const topBak = data.top_bak || [];
     const topMag = data.top_mag || [];
+    const topHall = (topOverall.length > 0) ? topOverall : (topBak.length > 0 ? topBak : topMag);
     const topGroups = data.top_groups || [];
     const categories = data.categories || [];
 
@@ -702,40 +704,49 @@ async function renderObserveDashboard(container) {
       const p3 = list[2];
       const rest = list.slice(3, 10);
 
+      function renderPodiumMini(p, rank) {
+        if (!p) {
+          return `
+            <div class="podium-card rank-${rank}" style="opacity:0.5;">
+              <div class="podium-medal">${rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉')}</div>
+              <div class="podium-name">—</div>
+              <div class="podium-score">0 <span>ball</span></div>
+            </div>
+          `;
+        }
+        const initials = `${(p.first_name || '').charAt(0)}${(p.last_name || '').charAt(0)}`.toUpperCase() || 'ST';
+        const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉');
+        const levelText = p.level === 'mag' ? 'Magistr' : 'Bakalavr';
+
+        return `
+          <div class="podium-card rank-${rank}">
+            <div class="podium-photo-box">
+              ${p.photo_url ? `
+                <img src="${p.photo_url}" alt="${p.first_name}" class="podium-photo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="podium-photo-placeholder" style="display:none;">${initials}</div>
+              ` : `
+                <div class="podium-photo-placeholder">${initials}</div>
+              `}
+              <div class="podium-badge-medal">${medal}</div>
+            </div>
+            <div class="podium-name" ${rank === 1 ? 'style="font-size:17px;"' : ''} title="${p.first_name} ${p.last_name}">${p.first_name} ${p.last_name}</div>
+            <div style="display:flex; justify-content:center; gap:4px; margin:4px 0 6px;">
+              <span class="podium-group" ${rank === 1 ? 'style="background:#FEF3C7; color:#92400E; font-weight:700;"' : ''}>${p.group_code || '—'}</span>
+              <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10.5px; padding:2px 6px; border-radius:8px;">${levelText}</span>
+            </div>
+            <div class="podium-score" ${rank === 1 ? 'style="font-size:22px; color:#D97706;"' : ''}>${p.season || p.total || 0} <span>ball</span></div>
+            <div style="font-size:11px; font-weight:700; color:${rank === 1 ? '#B45309' : (rank === 2 ? '#64748B' : '#9A3412')}; margin-top:4px;">
+              ${rank === 1 ? '🏆 1-o\'rin (Oltin)' : (rank === 2 ? '2-o\'rin (Kumush)' : '3-o\'rin (Bronza)')}
+            </div>
+          </div>
+        `;
+      }
+
       return `
         <div class="observe-podium-grid">
-          <!-- 2-O'RIN (KUMUSH) -->
-          ${p2 ? `
-            <div class="podium-card rank-2">
-              <div class="podium-medal">🥈</div>
-              <div class="podium-name" title="${p2.first_name} ${p2.last_name}">${p2.first_name} ${p2.last_name}</div>
-              <div class="podium-group">${p2.group_code || '—'}</div>
-              <div class="podium-score">${p2.season} <span>ball</span></div>
-              <div style="font-size:11px; color:#64748B; margin-top:4px;">2-o'rin (Kumush)</div>
-            </div>
-          ` : `<div class="podium-card rank-2" style="opacity:0.5;"><div class="podium-medal">🥈</div><div class="podium-name">—</div><div class="podium-score">0 <span>ball</span></div></div>`}
-
-          <!-- 1-O'RIN (OLTIN) -->
-          ${p1 ? `
-            <div class="podium-card rank-1">
-              <div class="podium-medal">🥇</div>
-              <div class="podium-name" style="font-size:18px;" title="${p1.first_name} ${p1.last_name}">${p1.first_name} ${p1.last_name}</div>
-              <div class="podium-group" style="background:#FEF3C7; color:#92400E; font-weight:700;">${p1.group_code || '—'}</div>
-              <div class="podium-score" style="font-size:24px; color:#D97706;">${p1.season} <span>ball</span></div>
-              <div style="font-size:11px; font-weight:700; color:#B45309; margin-top:6px;">🏆 1-o'rin (Oltin Lider)</div>
-            </div>
-          ` : `<div class="podium-card rank-1" style="opacity:0.5;"><div class="podium-medal">🥇</div><div class="podium-name">—</div><div class="podium-score">0 <span>ball</span></div></div>`}
-
-          <!-- 3-O'RIN (BRONZA) -->
-          ${p3 ? `
-            <div class="podium-card rank-3">
-              <div class="podium-medal">🥉</div>
-              <div class="podium-name" title="${p3.first_name} ${p3.last_name}">${p3.first_name} ${p3.last_name}</div>
-              <div class="podium-group">${p3.group_code || '—'}</div>
-              <div class="podium-score">${p3.season} <span>ball</span></div>
-              <div style="font-size:11px; color:#9A3412; margin-top:4px;">3-o'rin (Bronza)</div>
-            </div>
-          ` : `<div class="podium-card rank-3" style="opacity:0.5;"><div class="podium-medal">🥉</div><div class="podium-name">—</div><div class="podium-score">0 <span>ball</span></div></div>`}
+          ${renderPodiumMini(p2, 2)}
+          ${renderPodiumMini(p1, 1)}
+          ${renderPodiumMini(p3, 3)}
         </div>
 
         <!-- 4-10 O'RINLAR -->
@@ -744,21 +755,32 @@ async function renderObserveDashboard(container) {
             <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
               Top 4 – 10 Yetakchilar Safi
             </div>
-            ${rest.map((s, idx) => `
-              <div class="leader-item-row">
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <span class="leader-rank-badge">#${idx + 4}</span>
-                  <div>
-                    <strong style="color:#0F172A; font-size:14px;">${s.first_name} ${s.last_name}</strong>
-                    <div style="font-size:12px; color:#64748B;">${s.program_code || 'Universitet'}</div>
+            ${rest.map((s, idx) => {
+              const inits = `${(s.first_name || '').charAt(0)}${(s.last_name || '').charAt(0)}`.toUpperCase();
+              return `
+                <div class="leader-item-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; margin-bottom:6px;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="leader-rank-badge" style="font-weight:800; color:#475569; width:26px;">#${idx + 4}</span>
+                    <div style="width:34px; height:34px; border-radius:50%; overflow:hidden; flex-shrink:0;">
+                      ${s.photo_url ? `
+                        <img src="${s.photo_url}" alt="${s.first_name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                        <div style="width:100%; height:100%; background:#EFF6FF; color:#2563EB; display:none; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${inits}</div>
+                      ` : `
+                        <div style="width:100%; height:100%; background:#EFF6FF; color:#2563EB; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${inits}</div>
+                      `}
+                    </div>
+                    <div>
+                      <strong style="color:#0F172A; font-size:13.5px;">${s.first_name} ${s.last_name}</strong>
+                      <div style="font-size:11.5px; color:#64748B;">${s.program_code || 'Universitet'} • ${s.level === 'mag' ? 'Magistr' : 'Bakalavr'}</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="badge badge-light" style="font-size:11.5px; padding:3px 8px; font-weight:700;">${s.group_code || '—'}</span>
+                    <strong style="color:#2563EB; font-size:14px;">${s.season || s.total || 0} ball</strong>
                   </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <span class="badge badge-light" style="font-size:12px; padding:4px 8px;">${s.group_code}</span>
-                  <strong style="color:#2563EB; font-size:15px;">${s.season} ball</strong>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         ` : ''}
       `;
@@ -841,31 +863,55 @@ async function renderObserveDashboard(container) {
         </div>
         <div class="card-body" style="padding: 20px;">
           <div class="grid grid-3">
-            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 12px; border-left: 4px solid #F59E0B; border: 1px solid rgba(245, 158, 11, 0.2);">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-size: 11px; text-transform: uppercase; color: #F59E0B; font-weight: 800; letter-spacing:0.5px;">👑 Hafta Qahramoni</span>
-                <span class="badge" style="background:rgba(245,158,11,0.25); color:#FDE68A; font-size:11px;">+${heroPoints} ball</span>
+            <div class="weekly-star-card" style="border-left: 4px solid #F59E0B; border: 1px solid rgba(245, 158, 11, 0.25);">
+              ${ws.hero?.photo_url ? `
+                <img src="${ws.hero.photo_url}" alt="${heroName}" class="weekly-star-avatar" style="border: 2px solid #F59E0B;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="weekly-star-fallback" style="display:none; background:#FEF3C7; color:#92400E;">${(ws.hero.first_name || 'H').charAt(0)}</div>
+              ` : `
+                <div class="weekly-star-fallback" style="background:#FEF3C7; color:#92400E; border: 2px solid #FDE68A;">${(ws.hero?.first_name || 'H').charAt(0)}</div>
+              `}
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-size: 11px; text-transform: uppercase; color: #F59E0B; font-weight: 800; letter-spacing:0.5px;">👑 Hafta Qahramoni</span>
+                  <span class="badge" style="background:rgba(245,158,11,0.25); color:#FDE68A; font-size:11px;">+${heroPoints} ball</span>
+                </div>
+                <h4 style="font-size: 16px; margin: 0 0 2px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${heroName}">${heroName}</h4>
+                <p style="font-size: 12px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${heroGroup}</strong></p>
               </div>
-              <h4 style="font-size: 17px; margin: 4px 0 4px; font-weight:700; color:#FFFFFF;">${heroName}</h4>
-              <p style="font-size: 13px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${heroGroup}</strong></p>
             </div>
 
-            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 12px; border-left: 4px solid #EC4899; border: 1px solid rgba(236, 72, 153, 0.2);">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-size: 11px; text-transform: uppercase; color: #EC4899; font-weight: 800; letter-spacing:0.5px;">🌸 Eng Faol Qiz</span>
-                <span class="badge" style="background:rgba(236,72,153,0.25); color:#FBCFE8; font-size:11px;">+${girlPoints} ball</span>
+            <div class="weekly-star-card" style="border-left: 4px solid #EC4899; border: 1px solid rgba(236, 72, 153, 0.25);">
+              ${ws.girl?.photo_url ? `
+                <img src="${ws.girl.photo_url}" alt="${girlName}" class="weekly-star-avatar" style="border: 2px solid #EC4899;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="weekly-star-fallback" style="display:none; background:#FCE7F3; color:#BE185D;">${(ws.girl.first_name || 'Q').charAt(0)}</div>
+              ` : `
+                <div class="weekly-star-fallback" style="background:#FCE7F3; color:#BE185D; border: 2px solid #FBCFE8;">${(ws.girl?.first_name || 'Q').charAt(0)}</div>
+              `}
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-size: 11px; text-transform: uppercase; color: #EC4899; font-weight: 800; letter-spacing:0.5px;">🌸 Eng Faol Qiz</span>
+                  <span class="badge" style="background:rgba(236,72,153,0.25); color:#FBCFE8; font-size:11px;">+${girlPoints} ball</span>
+                </div>
+                <h4 style="font-size: 16px; margin: 0 0 2px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${girlName}">${girlName}</h4>
+                <p style="font-size: 12px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${girlGroup}</strong></p>
               </div>
-              <h4 style="font-size: 17px; margin: 4px 0 4px; font-weight:700; color:#FFFFFF;">${girlName}</h4>
-              <p style="font-size: 13px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${girlGroup}</strong></p>
             </div>
 
-            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 12px; border-left: 4px solid #3B82F6; border: 1px solid rgba(59, 130, 246, 0.2);">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-size: 11px; text-transform: uppercase; color: #3B82F6; font-weight: 800; letter-spacing:0.5px;">⚡ Eng Faol Yigit</span>
-                <span class="badge" style="background:rgba(59,130,246,0.25); color:#BFDBFE; font-size:11px;">+${boyPoints} ball</span>
+            <div class="weekly-star-card" style="border-left: 4px solid #3B82F6; border: 1px solid rgba(59, 130, 246, 0.25);">
+              ${ws.boy?.photo_url ? `
+                <img src="${ws.boy.photo_url}" alt="${boyName}" class="weekly-star-avatar" style="border: 2px solid #3B82F6;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="weekly-star-fallback" style="display:none; background:#EFF6FF; color:#1D4ED8;">${(ws.boy.first_name || 'Y').charAt(0)}</div>
+              ` : `
+                <div class="weekly-star-fallback" style="background:#EFF6FF; color:#1D4ED8; border: 2px solid #BFDBFE;">${(ws.boy?.first_name || 'Y').charAt(0)}</div>
+              `}
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-size: 11px; text-transform: uppercase; color: #3B82F6; font-weight: 800; letter-spacing:0.5px;">⚡ Eng Faol Yigit</span>
+                  <span class="badge" style="background:rgba(59,130,246,0.25); color:#BFDBFE; font-size:11px;">+${boyPoints} ball</span>
+                </div>
+                <h4 style="font-size: 16px; margin: 0 0 2px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${boyName}">${boyName}</h4>
+                <p style="font-size: 12px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${boyGroup}</strong></p>
               </div>
-              <h4 style="font-size: 17px; margin: 4px 0 4px; font-weight:700; color:#FFFFFF;">${boyName}</h4>
-              <p style="font-size: 13px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${boyGroup}</strong></p>
             </div>
           </div>
         </div>
@@ -880,12 +926,12 @@ async function renderObserveDashboard(container) {
               <h3 style="display:flex; align-items:center; gap:8px;">
                 <span style="color:#D97706;">${icon('trophy', 16)}</span> Top 10 Yetakchilar Faxriy Doskasi
               </h3>
-              <span style="font-size:12px; color:#64748B;">Bakalavriyat bosqichi bo'yicha eng yuqori natijalar</span>
+              <span style="font-size:12px; color:#64748B;">Universitet miqyosida eng yuqori natijalar</span>
             </div>
             <button class="btn btn-outline btn-sm" onclick="navigateTo('observe-rating')">Batafsil Reyting →</button>
           </div>
           <div class="card-body">
-            ${buildPodiumHtml(topBak)}
+            ${buildPodiumHtml(topHall)}
             <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed #E2E8F0; font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px;">
               🛡️ Ochiq monitoring faqat eng yuqori natija ko'rsatgan Top 10 yetakchilar shaxsiy e'tirofini aks ettiradi.
             </div>
@@ -985,7 +1031,7 @@ async function renderObserveDashboard(container) {
 // SAHIFA: YETAKCHILAR FAXRIY DOSKASI (OCHIQ REYTING)
 // -------------------------------------------------------------
 async function renderObserveRating(container) {
-  let currentLevel = 'bak';
+  let currentLevel = 'all'; // Default: Barchasi (Universitet umumiy yetakchilari)
 
   async function loadData() {
     container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Yetakchilar ko\'rsatkichlari yuklanmoqda...</p></div>';
@@ -997,43 +1043,62 @@ async function renderObserveRating(container) {
 
       function buildPodium(items) {
         if (!items || items.length === 0) {
-          return '<div class="p-4 text-center text-muted">Joriy bosqich bo\'yicha reyting hisoblanmoqda...</div>';
+          return '<div class="p-4 text-center text-muted" style="background:#F8FAFC; border-radius:12px; margin-bottom:24px;">Joriy bosqich bo\'yicha reyting hisoblanmoqda...</div>';
         }
         const p1 = items[0];
         const p2 = items[1];
         const p3 = items[2];
 
+        function renderCard(p, rank) {
+          if (!p) {
+            return `
+              <div class="podium-card rank-${rank}" style="opacity:0.5;">
+                <div class="podium-medal">${rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉')}</div>
+                <div class="podium-name">—</div>
+                <div class="podium-score">0 <span>ball</span></div>
+                <div style="font-size:11px; color:#64748B; margin-top:4px;">${rank}-o'rin</div>
+              </div>
+            `;
+          }
+
+          const initials = `${(p.first_name || '').charAt(0)}${(p.last_name || '').charAt(0)}`.toUpperCase() || 'ST';
+          const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉');
+          const rankTitle = rank === 1 ? '🏆 1-o\'rin (Oltin Lider)' : (rank === 2 ? '🥈 2-o\'rin (Kumush)' : '🥉 3-o\'rin (Bronza)');
+          const levelText = p.level === 'mag' ? 'Magistratura' : 'Bakalavriyat';
+
+          return `
+            <div class="podium-card rank-${rank}">
+              <div class="podium-photo-box">
+                ${p.photo_url ? `
+                  <img src="${p.photo_url}" alt="${p.first_name}" class="podium-photo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                  <div class="podium-photo-placeholder" style="display:none;">${initials}</div>
+                ` : `
+                  <div class="podium-photo-placeholder">${initials}</div>
+                `}
+                <div class="podium-badge-medal">${medal}</div>
+              </div>
+              <div class="podium-name" ${rank === 1 ? 'style="font-size:18px;"' : ''} title="${p.first_name} ${p.last_name}">
+                ${p.first_name} ${p.last_name}
+              </div>
+              <div style="display:flex; justify-content:center; gap:6px; margin:4px 0 8px; flex-wrap:wrap;">
+                <span class="podium-group" ${rank === 1 ? 'style="background:#FEF3C7; color:#92400E; font-weight:700;"' : ''}>${p.group_code || '—'}</span>
+                <span class="badge" style="background:#F1F5F9; color:#475569; font-size:11px; padding:3px 8px; border-radius:10px;">${levelText}</span>
+              </div>
+              <div class="podium-score" ${rank === 1 ? 'style="font-size:24px; color:#D97706;"' : ''}>
+                ${p.season || p.total || 0} <span>ball</span>
+              </div>
+              <div style="font-size:11.5px; font-weight:700; margin-top:6px; color:${rank === 1 ? '#B45309' : (rank === 2 ? '#475569' : '#9A3412')};">
+                ${rankTitle}
+              </div>
+            </div>
+          `;
+        }
+
         return `
           <div class="observe-podium-grid">
-            ${p2 ? `
-              <div class="podium-card rank-2">
-                <div class="podium-medal">🥈</div>
-                <div class="podium-name" title="${p2.first_name} ${p2.last_name}">${p2.first_name} ${p2.last_name}</div>
-                <div class="podium-group">${p2.group_code || '—'}</div>
-                <div class="podium-score">${p2.season} <span>ball</span></div>
-                <div style="font-size:11px; color:#64748B; margin-top:4px;">2-o'rin (Kumush)</div>
-              </div>
-            ` : ''}
-
-            ${p1 ? `
-              <div class="podium-card rank-1">
-                <div class="podium-medal">🥇</div>
-                <div class="podium-name" style="font-size:18px;" title="${p1.first_name} ${p1.last_name}">${p1.first_name} ${p1.last_name}</div>
-                <div class="podium-group" style="background:#FEF3C7; color:#92400E; font-weight:700;">${p1.group_code || '—'}</div>
-                <div class="podium-score" style="font-size:24px; color:#D97706;">${p1.season} <span>ball</span></div>
-                <div style="font-size:11px; font-weight:700; color:#B45309; margin-top:6px;">🏆 1-o'rin (Oltin Lider)</div>
-              </div>
-            ` : ''}
-
-            ${p3 ? `
-              <div class="podium-card rank-3">
-                <div class="podium-medal">🥉</div>
-                <div class="podium-name" title="${p3.first_name} ${p3.last_name}">${p3.first_name} ${p3.last_name}</div>
-                <div class="podium-group">${p3.group_code || '—'}</div>
-                <div class="podium-score">${p3.season} <span>ball</span></div>
-                <div style="font-size:11px; color:#9A3412; margin-top:4px;">3-o'rin (Bronza)</div>
-              </div>
-            ` : ''}
+            ${renderCard(p2, 2)}
+            ${renderCard(p1, 1)}
+            ${renderCard(p3, 3)}
           </div>
         `;
       }
@@ -1048,15 +1113,18 @@ async function renderObserveRating(container) {
               </div>
               <h2 style="font-size:20px; font-weight:800; margin:0 0 4px;">Top 10 Yetakchilar va Guruhlar Standigi</h2>
               <p style="margin:0; font-size:13px; color:#94A3B8;">
-                Eng yuqori shaxsiy faollik ko'rsatkichiga erishgan 10 nafar talaba va akademik guruhlar ligasi.
+                Eng yuqori shaxsiy faollik ko'rsatkichiga erishgan yetakchi talabalar va akademik guruhlar ligasi.
               </p>
             </div>
             <!-- LEVEL TOGGLE -->
             <div style="display:flex; gap:6px; background:rgba(255,255,255,0.08); padding:4px; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
-              <button class="btn btn-sm" id="btn-toggle-bak" style="padding:6px 16px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'bak' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
+              <button class="btn btn-sm" id="btn-toggle-all" style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'all' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
+                🏆 Barchasi
+              </button>
+              <button class="btn btn-sm" id="btn-toggle-bak" style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'bak' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
                 Bakalavriyat
               </button>
-              <button class="btn btn-sm" id="btn-toggle-mag" style="padding:6px 16px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'mag' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
+              <button class="btn btn-sm" id="btn-toggle-mag" style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all 0.15s ease; ${currentLevel === 'mag' ? 'background:#2563EB; color:#FFFFFF;' : 'background:rgba(255,255,255,0.1); color:#E2E8F0;'}">
                 Magistratura
               </button>
             </div>
@@ -1071,11 +1139,11 @@ async function renderObserveRating(container) {
           <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background:#F8FAFC; padding: 16px 20px; border-bottom: 1px solid #E2E8F0;">
             <div>
               <h3 style="font-size:15px; margin:0 0 3px; font-weight:700; color:#0F172A; display:flex; align-items:center; gap:8px;">
-                <span>🏆</span> ${currentLevel === 'bak' ? 'Bakalavriyat' : 'Magistratura'} — Top 10 Yetakchilar Safi
+                <span>🏆</span> ${currentLevel === 'all' ? 'Universitet Bo\'yicha (Umumiy)' : (currentLevel === 'bak' ? 'Bakalavriyat' : 'Magistratura')} — Top 10 Yetakchilar Safi
               </h3>
               <span style="font-size:12px; color:#64748B;">Mavsumiy jamg'arilgan eng yuqori e'tirof ballari</span>
             </div>
-            <span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:4px 10px; border-radius:12px;">10 nafar yetakchi</span>
+            <span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:4px 10px; border-radius:12px;">Top 10 Lider</span>
           </div>
           <div class="card-body p-0">
             ${list.length > 0 ? `
@@ -1096,6 +1164,7 @@ async function renderObserveRating(container) {
                     ${list.map((s, idx) => {
                       const initials = `${(s.first_name || '').charAt(0)}${(s.last_name || '').charAt(0)}`.toUpperCase();
                       const isTop3 = idx < 3;
+                      const levelTitle = s.level === 'mag' ? 'Magistratura' : 'Bakalavriyat';
                       return `
                         <tr style="${isTop3 ? 'background:#FCFDFE;' : ''}">
                           <td style="text-align:center;">
@@ -1105,8 +1174,13 @@ async function renderObserveRating(container) {
                           </td>
                           <td>
                             <div style="display:flex; align-items:center; gap:12px;">
-                              <div style="width:34px; height:34px; border-radius:50%; background:${idx === 0 ? '#FEF3C7' : (idx === 1 ? '#F1F5F9' : (idx === 2 ? '#FFEDD5' : '#EFF6FF'))}; color:${idx === 0 ? '#92400E' : (idx === 1 ? '#334155' : (idx === 2 ? '#9A3412' : '#2563EB'))}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; border:1.5px solid ${idx === 0 ? '#FDE68A' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#FED7AA' : '#DBEAFE'))}; flex-shrink:0;">
-                                ${initials || 'ST'}
+                              <div style="width:38px; height:38px; border-radius:50%; overflow:hidden; flex-shrink:0;">
+                                ${s.photo_url ? `
+                                  <img src="${s.photo_url}" alt="${s.first_name}" style="width:100%; height:100%; object-fit:cover; border:2px solid ${isTop3 ? (idx===0?'#F59E0B':(idx===1?'#94A3B8':'#D97706')) : '#E2E8F0'}; border-radius:50%;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                  <div style="width:100%; height:100%; border-radius:50%; background:#EFF6FF; color:#2563EB; display:none; align-items:center; justify-content:center; font-weight:700; font-size:13px; border:1.5px solid #DBEAFE;">${initials || 'ST'}</div>
+                                ` : `
+                                  <div style="width:100%; height:100%; border-radius:50%; background:${idx === 0 ? '#FEF3C7' : (idx === 1 ? '#F1F5F9' : (idx === 2 ? '#FFEDD5' : '#EFF6FF'))}; color:${idx === 0 ? '#92400E' : (idx === 1 ? '#334155' : (idx === 2 ? '#9A3412' : '#2563EB'))}; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; border:1.5px solid ${idx === 0 ? '#FDE68A' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#FED7AA' : '#DBEAFE'))};">${initials || 'ST'}</div>
+                                `}
                               </div>
                               <div>
                                 <div style="font-weight:700; color:#0F172A; font-size:13.5px; letter-spacing:-0.2px;">
@@ -1123,8 +1197,9 @@ async function renderObserveRating(container) {
                           </td>
                           <td>
                             <div style="font-size:13px; color:#1E293B; font-weight:600;">${s.program_code || 'IT'}</div>
-                            <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
+                            <div style="font-size:11.5px; color:#64748B; margin-top:2px; display:flex; gap:4px; align-items:center;">
                               <span class="badge badge-course" style="font-size:11px; padding:2px 7px;">${s.course || 1}-kurs</span>
+                              <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10.5px; padding:2px 6px;">${levelTitle}</span>
                             </div>
                           </td>
                           <td style="text-align:right;">
@@ -1190,7 +1265,7 @@ async function renderObserveRating(container) {
                             </span>
                           </td>
                           <td style="text-align:right;">
-                            <span class="score-pill-blue">${g.avg_score} ball</span>
+                            <span class="score-pill-blue" style="font-size:13px; font-weight:800;">${g.avg_score || 0} ball</span>
                           </td>
                           <td style="text-align:right;">
                             <strong style="color:#0F172A; font-size:13.5px;">${g.total_score || 0} ball</strong>
@@ -1222,6 +1297,10 @@ async function renderObserveRating(container) {
       container.innerHTML = html;
 
       // Event listenerlar
+      document.getElementById('btn-toggle-all')?.addEventListener('click', () => {
+        currentLevel = 'all';
+        loadData();
+      });
       document.getElementById('btn-toggle-bak')?.addEventListener('click', () => {
         currentLevel = 'bak';
         loadData();

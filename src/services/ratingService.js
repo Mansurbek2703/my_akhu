@@ -181,7 +181,7 @@ function getRatingList({ period = 'season', level = null, course = null, program
   let whereClauses = ["st.status = 'active'"];
   let params = [];
 
-  if (level) {
+  if (level && level !== 'all' && level !== 'barchasi') {
     whereClauses.push('st.level = ?');
     params.push(level);
   }
@@ -210,12 +210,12 @@ function getRatingList({ period = 'season', level = null, course = null, program
 
   const sql = `
     SELECT 
-      st.id, st.first_name, st.last_name, st.group_code, st.program_code, st.level, st.course, st.gender,
+      st.id, st.external_id, st.first_name, st.last_name, st.photo_url, st.group_code, st.program_code, st.level, st.course, st.gender,
       sc.total, sc.season, sc.week_cur, sc.week_prev, sc.rank_cohort, sc.by_category, sc.events_count, sc.is_passive
     FROM student st
     JOIN student_score sc ON st.id = sc.student_id
     ${whereStr}
-    ORDER BY ${sortColumn} DESC, sc.season DESC
+    ORDER BY ${sortColumn} DESC, sc.season DESC, sc.total DESC, st.last_name ASC
     LIMIT ? OFFSET ?
   `;
 
@@ -263,13 +263,16 @@ function calculateWeeklyStars() {
   const { prevWeekStartIso } = getWeekBounds();
   recalculateStudentScores();
 
-  // Barcha talabalar o'tgan hafta ballari (week_prev) bo'yicha saralangan
+  // Barcha talabalar ballari (joriy hafta, o'tgan hafta va mavsum) bo'yicha saralangan
   const candidateStudents = db.prepare(`
-    SELECT st.*, sc.week_prev, sc.season, sc.by_category
+    SELECT st.*, sc.week_prev, sc.week_cur, sc.season, sc.total, sc.by_category
     FROM student st
     JOIN student_score sc ON st.id = sc.student_id
     WHERE st.status = 'active'
-    ORDER BY sc.week_prev DESC, sc.season DESC
+    ORDER BY 
+      (CASE WHEN sc.week_cur > 0 THEN sc.week_cur ELSE (CASE WHEN sc.week_prev > 0 THEN sc.week_prev ELSE sc.season END) END) DESC,
+      sc.season DESC,
+      sc.total DESC
   `).all();
 
   const usedStudentIds = new Set();
@@ -277,12 +280,15 @@ function calculateWeeklyStars() {
     for (const c of candidateStudents) {
       if (!usedStudentIds.has(c.id) && filterFn(c)) {
         usedStudentIds.add(c.id);
+        const starScore = c.week_cur > 0 ? c.week_cur : (c.week_prev > 0 ? c.week_prev : c.season);
         return {
           id: c.id,
           first_name: c.first_name,
           last_name: c.last_name,
+          photo_url: c.photo_url || null,
           group_code: c.group_code,
-          score: c.week_prev,
+          score: starScore,
+          week_points: starScore,
           season: c.season,
           gender: c.gender,
           level: c.level,
@@ -293,28 +299,31 @@ function calculateWeeklyStars() {
     return null;
   };
 
-  // 1. Haftaning talabasi (eng katta week_prev butun universitet)
-  const hero = pickCandidate(() => true);
+  // 1. Haftaning talabasi (eng katta ballga ega bo'lgan talaba)
+  const hero = pickCandidate((c) => (c.week_cur > 0 || c.week_prev > 0 || c.season > 0)) || pickCandidate(() => true);
 
-  // 2. Eng faol qiz bola (jins = f, 1-banddagilar chiqarilgan)
-  const girl = pickCandidate((c) => c.gender === 'f');
+  // 2. Eng faol qiz bola (jins = f)
+  const girl = pickCandidate((c) => c.gender === 'f' && (c.week_cur > 0 || c.week_prev > 0 || c.season > 0)) || pickCandidate((c) => c.gender === 'f');
 
-  // 3. Eng faol o'g'il bola (jins = m, oldingilar chiqarilgan)
-  const boy = pickCandidate((c) => c.gender === 'm');
+  // 3. Eng faol o'g'il bola (jins = m)
+  const boy = pickCandidate((c) => c.gender === 'm' && (c.week_cur > 0 || c.week_prev > 0 || c.season > 0)) || pickCandidate((c) => c.gender === 'm');
 
   // 4. Kurslar bo'yicha:
   const c1 = pickCandidate((c) => c.level === 'bak' && c.course === 1);
   const c2 = pickCandidate((c) => c.level === 'bak' && c.course === 2);
   const cMag = pickCandidate((c) => c.level === 'mag');
 
-  // 5. Haftaning guruhi: o'rtacha week_prev eng katta guruh
+  // 5. Haftaning guruhi: o'rtacha balli eng yuqori guruh
   const groupStats = db.prepare(`
-    SELECT st.group_code, AVG(sc.week_prev) as avg_score, SUM(sc.week_prev) as sum_score, COUNT(st.id) as cnt
+    SELECT st.group_code, 
+           COALESCE(ROUND(AVG(CASE WHEN sc.week_cur > 0 THEN sc.week_cur ELSE sc.season END), 1), 0) as avg_score, 
+           COALESCE(SUM(CASE WHEN sc.week_cur > 0 THEN sc.week_cur ELSE sc.season END), 0) as sum_score, 
+           COUNT(st.id) as cnt
     FROM student st
     JOIN student_score sc ON st.id = sc.student_id
     WHERE st.status = 'active'
     GROUP BY st.group_code
-    ORDER BY avg_score DESC
+    ORDER BY avg_score DESC, sum_score DESC
     LIMIT 1
   `).get();
 
@@ -347,15 +356,15 @@ function calculateWeeklyStars() {
   const payload = {
     week_start: prevWeekStartIso,
     calculated_at: new Date().toISOString(),
-    hero: hero || { first_name: 'Diyorbek', last_name: 'Ismoilov', group_code: '210-21', score: 32 },
-    girl: girl || { first_name: 'Malika', last_name: 'Nazarova', group_code: '210-21', score: 26 },
-    boy: boy || { first_name: 'Jahongir', last_name: 'Mirzayev', group_code: '211-21', score: 25 },
+    hero: hero || (candidateStudents[0] ? { ...candidateStudents[0], score: candidateStudents[0].season, week_points: candidateStudents[0].season } : null),
+    girl: girl || (candidateStudents.find(c => c.gender === 'f') ? { ...candidateStudents.find(c => c.gender === 'f'), score: 0, week_points: 0 } : null),
+    boy: boy || (candidateStudents.find(c => c.gender === 'm') ? { ...candidateStudents.find(c => c.gender === 'm'), score: 0, week_points: 0 } : null),
     courses: {
-      c1: c1 || { first_name: 'Bekzod', last_name: 'Rahimov', group_code: '211-22', score: 20 },
-      c2: c2 || { first_name: 'Otabek', last_name: 'Xalilov', group_code: '210-22', score: 22 },
-      cMag: cMag || { first_name: 'Umidbek', last_name: 'Sultonov', group_code: 'M-101', score: 40 }
+      c1: c1 || (candidateStudents.find(c => c.course === 1) ? { ...candidateStudents.find(c => c.course === 1), score: 0 } : null),
+      c2: c2 || (candidateStudents.find(c => c.course === 2) ? { ...candidateStudents.find(c => c.course === 2), score: 0 } : null),
+      cMag: cMag || (candidateStudents.find(c => c.level === 'mag') ? { ...candidateStudents.find(c => c.level === 'mag'), score: 0 } : null)
     },
-    top_group: groupStats || { group_code: '210-21', avg_score: 18.5, sum_score: 55, cnt: 3 },
+    top_group: groupStats || { group_code: '—', avg_score: 0, sum_score: 0, cnt: 0 },
     top_club: { name: 'IT & Robotics Club', organizer: 'dep_yb', events_count: 3 },
     categories: categoryStars
   };

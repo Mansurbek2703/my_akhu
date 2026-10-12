@@ -26,7 +26,10 @@ router.get('/dashboard', (req, res) => {
 
   // 2. Haftaning yulduzlari
   const weeklyStarsRow = db.prepare(`SELECT payload FROM weekly_stars ORDER BY week_start DESC LIMIT 1`).get();
-  const rawStars = weeklyStarsRow ? JSON.parse(weeklyStarsRow.payload) : calculateWeeklyStars();
+  let rawStars = weeklyStarsRow ? JSON.parse(weeklyStarsRow.payload) : null;
+  if (!rawStars || ((!rawStars.hero?.score && !rawStars.hero?.week_points) && totalSeasonPoints > 0)) {
+    rawStars = calculateWeeklyStars();
+  }
 
   const formatStar = (s) => {
     if (!s) return null;
@@ -34,6 +37,7 @@ router.get('/dashboard', (req, res) => {
     return {
       ...s,
       student_name: name || 'Aniqlanmoqda',
+      photo_url: s.photo_url || null,
       week_points: s.week_points !== undefined ? s.week_points : (s.score !== undefined ? s.score : (s.week_cur || 0)),
       group_code: s.group_code || '—'
     };
@@ -55,9 +59,10 @@ router.get('/dashboard', (req, res) => {
     ORDER BY cc.sort ASC
   `).all();
 
-  // 4. TOP 10 Bakalavriat & Magistratura (Faxriy doska)
+  // 4. TOP 10 Bakalavriat & Magistratura & Barchasi (Faxriy doska)
   const { list: topBak } = getRatingList({ level: 'bak', limit: 10 });
   const { list: topMag } = getRatingList({ level: 'mag', limit: 10 });
+  const { list: topOverall } = getRatingList({ level: null, limit: 10 });
 
   // 5. Guruhlar reytingi (O'rtacha ball va faollik)
   const topGroups = db.prepare(`
@@ -108,6 +113,7 @@ router.get('/dashboard', (req, res) => {
     },
     weekly_stars: weeklyStars,
     categories,
+    top_overall: topOverall,
     top_bak: topBak,
     top_mag: topMag,
     top_groups: topGroups,
@@ -207,12 +213,13 @@ router.get('/students/:id', (req, res) => {
 
 /**
  * GET /api/observe/rating
- * K-03: TOP 50 va kesim o'rtachalari
+ * K-03: TOP 10 va kesim o'rtachalari (Yetakchilar Faxriy Doskasi)
  */
 router.get('/rating', (req, res) => {
-  const { period = 'season', level = 'bak' } = req.query;
+  const { period = 'season', level = 'all' } = req.query;
+  const filterLevel = (!level || level === 'all' || level === 'barchasi') ? null : level;
   // Ochiq monitoring: Faqat Top 10 yetakchilar ko'rsatiladi (barcha talabalar emas)
-  const { list, total_count, avg_season } = getRatingList({ period, level, limit: 10 });
+  const { list, total_count, avg_season } = getRatingList({ period, level: filterLevel, limit: 10 });
 
   // Kesim o'rtachalari (guruhlar bo'yicha)
   const groupAverages = db.prepare(`
@@ -222,11 +229,11 @@ router.get('/rating', (req, res) => {
            COALESCE(SUM(sc.season), 0) as total_score
     FROM student st
     LEFT JOIN student_score sc ON st.id = sc.student_id
-    WHERE (st.level = ? OR ? = '') AND st.status = 'active'
+    WHERE (? IS NULL OR st.level = ?) AND st.status = 'active'
     GROUP BY st.group_code
     ORDER BY avg_score DESC, total_score DESC
     LIMIT 15
-  `).all(level || 'bak', level || 'bak');
+  `).all(filterLevel, filterLevel);
 
   res.json({
     list: (list || []).slice(0, 10),
