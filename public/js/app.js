@@ -432,9 +432,9 @@ function renderModuleSubNav(pageName) {
 
   if (sectionKey === 'observe-dashboard') {
     tabs = [
-      { id: 'observe-dashboard', label: 'Asosiy Ko\'rsatkichlar' },
-      { id: 'observe-rating', label: 'Talabalar Reytingi' },
-      { id: 'observe-catalog', label: 'Ball Katalogi' }
+      { id: 'observe-dashboard', label: 'Asosiy Ko\'rsatkichlar & Tahlil' },
+      { id: 'observe-rating', label: 'Yetakchilar Faxriy Doskasi' },
+      { id: 'observe-catalog', label: 'Ball Nizomi & Mezonlar' }
     ];
   } else if (sectionKey === 'admin-students-manage') {
     tabs = [
@@ -553,8 +553,8 @@ function navigateTo(pageName) {
       renderObserveDashboard(targetContainer);
       break;
     case 'observe-rating':
-      pageTitle.textContent = 'Talabalar Reytingi';
-      pageDesc.textContent = 'Mavsumiy va umumiy o\'rinlar jadvali, filtrlar';
+      pageTitle.textContent = 'Yetakchilar Faxriy Doskasi';
+      pageDesc.textContent = 'Universitet eng faol talabalari va akademik guruhlar reytingi';
       renderObserveRating(targetContainer);
       break;
     case 'observe-students':
@@ -666,21 +666,136 @@ async function loadCatalogData() {
 // -------------------------------------------------------------
 // SAHIFA: KUZATUV DASHBOARDI
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// SAHIFA: KUZATUV DASHBOARDI (OCHIQ MONITORING)
+// -------------------------------------------------------------
 async function renderObserveDashboard(container) {
   try {
     const data = await apiFetch('/api/observe/dashboard');
-    const m = data.metrics;
+    const m = data.metrics || {};
     const ws = data.weekly_stars || {};
+    const topBak = data.top_bak || [];
+    const topMag = data.top_mag || [];
+    const topGroups = data.top_groups || [];
+    const categories = data.categories || [];
+
+    // Haftaning yulduzlari xavfsiz qiymatlari (undefined bo'lishini oldini olish)
+    const heroName = (ws.hero?.student_name || `${ws.hero?.first_name || ''} ${ws.hero?.last_name || ''}`).trim() || 'Aniqlanmoqda';
+    const heroPoints = ws.hero?.week_points ?? ws.hero?.score ?? ws.hero?.week_cur ?? 0;
+    const heroGroup = ws.hero?.group_code || '—';
+
+    const girlName = (ws.girl?.student_name || `${ws.girl?.first_name || ''} ${ws.girl?.last_name || ''}`).trim() || 'Aniqlanmoqda';
+    const girlPoints = ws.girl?.week_points ?? ws.girl?.score ?? ws.girl?.week_cur ?? 0;
+    const girlGroup = ws.girl?.group_code || '—';
+
+    const boyName = (ws.boy?.student_name || `${ws.boy?.first_name || ''} ${ws.boy?.last_name || ''}`).trim() || 'Aniqlanmoqda';
+    const boyPoints = ws.boy?.week_points ?? ws.boy?.score ?? ws.boy?.week_cur ?? 0;
+    const boyGroup = ws.boy?.group_code || '—';
+
+    // Podium HTML generator
+    function buildPodiumHtml(list) {
+      if (!list || list.length === 0) {
+        return `<div class="p-4 text-center text-muted" style="background:#F8FAFC; border-radius:12px;">Hozircha reyting ballari hisoblanmoqda...</div>`;
+      }
+      const p1 = list[0];
+      const p2 = list[1];
+      const p3 = list[2];
+      const rest = list.slice(3, 10);
+
+      return `
+        <div class="observe-podium-grid">
+          <!-- 2-O'RIN (KUMUSH) -->
+          ${p2 ? `
+            <div class="podium-card rank-2">
+              <div class="podium-medal">🥈</div>
+              <div class="podium-name" title="${p2.first_name} ${p2.last_name}">${p2.first_name} ${p2.last_name}</div>
+              <div class="podium-group">${p2.group_code || '—'}</div>
+              <div class="podium-score">${p2.season} <span>ball</span></div>
+              <div style="font-size:11px; color:#64748B; margin-top:4px;">2-o'rin (Kumush)</div>
+            </div>
+          ` : `<div class="podium-card rank-2" style="opacity:0.5;"><div class="podium-medal">🥈</div><div class="podium-name">—</div><div class="podium-score">0 <span>ball</span></div></div>`}
+
+          <!-- 1-O'RIN (OLTIN) -->
+          ${p1 ? `
+            <div class="podium-card rank-1">
+              <div class="podium-medal">🥇</div>
+              <div class="podium-name" style="font-size:18px;" title="${p1.first_name} ${p1.last_name}">${p1.first_name} ${p1.last_name}</div>
+              <div class="podium-group" style="background:#FEF3C7; color:#92400E; font-weight:700;">${p1.group_code || '—'}</div>
+              <div class="podium-score" style="font-size:24px; color:#D97706;">${p1.season} <span>ball</span></div>
+              <div style="font-size:11px; font-weight:700; color:#B45309; margin-top:6px;">🏆 1-o'rin (Oltin Lider)</div>
+            </div>
+          ` : `<div class="podium-card rank-1" style="opacity:0.5;"><div class="podium-medal">🥇</div><div class="podium-name">—</div><div class="podium-score">0 <span>ball</span></div></div>`}
+
+          <!-- 3-O'RIN (BRONZA) -->
+          ${p3 ? `
+            <div class="podium-card rank-3">
+              <div class="podium-medal">🥉</div>
+              <div class="podium-name" title="${p3.first_name} ${p3.last_name}">${p3.first_name} ${p3.last_name}</div>
+              <div class="podium-group">${p3.group_code || '—'}</div>
+              <div class="podium-score">${p3.season} <span>ball</span></div>
+              <div style="font-size:11px; color:#9A3412; margin-top:4px;">3-o'rin (Bronza)</div>
+            </div>
+          ` : `<div class="podium-card rank-3" style="opacity:0.5;"><div class="podium-medal">🥉</div><div class="podium-name">—</div><div class="podium-score">0 <span>ball</span></div></div>`}
+        </div>
+
+        <!-- 4-10 O'RINLAR -->
+        ${rest.length > 0 ? `
+          <div style="margin-top: 14px;">
+            <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
+              Top 4 – 10 Yetakchilar Safi
+            </div>
+            ${rest.map((s, idx) => `
+              <div class="leader-item-row">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span class="leader-rank-badge">#${idx + 4}</span>
+                  <div>
+                    <strong style="color:#0F172A; font-size:14px;">${s.first_name} ${s.last_name}</strong>
+                    <div style="font-size:12px; color:#64748B;">${s.program_code || 'Universitet'}</div>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span class="badge badge-light" style="font-size:12px; padding:4px 8px;">${s.group_code}</span>
+                  <strong style="color:#2563EB; font-size:15px;">${s.season} ball</strong>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      `;
+    }
 
     let html = `
-      <!-- METRIKALAR -->
-      <div class="metrics-grid">
+      <!-- INSTITUTIONAL HERO BANNER -->
+      <div class="observe-hero-banner">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,0.12); padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-bottom:8px; border:1px solid rgba(255,255,255,0.15);">
+              🏛️ AL-XORAZMIY UNIVERSITETI • OCHIQ MONITORING PORTALI
+            </div>
+            <h2 style="font-size:22px; font-weight:800; margin:0 0 6px; letter-spacing:-0.5px;">Talabalar Faolligi va Yutuqlari Tahlili</h2>
+            <p style="margin:0; font-size:13px; color:#94A3B8; max-width:680px;">
+              Universitet talabalarining darsdan tashqari faoliyati, ilmiy-innovatsion tashabbuslari, sport va jamoat ishlaridagi yutuqlari bo'yicha rasmiy ochiq statistikasi.
+            </p>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span class="badge" style="background:rgba(16,185,129,0.2); color:#34D399; border:1px solid #10B981; font-weight:700; padding:6px 14px; font-size:12px; border-radius:20px;">
+              🟢 Jonli Hisob-kitob
+            </span>
+            <button class="btn btn-outline btn-sm" onclick="navigateTo('observe-catalog')" style="color:#FFFFFF; border-color:rgba(255,255,255,0.3); font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+              ${icon('book', 13)} Mezonlar Nizomi
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASOSIY KPI KO'RSATKICHLAR -->
+      <div class="metrics-grid mb-4">
         <div class="stat-card">
           <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Jami Talabalar</span>
-            <h3 class="stat-val">${m.total_students} nafar</h3>
-            <span class="stat-sub">Faollik: <strong>${m.active_ratio}%</strong> (30+ ball)</span>
+            <h3 class="stat-val">${m.total_students || 0} nafar</h3>
+            <span class="stat-sub">Faollik qamrovi: <strong>${m.active_ratio || 0}%</strong></span>
           </div>
         </div>
 
@@ -688,134 +803,164 @@ async function renderObserveDashboard(container) {
           <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">${icon('zap', 20)}</div>
           <div class="stat-data">
             <span class="stat-label">Mavsum Ballari</span>
-            <h3 class="stat-val">${m.total_season_points.toLocaleString()}</h3>
-            <span class="stat-sub">Tasdiqlanish: <strong>${m.approved_ratio}%</strong></span>
+            <h3 class="stat-val">${(m.total_season_points || 0).toLocaleString()} ball</h3>
+            <span class="stat-sub">Tasdiqlanish: <strong>${m.approved_ratio || 0}%</strong></span>
           </div>
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEE2E2; color:#DC2626;">${icon('clock', 20)}</div>
+          <div class="stat-icon" style="background:#F0FDF4; color:#16A34A;">${icon('trophy', 20)}</div>
           <div class="stat-data">
-            <span class="stat-label">Kutilayotgan Tasdiq</span>
-            <h3 class="stat-val">${m.pending_approvals} ta</h3>
-            <span class="stat-sub text-danger">Kechikkan: <strong>${data.attention_required.late_approvals_count} ta</strong></span>
+            <span class="stat-label">Yetakchi Guruh</span>
+            <h3 class="stat-val">${m.top_group || '—'}</h3>
+            <span class="stat-sub">Akademik yetakchilik</span>
           </div>
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('target', 20)}</div>
+          <div class="stat-icon" style="background:#F5F3FF; color:#7C3AED;">${icon('target', 20)}</div>
           <div class="stat-data">
-            <span class="stat-label">Bugungi Tadbirlar</span>
-            <h3 class="stat-val">${m.today_events} ta</h3>
+            <span class="stat-label">Tadbirlar & Loyihalar</span>
+            <h3 class="stat-val">${m.today_events || 0} ta o'tkazildi</h3>
             <span class="stat-sub">QR check-in faol</span>
           </div>
         </div>
       </div>
 
-      <!-- HAFTANING YULDUZLARI -->
-      <div class="card mb-4" style="background: linear-gradient(135deg, #1E293B, #0F172A); color: white; border: none;">
-        <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+      <!-- HAFTANING YULDUZLARI (WEEKLY STARS) -->
+      <div class="card mb-4" style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color: white; border: 1px solid rgba(251, 191, 36, 0.25); box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+        <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding: 16px 20px;">
           <div>
-            <h3 style="color: #FBBF24; display: flex; align-items: center; gap: 8px;">
-              <span style="color:#D97706;">${icon('star', 16)}</span> HAFTANING YULDUZLARI
+            <h3 style="color: #FBBF24; display: flex; align-items: center; gap: 8px; font-size:16px;">
+              <span style="color:#D97706;">${icon('star', 16)}</span> HAFTANING ENG FAOL YULDUZLARI
             </h3>
-            <span style="font-size: 12px; color: #94A3B8;">Avtomatlashgan haftalik reyting g'oliblari</span>
+            <span style="font-size: 12px; color: #94A3B8;">Avtomatlashgan haftalik ballar bo'yicha e'tirof etilgan liderlar</span>
           </div>
-          <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid #F59E0B;">Joriy Hafta</span>
+          <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid #F59E0B; font-weight:700;">Joriy Hafta</span>
+        </div>
+        <div class="card-body" style="padding: 20px;">
+          <div class="grid grid-3">
+            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 12px; border-left: 4px solid #F59E0B; border: 1px solid rgba(245, 158, 11, 0.2);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size: 11px; text-transform: uppercase; color: #F59E0B; font-weight: 800; letter-spacing:0.5px;">👑 Hafta Qahramoni</span>
+                <span class="badge" style="background:rgba(245,158,11,0.25); color:#FDE68A; font-size:11px;">+${heroPoints} ball</span>
+              </div>
+              <h4 style="font-size: 17px; margin: 4px 0 4px; font-weight:700; color:#FFFFFF;">${heroName}</h4>
+              <p style="font-size: 13px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${heroGroup}</strong></p>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 12px; border-left: 4px solid #EC4899; border: 1px solid rgba(236, 72, 153, 0.2);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size: 11px; text-transform: uppercase; color: #EC4899; font-weight: 800; letter-spacing:0.5px;">🌸 Eng Faol Qiz</span>
+                <span class="badge" style="background:rgba(236,72,153,0.25); color:#FBCFE8; font-size:11px;">+${girlPoints} ball</span>
+              </div>
+              <h4 style="font-size: 17px; margin: 4px 0 4px; font-weight:700; color:#FFFFFF;">${girlName}</h4>
+              <p style="font-size: 13px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${girlGroup}</strong></p>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 12px; border-left: 4px solid #3B82F6; border: 1px solid rgba(59, 130, 246, 0.2);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size: 11px; text-transform: uppercase; color: #3B82F6; font-weight: 800; letter-spacing:0.5px;">⚡ Eng Faol Yigit</span>
+                <span class="badge" style="background:rgba(59,130,246,0.25); color:#BFDBFE; font-size:11px;">+${boyPoints} ball</span>
+              </div>
+              <h4 style="font-size: 17px; margin: 4px 0 4px; font-weight:700; color:#FFFFFF;">${boyName}</h4>
+              <p style="font-size: 13px; color: #94A3B8; margin:0;">Guruh: <strong style="color:#F1F5F9;">${boyGroup}</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IKKITA ASOSIY BLOK: TOP 10 YETAKCHILAR & GURUHLAR STANDINGI -->
+      <div class="grid grid-2 mb-4">
+        <!-- TOP 10 LIDERLAR PODIUMI -->
+        <div class="card">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3 style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#D97706;">${icon('trophy', 16)}</span> Top 10 Yetakchilar Faxriy Doskasi
+              </h3>
+              <span style="font-size:12px; color:#64748B;">Bakalavriyat bosqichi bo'yicha eng yuqori natijalar</span>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="navigateTo('observe-rating')">Batafsil Reyting →</button>
+          </div>
+          <div class="card-body">
+            ${buildPodiumHtml(topBak)}
+            <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed #E2E8F0; font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px;">
+              🛡️ Ochiq monitoring faqat eng yuqori natija ko'rsatgan Top 10 yetakchilar shaxsiy e'tirofini aks ettiradi.
+            </div>
+          </div>
+        </div>
+
+        <!-- GURUHLAR VA YO'NALISHLAR REYTINGI -->
+        <div class="card">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3 style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#2563EB;">${icon('shield', 16)}</span> Akademik Guruhlar Reytingi
+              </h3>
+              <span style="font-size:12px; color:#64748B;">Universitet guruhlarining o'rtacha ko'rsatkichi</span>
+            </div>
+            <span class="badge badge-light" style="font-size:12px;">Top 10 Guruh</span>
+          </div>
+          <div class="card-body p-0">
+            ${topGroups.length > 0 ? `
+              <div class="table-responsive">
+                <table class="table" style="margin-bottom:0;">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">O'rin</th>
+                      <th>Guruh</th>
+                      <th>Yo'nalishi</th>
+                      <th style="text-align:center;">Talabalar</th>
+                      <th style="text-align:right;">O'rtacha Ball</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${topGroups.map((g, idx) => `
+                      <tr>
+                        <td>
+                          <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}" style="width:26px; height:26px; font-size:12px;">
+                            ${idx + 1}
+                          </span>
+                        </td>
+                        <td><strong style="color:#0F172A;">${g.group_code}</strong></td>
+                        <td style="font-size:13px; color:#475569;">${g.program_code || 'IT'}</td>
+                        <td style="text-align:center;"><span class="badge badge-light">${g.students_count} nafar</span></td>
+                        <td style="text-align:right;"><strong style="color:#2563EB; font-size:14px;">${g.avg_score} ball</strong></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div class="p-4 text-center text-muted">Guruhlar statistikasi hisoblanmoqda...</div>
+            `}
+          </div>
+        </div>
+      </div>
+
+      <!-- FAOLIYAT SOHALARI TAQSIMOTI -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3><span style="color:#2563EB;">${icon('activity', 16)}</span> Talabalar Faoliyati Yo'nalishlari Bo'yicha Taqsimot</h3>
+          <span style="font-size: 12px; color: var(--text-muted);">Universitet bo'yicha jami tasdiqlangan ballar balansi</span>
         </div>
         <div class="card-body">
           <div class="grid grid-3">
-            <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 12px; border-left: 4px solid #F59E0B;">
-              <span style="font-size: 11px; text-transform: uppercase; color: #F59E0B; font-weight: 700;">Hafta Qahramoni</span>
-              <h4 style="font-size: 16px; margin: 6px 0 2px;">${ws.hero ? ws.hero.student_name : 'Aniqlanmoqda'}</h4>
-              <p style="font-size: 12px; color: #94A3B8;">${ws.hero ? ws.hero.group_code + ' • +' + ws.hero.week_points + ' ball' : ''}</p>
-            </div>
-
-            <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 12px; border-left: 4px solid #EC4899;">
-              <span style="font-size: 11px; text-transform: uppercase; color: #EC4899; font-weight: 700;">Eng Faol Qiz</span>
-              <h4 style="font-size: 16px; margin: 6px 0 2px;">${ws.girl ? ws.girl.student_name : 'Aniqlanmoqda'}</h4>
-              <p style="font-size: 12px; color: #94A3B8;">${ws.girl ? ws.girl.group_code + ' • +' + ws.girl.week_points + ' ball' : ''}</p>
-            </div>
-
-            <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 12px; border-left: 4px solid #3B82F6;">
-              <span style="font-size: 11px; text-transform: uppercase; color: #3B82F6; font-weight: 700;">Eng Faol Yigit</span>
-              <h4 style="font-size: 16px; margin: 6px 0 2px;">${ws.boy ? ws.boy.student_name : 'Aniqlanmoqda'}</h4>
-              <p style="font-size: 12px; color: #94A3B8;">${ws.boy ? ws.boy.group_code + ' • +' + ws.boy.week_points + ' ball' : ''}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- IKKITA USTUN: TOP TALABALAR VA SOHALAR -->
-      <div class="grid grid-2 mb-4">
-        <!-- TOP BAKALAVRIAT -->
-        <div class="card">
-          <div class="card-header">
-            <h3><span style="color:#D97706;">${icon('trophy', 16)}</span> Top 10 — Bakalavriat</h3>
-            <button class="btn btn-outline btn-sm" onclick="navigateTo('observe-rating')">Barchasi →</button>
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>O'rin</th>
-                    <th>Talaba</th>
-                    <th>Guruh</th>
-                    <th>Mavsumiy</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${(data.top_bak || []).map((s, idx) => `
-                    <tr>
-                      <td><span class="rank-badge rank-${idx + 1}">${idx + 1}</span></td>
-                      <td>
-                        <strong>${s.first_name} ${s.last_name}</strong>
-                      </td>
-                      <td><span class="badge badge-light">${s.group_code}</span></td>
-                      <td><strong style="color: #2563EB;">${s.season} ball</strong></td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- SOHALAR BO'YICHA TAQSIMOT -->
-        <div class="card">
-          <div class="card-header">
-            <h3><span style="color:#2563EB;">${icon('activity', 16)}</span> Sohalar Bo'yicha Taqsimot</h3>
-            <span style="font-size: 12px; color: var(--text-muted);">Tasdiqlangan ballar</span>
-          </div>
-          <div class="card-body">
-            <div class="categories-list">
-              ${(data.categories || []).map(c => `
-                <div class="cat-progress-item mb-3">
-                  <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 6px;">
-                    <span style="color: ${c.color || '#3B82F6'};">● ${c.name}</span>
-                    <span>${c.total_points} ball</span>
-                  </div>
-                  <div class="progress-bar-bg" style="height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: ${Math.min(100, Math.round((c.total_points / (m.total_season_points || 1)) * 100))}%; background: ${c.color || '#3B82F6'}; border-radius: 4px;"></div>
-                  </div>
+            ${categories.map(c => `
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:16px; border-radius:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <strong style="color:${c.color || '#3B82F6'}; font-size:13px;">● ${c.name}</strong>
+                  <span class="badge badge-light" style="font-weight:700;">${c.total_points || 0} ball</span>
                 </div>
-              `).join('')}
-            </div>
+                <div style="height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
+                  <div style="height:100%; width:${Math.min(100, Math.round(((c.total_points || 0) / (m.total_season_points || 1)) * 100))}%; background:${c.color || '#3B82F6'};"></div>
+                </div>
+              </div>
+            `).join('')}
           </div>
         </div>
       </div>
-
-      <!-- XAVFLAR VA E'TIBOR TALAB QILADIGAN HOLATLAR -->
-      ${data.attention_required.late_approvals_count > 0 ? `
-        <div class="alert-box alert-warning mb-4" style="background:#FFFBEB; border: 1px solid #FDE68A; padding: 16px; border-radius: 10px;">
-          <h4 style="color:#B45309; font-size: 15px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-            ${icon('alertTriangle', 14)} 3 ish kunidan oshib ketgan tasdiqlar: ${data.attention_required.late_approvals_count} ta
-          </h4>
-          <p style="font-size: 13px; color: #78350F; margin-bottom: 12px;">R-07 qoidasi bo'yicha sohaviy bo'limlar ushbu arizalarni zudlik bilan ko'rib chiqishi shart.</p>
-          <button class="btn btn-warning btn-sm" onclick="navigateTo('dept-approvals')">Tasdiq Navbatiga O'tish →</button>
-        </div>
-      ` : ''}
     `;
 
     container.innerHTML = html;
@@ -825,104 +970,211 @@ async function renderObserveDashboard(container) {
 }
 
 // -------------------------------------------------------------
-// SAHIFA: TALABALAR REYTINGI
+// SAHIFA: YETAKCHILAR FAXRIY DOSKASI (OCHIQ REYTING)
 // -------------------------------------------------------------
 async function renderObserveRating(container) {
-  let html = `
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="filter-bar" style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <select id="rating-filter-level" class="form-control" style="width: auto;">
-            <option value="">Barcha bosqichlar</option>
-            <option value="bak">Bakalavriat</option>
-            <option value="mag">Magistratura</option>
-          </select>
-          <select id="rating-filter-course" class="form-control" style="width: auto;">
-            <option value="">Barcha kurslar</option>
-            <option value="1">1-kurs</option>
-            <option value="2">2-kurs</option>
-            <option value="3">3-kurs</option>
-            <option value="4">4-kurs</option>
-          </select>
-          <input type="text" id="rating-filter-group" class="form-control" placeholder="Guruh (masalan, 210-22)" style="width: 180px;">
-          <input type="text" id="rating-filter-search" class="form-control" placeholder="Ism yoki familiya..." style="flex: 1; min-width: 200px;">
-          <button id="btn-rating-filter" class="btn btn-primary">Qidirish</button>
-        </div>
-      </div>
-    </div>
+  let currentLevel = 'bak';
 
-    <div class="card">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table" id="rating-table">
-            <thead>
-              <tr>
-                <th style="width: 60px;">O'rin</th>
-                <th>Talaba</th>
-                <th>Guruh</th>
-                <th>Bosqich</th>
-                <th>Mavsum Balli</th>
-                <th>Jami Ball</th>
-                <th>Haftalik</th>
-                <th style="text-align: right;">Amal</th>
-              </tr>
-            </thead>
-            <tbody id="rating-table-body">
-              <tr><td colspan="8" class="text-center p-4">Yuklanmoqda...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-  container.innerHTML = html;
-
-  async function loadRating() {
-    const level = document.getElementById('rating-filter-level').value;
-    const course = document.getElementById('rating-filter-course').value;
-    const group = document.getElementById('rating-filter-group').value;
-    const search = document.getElementById('rating-filter-search').value;
-
-    const params = new URLSearchParams();
-    if (level) params.append('level', level);
-    if (course) params.append('course', course);
-    if (group) params.append('group', group);
-    if (search) params.append('search', search);
-
-    const tbody = document.getElementById('rating-table-body');
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center p-4"><div class="spinner"></div></td></tr>';
+  async function loadData() {
+    container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Yetakchilar ko\'rsatkichlari yuklanmoqda...</p></div>';
 
     try {
-      const data = await apiFetch(`/api/observe/rating?${params.toString()}`);
-      if (!data.list || data.list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center p-4">Talabalar topilmadi</td></tr>';
-        return;
+      const data = await apiFetch(`/api/observe/rating?level=${currentLevel}`);
+      const list = data.list || data.top_10 || [];
+      const groups = data.group_averages || [];
+
+      function buildPodium(items) {
+        if (!items || items.length === 0) {
+          return '<div class="p-4 text-center text-muted">Joriy bosqich bo\'yicha reyting hisoblanmoqda...</div>';
+        }
+        const p1 = items[0];
+        const p2 = items[1];
+        const p3 = items[2];
+
+        return `
+          <div class="observe-podium-grid">
+            ${p2 ? `
+              <div class="podium-card rank-2">
+                <div class="podium-medal">🥈</div>
+                <div class="podium-name" title="${p2.first_name} ${p2.last_name}">${p2.first_name} ${p2.last_name}</div>
+                <div class="podium-group">${p2.group_code || '—'}</div>
+                <div class="podium-score">${p2.season} <span>ball</span></div>
+                <div style="font-size:11px; color:#64748B; margin-top:4px;">2-o'rin (Kumush)</div>
+              </div>
+            ` : ''}
+
+            ${p1 ? `
+              <div class="podium-card rank-1">
+                <div class="podium-medal">🥇</div>
+                <div class="podium-name" style="font-size:18px;" title="${p1.first_name} ${p1.last_name}">${p1.first_name} ${p1.last_name}</div>
+                <div class="podium-group" style="background:#FEF3C7; color:#92400E; font-weight:700;">${p1.group_code || '—'}</div>
+                <div class="podium-score" style="font-size:24px; color:#D97706;">${p1.season} <span>ball</span></div>
+                <div style="font-size:11px; font-weight:700; color:#B45309; margin-top:6px;">🏆 1-o'rin (Oltin Lider)</div>
+              </div>
+            ` : ''}
+
+            ${p3 ? `
+              <div class="podium-card rank-3">
+                <div class="podium-medal">🥉</div>
+                <div class="podium-name" title="${p3.first_name} ${p3.last_name}">${p3.first_name} ${p3.last_name}</div>
+                <div class="podium-group">${p3.group_code || '—'}</div>
+                <div class="podium-score">${p3.season} <span>ball</span></div>
+                <div style="font-size:11px; color:#9A3412; margin-top:4px;">3-o'rin (Bronza)</div>
+              </div>
+            ` : ''}
+          </div>
+        `;
       }
 
-      tbody.innerHTML = data.list.map(s => `
-        <tr>
-          <td><span class="rank-badge rank-${s.rank_cohort}">${s.rank_cohort}</span></td>
-          <td>
-            <strong>${s.first_name} ${s.last_name}</strong>
-            ${s.is_passive ? '<span class="badge badge-warning" style="margin-left: 6px;">Passiv</span>' : ''}
-          </td>
-          <td><span class="badge badge-light">${s.group_code}</span></td>
-          <td>${s.level === 'bak' ? 'Bakalavr' : 'Magistr'} (${s.course}-kurs)</td>
-          <td><strong style="color: #2563EB;">${s.season} ball</strong></td>
-          <td><strong>${s.total} ball</strong></td>
-          <td><span style="color: #059669; font-weight: 600;">+${s.week_cur}</span></td>
-          <td style="text-align: right;">
-            <button class="btn btn-outline btn-sm" onclick="showStudentModal('${s.id}')">Ko'rish</button>
-          </td>
-        </tr>
-      `).join('');
+      let html = `
+        <!-- HEADER -->
+        <div class="observe-hero-banner" style="margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+            <div>
+              <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.12); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; margin-bottom:6px;">
+                🏆 UNIVERSITET FAXRIY DOSKASI
+              </div>
+              <h2 style="font-size:20px; font-weight:800; margin:0 0 4px;">Top 10 Yetakchilar va Guruhlar Standigi</h2>
+              <p style="margin:0; font-size:13px; color:#94A3B8;">
+                Eng yuqori shaxsiy faollik ko'rsatkichiga erishgan 10 nafar talaba va akademik guruhlar ligasi.
+              </p>
+            </div>
+            <!-- LEVEL TOGGLE -->
+            <div style="display:flex; gap:6px; background:rgba(255,255,255,0.08); padding:4px; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
+              <button class="btn btn-sm ${currentLevel === 'bak' ? 'btn-primary' : 'btn-outline'}" id="btn-toggle-bak" style="padding:6px 14px; font-size:12px; font-weight:700;">
+                Bakalavriyat
+              </button>
+              <button class="btn btn-sm ${currentLevel === 'mag' ? 'btn-primary' : 'btn-outline'}" id="btn-toggle-mag" style="padding:6px 14px; font-size:12px; font-weight:700;">
+                Magistratura
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PODIUM -->
+        ${buildPodium(list)}
+
+        <!-- TOP 10 JADVALI -->
+        <div class="card mb-4">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3 style="font-size:16px;">🏆 ${currentLevel === 'bak' ? 'Bakalavriyat' : 'Magistratura'} — Top 10 Yetakchilar Safi</h3>
+              <span style="font-size:12px; color:#64748B;">Mavsumiy jamg'arilgan eng yuqori ballar</span>
+            </div>
+            <span class="badge badge-light">10 nafar yetakchi</span>
+          </div>
+          <div class="card-body p-0">
+            ${list.length > 0 ? `
+              <div class="table-responsive">
+                <table class="table" style="margin-bottom:0;">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px;">O'rin</th>
+                      <th>Talaba</th>
+                      <th>Guruh</th>
+                      <th>Ta'lim Yo'nalishi</th>
+                      <th style="text-align:right;">Mavsum Balli</th>
+                      <th style="text-align:right;">Jami Ball</th>
+                      <th style="text-align:right;">Haftalik</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${list.map((s, idx) => `
+                      <tr>
+                        <td>
+                          <span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">
+                            ${idx + 1}
+                          </span>
+                        </td>
+                        <td>
+                          <strong style="color:#0F172A; font-size:14px;">${s.first_name} ${s.last_name}</strong>
+                        </td>
+                        <td><span class="badge badge-light">${s.group_code}</span></td>
+                        <td style="font-size:13px; color:#475569;">${s.program_code || 'IT'} (${s.course}-kurs)</td>
+                        <td style="text-align:right;"><strong style="color:#2563EB; font-size:15px;">${s.season} ball</strong></td>
+                        <td style="text-align:right; color:#475569;">${s.total} ball</td>
+                        <td style="text-align:right;"><span style="color:#059669; font-weight:700;">+${s.week_cur || 0}</span></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div class="p-4 text-center text-muted">Yetakchilar ro'yxati hisoblanmoqda...</div>
+            `}
+          </div>
+        </div>
+
+        <!-- GURUHLAR LIGASI -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h3>🏢 Akademik Guruhlar O'rtasidagi Musobaqa Jadvali</h3>
+            <span style="font-size:12px; color:#64748B;">Guruhdagi talabalar o'rtacha balli va jami jamg'armasi</span>
+          </div>
+          <div class="card-body p-0">
+            ${groups.length > 0 ? `
+              <div class="table-responsive">
+                <table class="table" style="margin-bottom:0;">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px;">O'rin</th>
+                      <th>Guruh Kodi</th>
+                      <th>Yo'nalishi</th>
+                      <th style="text-align:center;">Talabalar Soni</th>
+                      <th style="text-align:right;">O'rtacha Ball</th>
+                      <th style="text-align:right;">Jami Ball</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${groups.map((g, idx) => `
+                      <tr>
+                        <td><span class="rank-badge ${idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''))}">${idx + 1}</span></td>
+                        <td><strong style="color:#0F172A;">${g.group_code}</strong></td>
+                        <td style="font-size:13px; color:#475569;">${g.program_code || 'IT'}</td>
+                        <td style="text-align:center;"><span class="badge badge-light">${g.count} nafar</span></td>
+                        <td style="text-align:right;"><strong style="color:#2563EB; font-size:14px;">${g.avg_score} ball</strong></td>
+                        <td style="text-align:right; font-weight:600; color:#475569;">${g.total_score} ball</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div class="p-4 text-center text-muted">Guruhlar statistikasi hisoblanmoqda...</div>
+            `}
+          </div>
+        </div>
+
+        <!-- MAXFIYLIK VA RASMIY ME'YOR BILDIRISHNOMASI -->
+        <div class="alert-box mb-4" style="background:#EFF6FF; border:1px solid #BFDBFE; padding:16px 20px; border-radius:12px; display:flex; align-items:flex-start; gap:12px;">
+          <div style="color:#2563EB; font-size:20px; line-height:1;">🛡️</div>
+          <div>
+            <h4 style="margin:0 0 4px; font-size:14px; color:#1E40AF; font-weight:700;">Rasmiy Ochiq Monitoring Nizomi</h4>
+            <p style="margin:0; font-size:13px; color:#1E3A8A; line-height:1.5;">
+              Universitet ochiq monitoringi talabalar shaxsiy ma'lumotlarini himoya qilish va sog'lom raqobatni rag'batlantirish maqsadida faqat eng yuqori natija ko'rsatgan 10 nafar talaba va akademik guruhlar reytingini taqdim etadi. Barcha talabalar o'z shaxsiy ballari va reytinglarini Talaba Mini App orqali kuzatib boradilar.
+            </p>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+
+      // Event listenerlar
+      document.getElementById('btn-toggle-bak')?.addEventListener('click', () => {
+        currentLevel = 'bak';
+        loadData();
+      });
+      document.getElementById('btn-toggle-mag')?.addEventListener('click', () => {
+        currentLevel = 'mag';
+        loadData();
+      });
+
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-danger p-4">Yuklashda xato: ${err.message}</td></tr>`;
+      container.innerHTML = `<div class="card"><p class="text-danger">Ma'lumotlarni yuklashda xatolik: ${err.message}</p></div>`;
     }
   }
 
-  document.getElementById('btn-rating-filter').addEventListener('click', loadRating);
-  loadRating();
+  loadData();
 }
 
 // -------------------------------------------------------------

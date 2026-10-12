@@ -26,7 +26,25 @@ router.get('/dashboard', (req, res) => {
 
   // 2. Haftaning yulduzlari
   const weeklyStarsRow = db.prepare(`SELECT payload FROM weekly_stars ORDER BY week_start DESC LIMIT 1`).get();
-  const weeklyStars = weeklyStarsRow ? JSON.parse(weeklyStarsRow.payload) : calculateWeeklyStars();
+  const rawStars = weeklyStarsRow ? JSON.parse(weeklyStarsRow.payload) : calculateWeeklyStars();
+
+  const formatStar = (s) => {
+    if (!s) return null;
+    const name = (s.student_name || `${s.first_name || ''} ${s.last_name || ''}`).trim();
+    return {
+      ...s,
+      student_name: name || 'Aniqlanmoqda',
+      week_points: s.week_points !== undefined ? s.week_points : (s.score !== undefined ? s.score : (s.week_cur || 0)),
+      group_code: s.group_code || '—'
+    };
+  };
+
+  const weeklyStars = {
+    ...rawStars,
+    hero: formatStar(rawStars?.hero),
+    girl: formatStar(rawStars?.girl),
+    boy: formatStar(rawStars?.boy)
+  };
 
   // 3. Sohalar bo'yicha yig'indi ballar
   const categories = db.prepare(`
@@ -37,11 +55,25 @@ router.get('/dashboard', (req, res) => {
     ORDER BY cc.sort ASC
   `).all();
 
-  // 4. TOP 10 Bakalavriat & Magistratura
+  // 4. TOP 10 Bakalavriat & Magistratura (Faxriy doska)
   const { list: topBak } = getRatingList({ level: 'bak', limit: 10 });
   const { list: topMag } = getRatingList({ level: 'mag', limit: 10 });
 
-  // 5. Tyutorlar statistikasi
+  // 5. Guruhlar reytingi (O'rtacha ball va faollik)
+  const topGroups = db.prepare(`
+    SELECT st.group_code, st.program_code,
+           COUNT(st.id) as students_count,
+           COALESCE(ROUND(AVG(sc.season), 1), 0) as avg_score,
+           COALESCE(SUM(sc.season), 0) as total_score
+    FROM student st
+    LEFT JOIN student_score sc ON st.id = sc.student_id
+    WHERE st.status = 'active'
+    GROUP BY st.group_code
+    ORDER BY avg_score DESC, total_score DESC
+    LIMIT 10
+  `).all();
+
+  // 6. Tyutorlar statistikasi
   const tutors = db.prepare(`
     SELECT su.id, su.full_name,
            (SELECT COUNT(*) FROM student WHERE tutor_id = su.id AND status = 'active') as student_count,
@@ -51,7 +83,7 @@ router.get('/dashboard', (req, res) => {
     WHERE su.roles LIKE '%tutor%'
   `).all();
 
-  // 6. Audit lentasi (oxirgi 15 ta)
+  // 7. Audit lentasi (oxirgi 15 ta)
   const auditLogs = db.prepare(`
     SELECT al.*, su.full_name as actor_name
     FROM audit_log al
@@ -60,7 +92,7 @@ router.get('/dashboard', (req, res) => {
     LIMIT 15
   `).all();
 
-  // 7. E'tibor talab qiladigan holatlar
+  // 8. E'tibor talab qiladigan holatlar
   const riskFlags = calculateRiskFlags();
   const lateApprovals = getLateApprovals();
 
@@ -71,12 +103,14 @@ router.get('/dashboard', (req, res) => {
       total_season_points: totalSeasonPoints,
       pending_approvals: pendingApprovalsCount,
       approved_ratio: approvedRatio,
-      today_events: todayEventsCount
+      today_events: todayEventsCount,
+      top_group: topGroups[0]?.group_code || '—'
     },
     weekly_stars: weeklyStars,
     categories,
     top_bak: topBak,
     top_mag: topMag,
+    top_groups: topGroups,
     tutors,
     audit_logs: auditLogs,
     attention_required: {
@@ -177,20 +211,27 @@ router.get('/students/:id', (req, res) => {
  */
 router.get('/rating', (req, res) => {
   const { period = 'season', level = 'bak' } = req.query;
-  const { list, total_count, avg_season } = getRatingList({ period, level, limit: 50 });
+  // Ochiq monitoring: Faqat Top 10 yetakchilar ko'rsatiladi (barcha talabalar emas)
+  const { list, total_count, avg_season } = getRatingList({ period, level, limit: 10 });
 
   // Kesim o'rtachalari (guruhlar bo'yicha)
   const groupAverages = db.prepare(`
-    SELECT st.group_code, AVG(sc.season) as avg_score, COUNT(st.id) as count
+    SELECT st.group_code, st.program_code,
+           COUNT(st.id) as count,
+           COALESCE(ROUND(AVG(sc.season), 1), 0) as avg_score,
+           COALESCE(SUM(sc.season), 0) as total_score
     FROM student st
-    JOIN student_score sc ON st.id = sc.student_id
-    WHERE st.level = ? AND st.status = 'active'
+    LEFT JOIN student_score sc ON st.id = sc.student_id
+    WHERE (st.level = ? OR ? = '') AND st.status = 'active'
     GROUP BY st.group_code
-    ORDER BY avg_score DESC
-  `).all(level);
+    ORDER BY avg_score DESC, total_score DESC
+    LIMIT 15
+  `).all(level || 'bak', level || 'bak');
 
   res.json({
-    top_50: list,
+    list: (list || []).slice(0, 10),
+    top_10: (list || []).slice(0, 10),
+    top_50: (list || []).slice(0, 10),
     total_students: total_count,
     cohort_avg: avg_season,
     group_averages: groupAverages
