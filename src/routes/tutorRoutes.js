@@ -178,7 +178,7 @@ router.put('/students/:id', authenticateStaff, (req, res) => {
     const student = db.prepare('SELECT * FROM student WHERE id = ?').get(studentId);
     if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
 
-    const groups = db.prepare('SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+    const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
     const isOwner = (student.tutor_id === tutorId || (student.group_code && groups.includes(student.group_code)));
 
     if (!isOwner && !req.staffUser.roles.includes('superadmin')) {
