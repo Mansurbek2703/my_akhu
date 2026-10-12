@@ -32,8 +32,10 @@ for (const x of fmc) {
   }
 }
 
+db.prepare("UPDATE student SET level = 'bak' WHERE level IS NULL OR level = ''").run();
 const count = db.prepare('SELECT COUNT(*) as c FROM student').get().c;
 console.log('SERVER BAZASIDAGI TALABALAR SONI:', count);
+console.log('TALABALAR BOSQICHLARI:', db.prepare('SELECT level, count(*) as count FROM student GROUP BY level').all());
 
 const { awardWelcomeBonus } = require('./src/services/pointService');
 const linkedStudents = db.prepare('SELECT id FROM student WHERE telegram_user_id IS NOT NULL').all();

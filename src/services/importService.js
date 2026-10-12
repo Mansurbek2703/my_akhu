@@ -51,6 +51,15 @@ function parseStudentsFromWorkbook(filePath) {
     }
   }
 
+  // Sarlavha qatoridagi ustunlarni tahlil qilish
+  const headerRow = rawGrid[headerRowIndex] || [];
+  const headerKeys = Array.isArray(headerRow) ? headerRow.map(cell => normalizeKey(cell)) : [];
+  
+  // "bosqich" yoki ta'lim bosqichiga oid alohida ustun mavjudligini aniqlash (9-ustun)
+  const hasBosqichColumn = headerKeys.some(k => 
+    k === 'bosqich' || k === 'bosqichi' || k === 'talimbosqichi' || k === 'talim_bosqichi' || k === 'daraja' || k === 'level' || k === 'educationlevel'
+  );
+
   // Sarlavhali obyektlar massivi
   const rawRows = headerRowIndex > 0
     ? xlsx.utils.sheet_to_json(sheet, { range: headerRowIndex, defval: '', raw: false })
@@ -111,7 +120,13 @@ function parseStudentsFromWorkbook(filePath) {
     let groupCode = getVal('guruhi', 'guruh', 'groupcode', 'group', 'guruhkodi', 'gruppa');
     let phone = getVal('telegramtelefonraqami', 'telegramtelefon', 'telegramtel', 'telefonraqami', 'telefonraqam', 'telefon', 'phone', 'phonenumber', 'tel', 'aloqa', 'aloqaraqami', 'aloqauchun', 'tgphone', 'tgtelefon');
     let genderRaw = getVal('jinsi', 'jins', 'gender', 'pol');
-    let courseRaw = getVal('kursi', 'kurs', 'course', 'bosqich');
+    let courseRaw = getVal('kursi', 'kurs', 'course');
+    if (!courseRaw && !hasBosqichColumn) {
+      const possibleCourse = getVal('bosqich', 'bosqichi');
+      if (possibleCourse && /\d/.test(possibleCourse)) {
+        courseRaw = possibleCourse;
+      }
+    }
 
     // Ustunlar pozitsiyasi bo'yicha zaxira tahlil
     const gridRowIndex = headerRowIndex + 1 + rIndex;
@@ -180,8 +195,29 @@ function parseStudentsFromWorkbook(filePath) {
     if (!programCode) programCode = 'Dasturiy ta\'minot muhandisligi';
     if (!groupCode) groupCode = 'SS01';
 
-    // Level: magistr yoki bakalavr
-    const level = (programCode.toLowerCase().includes('mag') || groupCode.toLowerCase().includes('mag') || groupCode.toLowerCase().startsWith('m-')) ? 'mag' : 'bak';
+    // Level: Agar fayldagi ustunlar soni 8 bo'lsa va unda "bosqich" degan 9-ustuni bo'lmasa,
+    // ularning barchasini tizim avtomatik bakalavr deb qabul qiladi.
+    let level = 'bak';
+    let levelRaw = '';
+    if (hasBosqichColumn) {
+      levelRaw = getVal('bosqich', 'bosqichi', 'talimbosqichi', 'talim_bosqichi', 'daraja', 'level', 'educationlevel');
+    } else if (rawGrid[gridRowIndex] && rawGrid[gridRowIndex].length >= 9 && rawGrid[gridRowIndex][8] !== undefined) {
+      const s8 = String(rawGrid[gridRowIndex][8]).trim().toLowerCase();
+      if (s8.includes('mag') || s8.includes('bak')) {
+        levelRaw = s8;
+      }
+    }
+
+    if (levelRaw) {
+      const lLower = levelRaw.toLowerCase();
+      if (lLower.includes('mag') || lLower.includes('master')) {
+        level = 'mag';
+      } else {
+        level = 'bak';
+      }
+    } else {
+      level = 'bak';
+    }
 
     // External ID unikalligini ta'minlash
     if (!extId) {
