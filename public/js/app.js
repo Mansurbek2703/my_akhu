@@ -27,6 +27,23 @@ const ROLE_META = {
   'observer': { label: 'Ommaviy Kuzatuv', color: '#60A5FA', bg: 'rgba(96, 165, 250, 0.1)' }
 };
 
+function formatApproverRole(role) {
+  if (!role || role === '-') return '-';
+  const roleNames = {
+    'dep_yb': "Yoshlar bo'limi",
+    'dep_mb': "Ma'naviyat bo'limi",
+    'dep_ob': "O'quv bo'limi",
+    'dep_ib': "Ilmiy bo'lim",
+    'dep_sb': "Sanoat hamkorlik",
+    'dep_pb': "Matbuot (PR)",
+    'prorektor': "Prorektor",
+    'tutor': "Tyutor",
+    'superadmin': "Superadmin",
+    'observer': "Kuzatuvchi"
+  };
+  return roleNames[role] || (ROLE_META[role] ? ROLE_META[role].label : role);
+}
+
 // ====================================================================
 // RASMIY UNIVERSITET VEKTOR SVG BELGILARI (ICONS SYSTEM)
 // ====================================================================
@@ -1697,7 +1714,7 @@ async function renderObserveCatalog(container) {
                     <span class="badge" style="background: ${c.color || '#2563EB'}15; color: ${c.color || '#2563EB'}; font-size: 11px; font-weight: 700;">#${c.id}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary);">
-                    <span>Mas'ul: <strong>${c.approver_role || 'Rektorat'}</strong></span>
+                    <span>Mas'ul: <strong>${formatApproverRole(c.approver_role) || 'Rektorat'}</strong></span>
                     <span class="badge badge-light" style="font-size: 11px;">${catItemsCount} ta mezon</span>
                   </div>
                 </div>
@@ -1864,7 +1881,7 @@ function renderObserveCatalogTable() {
           <span style="font-size: 11.5px; color: var(--text-secondary);">${it.evidence_hint || 'Majburiy emas'}</span>
         </td>
         <td>
-          <span class="badge badge-group" style="font-weight: 600;">${it.approver_role || '-'}</span>
+          <span class="badge badge-group" style="font-weight: 600;">${formatApproverRole(it.approver_role)}</span>
         </td>
       </tr>
     `;
@@ -4687,7 +4704,7 @@ function renderAdminCatalogRows() {
             : (it.base_points !== null ? `<span style="font-weight: 700; color: #2563EB; font-size: 13px;">+${it.base_points} ball</span>` : '-')}
         </td>
         <td><span class="badge badge-neutral">v${it.version_from || 1}</span></td>
-        <td><span class="badge badge-group" style="font-weight: 600;">${it.approver_role || '-'}</span></td>
+        <td><span class="badge badge-group" style="font-weight: 600;">${formatApproverRole(it.approver_role)}</span></td>
         <td><span style="font-size: 11.5px; color: var(--text-muted);">${it.evidence_hint || 'Majburiy emas'}</span></td>
       </tr>
     `;
