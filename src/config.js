@@ -7,6 +7,14 @@ module.exports = {
   domain: process.env.DOMAIN || 'my.akhu.uz',
   baseUrl: process.env.BASE_URL || 'https://my.akhu.uz',
   dbPath: process.env.DATABASE_PATH || path.join(__dirname, '../data/akhu_talabalar.db'),
+  usePostgres: process.env.USE_POSTGRES !== 'false',
+  pg: {
+    host: process.env.PG_HOST || (process.env.NODE_ENV === 'production' ? '127.0.0.1' : '192.168.1.2'),
+    port: parseInt(process.env.PG_PORT, 10) || 5432,
+    database: process.env.PG_DATABASE || 'akhu_rating',
+    user: process.env.PG_USER || 'akhu_admin',
+    password: process.env.PG_PASSWORD || 'AkhuAdmin2026!'
+  },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '8749111682:AAHbYXMyb6TBgeLXo6E2DCE_jUQM7ogJy50',
     botUsername: process.env.TELEGRAM_BOT_USERNAME || 'akhu_talabalar_bot',
