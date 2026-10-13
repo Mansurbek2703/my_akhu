@@ -49,7 +49,7 @@ function authenticateSuperadmin(req, res, next) {
 
 // Middleware: Superadmin, Registrator (dep_ob) YOKI Tyutor
 function authenticateSuperadminOrRegistrator(req, res, next) {
-  const userId = req.headers['x-user-id'] || 'superadmin';
+  const userId = req.headers['x-user-id'] || req.query.user_id || 'superadmin';
   const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
   if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
 
@@ -228,6 +228,101 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       groups: counts.groups_all || 0
     }
   });
+});
+
+/**
+ * GET /api/admin/students/template
+ * Namuna Excel shablonini yuklab olish (Foydalanuvchi talab qilgan 8 ustunli format)
+ * Ustunlar: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
+ */
+router.get('/students/template', (req, res) => {
+  const filePath1 = path.join(__dirname, '../../public/downloads/talabalar_import_shablon.xlsx');
+  const filePath2 = path.join(__dirname, '../../public/talabalar_import_shablon.xlsx');
+  if (fs.existsSync(filePath1)) {
+    return res.download(filePath1, 'talabalar_import_shablon.xlsx');
+  }
+  if (fs.existsSync(filePath2)) {
+    return res.download(filePath2, 'talabalar_import_shablon.xlsx');
+  }
+
+  const sampleData = [
+    {
+      'ID': 'AE1126333',
+      'Ism': 'AYGUL',
+      'Familiya': 'SHADIMURATOVA',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC04',
+      'telefon raqami': '+998-93-374-19-80',
+      'jinsi': 'Ayol',
+      'kursi': 1
+    },
+    {
+      'ID': 'AE3547765',
+      'Ism': 'BEHRUZBEK',
+      'Familiya': 'RAJABOV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC04',
+      'telefon raqami': '+998-99-469-43-30',
+      'jinsi': 'Erkak',
+      'kursi': 1
+    },
+    {
+      'ID': 'AD9349433',
+      'Ism': 'MUSLIMAXON',
+      'Familiya': 'FOZILOVA',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC02',
+      'telefon raqami': '+998-91-616-05-30',
+      'jinsi': 'Ayol',
+      'kursi': 1
+    },
+    {
+      'ID': 'AD8170783',
+      'Ism': 'SARVARBEK',
+      'Familiya': 'JANIBEKOV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC01',
+      'telefon raqami': '+998-95-192-17-34',
+      'jinsi': 'Erkak',
+      'kursi': 1
+    },
+    {
+      'ID': 'AD6634372',
+      'Ism': 'MAQSUD BEK',
+      'Familiya': 'OBIDOV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'FMC05',
+      'telefon raqami': '+998-97-577-01-08',
+      'jinsi': 'Erkak',
+      'kursi': 1
+    }
+  ];
+
+  const ws = xlsx.utils.json_to_sheet(sampleData);
+  ws['!cols'] = [
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 22 },
+    { wch: 12 },
+    { wch: 22 },
+    { wch: 10 },
+    { wch: 8 }
+  ];
+
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'Talabalar');
+  const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  try {
+    const dir = path.join(__dirname, '../../public/downloads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath1, buffer);
+  } catch (e) {}
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="talabalar_import_shablon.xlsx"');
+  res.send(buffer);
 });
 
 /**
@@ -653,85 +748,6 @@ router.post('/import/students', authenticateSuperadminOrRegistrator, upload.sing
   }
 });
 
-/**
- * GET /api/admin/students/template
- * Namuna Excel shablonini yuklab olish (Foydalanuvchi talab qilgan 8 ustunli format)
- * Ustunlar: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
- */
-router.get('/students/template', authenticateSuperadminOrRegistrator, (req, res) => {
-  const sampleData = [
-    {
-      'ID': 'AE1126333',
-      'Ism': 'AYGUL',
-      'Familiya': 'SHADIMURATOVA',
-      'yo\'nalishi': 'Sun\'iy intellekt',
-      'guruh': 'FMC04',
-      'telefon raqami': '+998-93-374-19-80',
-      'jinsi': 'Ayol',
-      'kursi': 1
-    },
-    {
-      'ID': 'AE3547765',
-      'Ism': 'BEHRUZBEK',
-      'Familiya': 'RAJABOV',
-      'yo\'nalishi': 'Sun\'iy intellekt',
-      'guruh': 'FMC04',
-      'telefon raqami': '+998-99-469-43-30',
-      'jinsi': 'Erkak',
-      'kursi': 1
-    },
-    {
-      'ID': 'AD9349433',
-      'Ism': 'MUSLIMAXON',
-      'Familiya': 'FOZILOVA',
-      'yo\'nalishi': 'Sun\'iy intellekt',
-      'guruh': 'FMC02',
-      'telefon raqami': '+998-91-616-05-30',
-      'jinsi': 'Ayol',
-      'kursi': 1
-    },
-    {
-      'ID': 'AD8170783',
-      'Ism': 'SARVARBEK',
-      'Familiya': 'JANIBEKOV',
-      'yo\'nalishi': 'Sun\'iy intellekt',
-      'guruh': 'FMC01',
-      'telefon raqami': '+998-95-192-17-34',
-      'jinsi': 'Erkak',
-      'kursi': 1
-    },
-    {
-      'ID': 'AD6634372',
-      'Ism': 'MAQSUD BEK',
-      'Familiya': 'OBIDOV',
-      'yo\'nalishi': 'Sun\'iy intellekt',
-      'guruh': 'FMC05',
-      'telefon raqami': '+998-97-577-01-08',
-      'jinsi': 'Erkak',
-      'kursi': 1
-    }
-  ];
-
-  const ws = xlsx.utils.json_to_sheet(sampleData);
-  ws['!cols'] = [
-    { wch: 15 }, // ID
-    { wch: 18 }, // Ism
-    { wch: 22 }, // Familiya
-    { wch: 22 }, // yo'nalishi
-    { wch: 12 }, // guruh
-    { wch: 22 }, // telefon raqami
-    { wch: 10 }, // jinsi
-    { wch: 8 }   // kursi
-  ];
-
-  const wb = xlsx.utils.book_new();
-  xlsx.utils.book_append_sheet(wb, ws, 'Talabalar');
-  const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="talabalar_import_shablon.xlsx"');
-  res.send(buffer);
-});
 
 /**
  * DELETE /api/admin/students/:id

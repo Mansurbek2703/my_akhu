@@ -6328,8 +6328,9 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           </p>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn btn-outline" style="color: #F8FAFC; border-color: rgba(255,255,255,0.25); display: inline-flex; align-items: center; gap: 6px;">
-            ${icon('download', 14)} <span>Excel Shablon</span>
+          <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: background 0.15s ease;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#FFFFFF'" title="Excel import uchun namunaviy shablon faylini yuklab olish">
+            <span style="color: #2563EB; display: inline-flex; align-items: center;">${icon('download', 15)}</span>
+            <span style="color: #1E293B;">Shablonni Yuklab Olish</span>
           </a>
           <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: inline-flex; align-items: center; gap: 6px;">
             ${icon('fileSpreadsheet', 14)} <span>Excel Import</span>
@@ -6357,9 +6358,14 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
       <div class="card-body">
         <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; align-items: start;">
           <div>
-            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px; font-weight: 600;">
-              Excel fayldagi talab qilinadigan 8 ta ustun tartibi:
-            </p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0; font-weight: 600;">
+                Excel fayldagi talab qilinadigan 8 ta ustun tartibi:
+              </p>
+              <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn btn-sm btn-outline" style="background: white; color: #2563EB; border-color: #93C5FD; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; text-decoration: none; padding: 4px 10px; font-size: 12px;">
+                ${icon('download', 13)} <span>Namuna Shablon (.xlsx)</span>
+              </a>
+            </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 12px;">
               <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>1. ID</strong> (masalan, AE1126333)</div>
               <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>2. Ism</strong> (masalan, AYGUL)</div>
