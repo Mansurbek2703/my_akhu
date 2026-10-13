@@ -4069,29 +4069,7 @@ async function renderStaffProfile(container) {
         <!-- Form Body -->
         <div style="padding: 28px;">
           <form id="staff-profile-edit-form" onsubmit="handleStaffProfileSave(event)">
-            <!-- 1. Foto yuklash qismi -->
-            <div style="margin-bottom: 24px;">
-              <label class="form-label" style="font-weight: 700; font-size: 14px; margin-bottom: 8px; display: block;">
-                📷 Profil Fotosurati (Rasm Yuklash)
-              </label>
-              <div class="photo-uploader-box">
-                <img id="profile-preview-thumb" src="${user.photo_url || ''}" class="photo-preview-thumb" style="${user.photo_url ? '' : 'display:none;'}" alt="Preview">
-                <div style="flex: 1;">
-                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-                    <input type="file" id="staff-profile-file-input" accept="image/*" style="display: none;" onchange="handleStaffProfilePhotoUpload(this)">
-                    <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('staff-profile-file-input').click()" style="display: inline-flex; align-items: center; gap: 6px; background: white;">
-                      ${icon('upload', 14)} <span>Kompyuterdan Rasm Yuklash</span>
-                    </button>
-                    <span style="font-size: 11.5px; color: var(--text-muted);">(JPG, PNG formatlarda)</span>
-                  </div>
-                  <div>
-                    <input type="text" id="staff-profile-photo-url" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://... yoki /api/files/...)" oninput="updateProfilePhotoPreview(this.value)">
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 2. Shaxsiy ma'lumotlar -->
+            <!-- 1. Shaxsiy ma'lumotlar -->
             <div class="grid grid-2 mb-3">
               <div class="form-group">
                 <label class="form-label" style="font-weight: 600;">F.I.Sh (To'liq Ism Sharif) *</label>
@@ -4114,14 +4092,14 @@ async function renderStaffProfile(container) {
               </div>
             </div>
 
-            <!-- 3. Parol o'zgartirish -->
+            <!-- 2. Parol o'zgartirish -->
             <div class="form-group mb-4" style="background: #F8FAFC; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 14px;">
               <label class="form-label" style="font-weight: 600; margin-bottom: 4px;">Yangi Parol O'rnatish</label>
               <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">Agar parolni o'zgartirishni istamasangiz, ushbu maydonni bo'sh qoldiring:</p>
               <input type="password" id="staff-profile-password" class="form-control" placeholder="Yangi parol (kamida 6 ta belgi)" style="max-width: 400px;">
             </div>
 
-            <!-- 4. Biriktirilgan Rollar va Guruhlar (Faqat ko'rish uchun) -->
+            <!-- 3. Biriktirilgan Rollar va Guruhlar (Faqat ko'rish uchun) -->
             <div class="grid grid-2 mb-4" style="background: #F1F5F9; border-radius: var(--radius-md); padding: 14px;">
               <div>
                 <label style="font-size: 11.5px; color: #64748B; font-weight: 700; text-transform: uppercase;">Biriktirilgan Rollar:</label>
@@ -4147,46 +4125,6 @@ async function renderStaffProfile(container) {
   }
 }
 
-function updateProfilePhotoPreview(url) {
-  const thumb = document.getElementById('profile-preview-thumb');
-  if (!thumb) return;
-  if (url && url.trim()) {
-    thumb.src = url.trim();
-    thumb.style.display = 'block';
-  } else {
-    thumb.style.display = 'none';
-  }
-}
-
-async function handleStaffProfilePhotoUpload(fileInput) {
-  const file = fileInput.files[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append('file', file);
-
-  try {
-    const res = await fetch('/api/files', {
-      method: 'POST',
-      headers: {
-        'x-user-id': AppState.user.id
-      },
-      body: formData
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Faylni yuklashda xatolik yuz berdi');
-
-    const urlInput = document.getElementById('staff-profile-photo-url');
-    if (urlInput) {
-      urlInput.value = data.url;
-      updateProfilePhotoPreview(data.url);
-    }
-    alert('Rasm muvaffaqiyatli yuklandi!');
-  } catch (err) {
-    alert(`Xatolik: ${err.message}`);
-  }
-}
-
 async function handleStaffProfileSave(event) {
   event.preventDefault();
 
@@ -4194,7 +4132,6 @@ async function handleStaffProfileSave(event) {
   const email = document.getElementById('staff-profile-email')?.value.trim();
   const phone = document.getElementById('staff-profile-phone')?.value.trim();
   const telegram_user_id = document.getElementById('staff-profile-tgid')?.value.trim();
-  const photo_url = document.getElementById('staff-profile-photo-url')?.value.trim();
   const password = document.getElementById('staff-profile-password')?.value;
 
   if (!full_name) {
@@ -4207,8 +4144,7 @@ async function handleStaffProfileSave(event) {
       full_name,
       email,
       phone,
-      telegram_user_id: telegram_user_id || null,
-      photo_url: photo_url || null
+      telegram_user_id: telegram_user_id || null
     };
     if (password && String(password).trim().length > 0) {
       payload.password = String(password).trim();
@@ -4224,11 +4160,10 @@ async function handleStaffProfileSave(event) {
     AppState.user.name = full_name;
     AppState.user.email = email;
     AppState.user.phone = phone;
-    AppState.user.photo_url = photo_url;
     localStorage.setItem('akhu_auth_user', JSON.stringify(AppState.user));
 
     updateAuthUI();
-    alert("Profil ma'lumotlaringiz va rasmingiz muvaffaqiyatli saqlandi!");
+    alert("Profil ma'lumotlaringiz muvaffaqiyatli saqlandi!");
     renderStaffProfile(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
   } catch (err) {
     alert(`Xatolik: ${err.message}`);

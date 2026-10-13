@@ -1362,7 +1362,8 @@ router.get('/profile/me', (req, res) => {
 
 /**
  * PUT /api/admin/profile/me
- * Joriy xodim o'z profilini yangilashi (F.I.Sh, email, phone, photo_url, telegram_user_id, parol)
+ * Joriy xodim o'z profilini yangilashi (F.I.Sh, email, phone, telegram_user_id, parol)
+ * Xodimlar o'z profilidan rasmni o'zgartira olmaydi (faqat Superadmin xodimlar boshqaruvida o'zgartiradi)
  */
 router.put('/profile/me', (req, res) => {
   try {
@@ -1372,12 +1373,17 @@ router.put('/profile/me', (req, res) => {
     const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staffId);
     if (!user) return res.status(404).json({ error: 'Xodim hisobi topilmadi' });
 
+    let parsedRoles = [];
+    try { parsedRoles = JSON.parse(user.roles); } catch(e) { parsedRoles = [user.roles]; }
+    const isSuperadmin = (user.id === 'superadmin' || parsedRoles.includes('superadmin'));
+
     const { full_name, email, phone, photo_url, telegram_user_id, password } = req.body;
 
     const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
     const newEmail = email !== undefined ? String(email).trim() : user.email;
     const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
-    const newPhotoUrl = photo_url !== undefined ? String(photo_url).trim() : user.photo_url;
+    // Xodimlar o'z profilidan rasmni almashtira olmaydi
+    const newPhotoUrl = (isSuperadmin && photo_url !== undefined) ? String(photo_url).trim() : user.photo_url;
     const newTgId = telegram_user_id !== undefined ? String(telegram_user_id).trim() : user.telegram_user_id;
 
     let passHash = user.password_hash;
@@ -1410,7 +1416,7 @@ router.put('/profile/me', (req, res) => {
       action: 'UPDATE_OWN_PROFILE',
       object_type: 'staff_user',
       object_id: staffId,
-      after: { full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl },
+      after: { full_name: newFullName, email: newEmail, phone: newPhone },
       ip: req.ip || '127.0.0.1'
     });
 
