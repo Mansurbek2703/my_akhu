@@ -13,6 +13,7 @@ const { logAudit } = require('../services/pointService');
 const { importStudentsBatch, parseStudentsFromWorkbook } = require('../services/importService');
 const { recalculateStudentScores } = require('../services/ratingService');
 const { normalizePhoneNumber } = require('../utils/phoneUtils');
+const { resolveTelegramChatInfo, sendStaffTelegramNotification } = require('../services/telegramService');
 
 // Multer upload sozlamasi (Excel va CSV uchun)
 const uploadDir = config.uploadDir || path.join(__dirname, '../../uploads');
@@ -930,10 +931,23 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
  * GET /api/admin/users/:id/monitoring
  * Xodimning to'liq faoliyati, Telegram bot holati va o'zgarmas audit tarixi (Superadmin Nazorati)
  */
-router.get('/users/:id/monitoring', authenticateSuperadmin, (req, res) => {
+router.get('/users/:id/monitoring', authenticateSuperadmin, async (req, res) => {
   try {
     const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
     if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
+
+    // Agar Telegram ID mavjud bo'lsa, username ni Telegram API orqali jonli tekshirish va avtomatik yangilash
+    if (user.telegram_user_id) {
+      try {
+        const tgInfo = await resolveTelegramChatInfo(user.telegram_user_id);
+        if (tgInfo.success && tgInfo.username && tgInfo.username !== user.telegram_username) {
+          user.telegram_username = tgInfo.username;
+          db.prepare(`UPDATE staff_user SET telegram_username = ? WHERE id = ?`).run(tgInfo.username, user.id);
+        }
+      } catch (e) {
+        // network error silent ignore
+      }
+    }
 
     let roles = [];
     try { roles = JSON.parse(user.roles); } catch(e) { roles = [user.roles]; }
@@ -1012,7 +1026,6 @@ router.post('/users/:id/test-notification', authenticateSuperadmin, async (req, 
       });
     }
 
-    const { sendStaffTelegramNotification } = require('../services/telegramService');
     const nowStr = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
 
     const message = `🔔 <b>SUPERADMIN TEST BILDIRISHNOMASI</b>\n\n` +
@@ -1055,6 +1068,86 @@ router.post('/users/:id/test-notification', authenticateSuperadmin, async (req, 
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/sync-telegram
+ * Xodimning Telegram ma'lumotlarini (username, ID, bot holati) Telegram API orqali majburiy yangilash
+ */
+router.post('/users/:id/sync-telegram', authenticateSuperadmin, async (req, res) => {
+  try {
+    const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
+
+    const target = user.telegram_user_id || (user.telegram_username ? `@${user.telegram_username}` : null);
+    if (!target) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ushbu xodimda Telegram ID kiritilmagan. Avval Telegram ID ni kiriting.'
+      });
+    }
+
+    const tgInfo = await resolveTelegramChatInfo(target);
+    if (tgInfo.success) {
+      const newUsername = tgInfo.username || user.telegram_username;
+      const newTgId = tgInfo.id || user.telegram_user_id;
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        UPDATE staff_user
+        SET telegram_user_id = COALESCE(?, telegram_user_id),
+            telegram_username = COALESCE(?, telegram_username),
+            bot_status = CASE WHEN bot_status = 'blocked' THEN bot_status ELSE 'active' END,
+            last_active_at = COALESCE(last_active_at, ?)
+        WHERE id = ?
+      `).run(newTgId, newUsername, now, user.id);
+
+      logAudit({
+        actor_id: req.staffUser.id,
+        actor_role: 'superadmin',
+        action: 'SYNC_STAFF_TELEGRAM',
+        object_type: 'staff_user',
+        object_id: user.id,
+        after: { telegram_user_id: newTgId, telegram_username: newUsername }
+      });
+
+      return res.json({
+        success: true,
+        username: newUsername,
+        telegram_user_id: newTgId,
+        first_name: tgInfo.firstName,
+        last_name: tgInfo.lastName,
+        message: newUsername
+          ? `Telegram ma'lumotlari muvaffaqiyatli olindi: @${newUsername}`
+          : `Telegram akkaunti tasdiqlandi (ID: ${newTgId}), lekin ushbu foydalanuvchida public username o'rnatilmagan.`
+      });
+    } else {
+      return res.json({
+        success: false,
+        not_started: Boolean(tgInfo.not_started),
+        error: tgInfo.error,
+        message: `Telegram chat topilmadi. Sababi: Xodim hali universitet botiga (@${config.telegram.botUsername}) kirmagan yoki /start bosmagan. Xodim bir marta botga /start bosishi bilanoq username avtomatik ulanadi.`
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/telegram-resolve?target=...
+ * Telegram ID yoki username bo'yicha Telegram API orqali jonli tekshirish (Superadmin)
+ */
+router.get('/telegram-resolve', authenticateSuperadmin, async (req, res) => {
+  try {
+    const target = req.query.target;
+    if (!target) return res.status(400).json({ success: false, error: 'Telegram ID yoki username talab qilinadi' });
+
+    const info = await resolveTelegramChatInfo(target);
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1145,7 +1238,7 @@ function reconcileAllStudentTutors() {
  * POST /api/admin/users
  * Superadmin tomonidan yangi xodim qo'shish va rollar biriktirish
  */
-router.post('/users', authenticateSuperadmin, (req, res) => {
+router.post('/users', authenticateSuperadmin, async (req, res) => {
   try {
     const {
       id,
@@ -1174,11 +1267,22 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
     const userEmail = email ? String(email).trim() : `${userId}@akhu.uz`;
     const userPhone = phone ? String(phone).trim() : null;
     const userPhoto = photo_url ? String(photo_url).trim() : null;
-    const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id || null);
-    const tgUsername = telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null;
+    let tgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : (telegram_id ? String(telegram_id).trim() : null);
+    let tgUsername = telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null;
     const tgPhone = telegram_phone ? String(telegram_phone).trim() : (userPhone || null);
     const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : (active !== undefined ? (active ? 1 : 0) : 1);
     const targetGroups = groups.length > 0 ? groups : tutor_groups;
+
+    // Telegram username avtomatik olish (agar Telegram ID kiritilgan bo'lsa)
+    if (tgId) {
+      try {
+        const tgInfo = await resolveTelegramChatInfo(tgId);
+        if (tgInfo.success) {
+          if (tgInfo.username) tgUsername = tgInfo.username;
+          if (tgInfo.id && String(tgId).startsWith('@')) tgId = tgInfo.id;
+        }
+      } catch (e) {}
+    }
 
     const cleanRoles = (Array.isArray(roles) ? roles : [roles]).filter(r => r && r !== 'undefined');
 
@@ -1332,7 +1436,7 @@ router.put('/profile/me', (req, res) => {
  * PUT /api/admin/users/:id
  * Xodim ma'lumotlarini, rollarini va guruhlarini tahrirlash (Superadmin Full Access)
  */
-router.put('/users/:id', authenticateSuperadmin, (req, res) => {
+router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
   try {
     const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
     if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
@@ -1375,12 +1479,23 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     const newEmail = email !== undefined ? String(email).trim() : user.email;
     const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
     const newPhotoUrl = photo_url !== undefined ? (photo_url ? String(photo_url).trim() : null) : user.photo_url;
-    const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
-    const tgUsername = telegram_username !== undefined ? (telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null) : user.telegram_username;
+    let tgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : (telegram_id !== undefined ? (telegram_id ? String(telegram_id).trim() : null) : user.telegram_user_id);
+    let tgUsername = telegram_username !== undefined ? (telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null) : user.telegram_username;
     const tgPhone = telegram_phone !== undefined ? (telegram_phone ? String(telegram_phone).trim() : null) : (user.telegram_phone || user.phone);
     const newBotStatus = bot_status !== undefined ? String(bot_status).trim() : user.bot_status;
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
+
+    // Agar Telegram ID berilgan bo'lsa va username kiritilmagan bo'lsa yoki tgId o'zgargan bo'lsa avtomatik tekshirish
+    if (tgId && (!tgUsername || tgId !== user.telegram_user_id)) {
+      try {
+        const tgInfo = await resolveTelegramChatInfo(tgId);
+        if (tgInfo.success) {
+          if (tgInfo.username) tgUsername = tgInfo.username;
+          if (tgInfo.id && String(tgId).startsWith('@')) tgId = tgInfo.id;
+        }
+      } catch (e) {}
+    }
 
     db.transaction(() => {
       // Yangi parol bo'lsa yangilash

@@ -86,6 +86,54 @@ async function editTelegramMessage(chatId, messageId, text, options = {}) {
 }
 
 /**
+ * Telegram User ID yoki username bo'yicha Telegram chat ma'lumotlarini (username, ism, familiya) olish
+ * @param {string|number} target - Telegram User ID (masalan: 1202082857) yoki @username
+ */
+async function resolveTelegramChatInfo(target) {
+  if (!target) return { success: false, error: "Telegram ID ko'rsatilmadi" };
+  try {
+    let raw = String(target).trim();
+    if (!raw) return { success: false, error: "Telegram ID bo'sh" };
+
+    // Agar @ siz username kiritilgan bo'lsa (lekin faqat raqam bo'lmasa)
+    let chatParam = raw;
+    if (!/^-?\d+$/.test(raw) && !raw.startsWith('@')) {
+      chatParam = `@${raw}`;
+    }
+
+    const url = `${TELEGRAM_API}/getChat?chat_id=${encodeURIComponent(chatParam)}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.ok && data.result) {
+      const res = data.result;
+      const username = res.username ? res.username.replace(/^@/, '') : null;
+      return {
+        success: true,
+        id: String(res.id),
+        username: username,
+        firstName: res.first_name || null,
+        lastName: res.last_name || null,
+        title: res.title || null
+      };
+    } else {
+      const desc = data.description || 'Chat topilmadi';
+      const isNotStarted = desc.toLowerCase().includes('chat not found');
+      return {
+        success: false,
+        not_started: isNotStarted,
+        error: desc
+      };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
  * M-01: Telegram WebApp initData ni bot token bilan HMAC tekshirish
  */
 function verifyTelegramInitData(initData) {
@@ -394,11 +442,15 @@ async function sendStaffTelegramNotification({ staff_id, type = 'system_alert', 
     return { success: true, delivered: true };
   } else {
     const errorDesc = res && res.description ? res.description : 'Xabar yuborishda xatolik';
-    const isBlocked = errorDesc.includes('blocked') || errorDesc.includes('deactivated') || errorDesc.includes('chat not found');
-    const status = isBlocked ? 'blocked' : 'failed';
+    const isDeactivatedOrBlocked = errorDesc.toLowerCase().includes('blocked') || errorDesc.toLowerCase().includes('deactivated');
+    const isNotFound = errorDesc.toLowerCase().includes('chat not found');
 
-    if (isBlocked) {
+    const status = isDeactivatedOrBlocked ? 'blocked' : (isNotFound ? 'not_started' : 'failed');
+
+    if (isDeactivatedOrBlocked) {
       db.prepare(`UPDATE staff_user SET bot_status = 'blocked', last_notification_at = ? WHERE id = ?`).run(now, staff.id);
+    } else if (isNotFound) {
+      db.prepare(`UPDATE staff_user SET bot_status = 'not_started', last_notification_at = ? WHERE id = ?`).run(now, staff.id);
     }
 
     db.prepare(`
@@ -409,13 +461,13 @@ async function sendStaffTelegramNotification({ staff_id, type = 'system_alert', 
     logAudit({
       actor_id: 'system',
       actor_role: 'system',
-      action: isBlocked ? 'STAFF_NOTIF_BLOCKED' : 'STAFF_NOTIF_FAILED',
+      action: isDeactivatedOrBlocked ? 'STAFF_NOTIF_BLOCKED' : (isNotFound ? 'STAFF_NOTIF_NOT_STARTED' : 'STAFF_NOTIF_FAILED'),
       object_type: 'staff_user',
       object_id: staff.id,
       after: { type, title, error: errorDesc }
     });
 
-    return { success: false, blocked: isBlocked, error: errorDesc };
+    return { success: false, blocked: isDeactivatedOrBlocked, not_started: isNotFound, error: errorDesc };
   }
 }
 
@@ -577,15 +629,33 @@ async function handleTelegramWebhook(update) {
   const chatId = msg.chat.id;
   const text = msg.text || '';
   const isSuperadmin = String(chatId) === SUPERADMIN_TG_ID;
+  const tgId = String(chatId);
+  const rawUsername = msg.from?.username ? msg.from.username.replace(/^@/, '') : null;
+  const nowIso = new Date().toISOString();
+
+  // Agar bu xodim bo'lsa, uning username va oxirgi faolligini har qanday xabarda darhol yangilash
+  try {
+    const existingStaff = db.prepare(`
+      SELECT id, telegram_username FROM staff_user 
+      WHERE telegram_user_id = ? OR (telegram_username IS NOT NULL AND LOWER(telegram_username) = LOWER(?))
+    `).get(tgId, rawUsername || '');
+
+    if (existingStaff) {
+      db.prepare(`
+        UPDATE staff_user
+        SET telegram_user_id = ?,
+            telegram_username = COALESCE(?, telegram_username),
+            bot_status = 'active',
+            last_active_at = ?
+        WHERE id = ?
+      `).run(tgId, rawUsername, nowIso, existingStaff.id);
+    }
+  } catch (e) {}
 
   // 1. /start buyrug'i
   if (text.startsWith('/start')) {
-    const tgId = String(chatId);
-    const username = msg.from?.username ? `@${msg.from.username}` : null;
-    const nowIso = new Date().toISOString();
-
     recordBotActivity(chatId, 'command_start', `/start buyrug'i yuborildi`, {
-      username: msg.from?.username,
+      username: rawUsername,
       firstName: msg.from?.first_name,
       lastName: msg.from?.last_name
     });
@@ -596,8 +666,8 @@ async function handleTelegramWebhook(update) {
       staffUser = db.prepare(`SELECT * FROM staff_user WHERE id = 'superadmin'`).get();
     } else {
       staffUser = db.prepare(`SELECT * FROM staff_user WHERE telegram_user_id = ?`).get(tgId);
-      if (!staffUser && msg.from?.username) {
-        staffUser = db.prepare(`SELECT * FROM staff_user WHERE LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)`).get(msg.from.username, `@${msg.from.username}`);
+      if (!staffUser && rawUsername) {
+        staffUser = db.prepare(`SELECT * FROM staff_user WHERE LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)`).get(rawUsername, `@${rawUsername}`);
       }
     }
 
@@ -610,7 +680,7 @@ async function handleTelegramWebhook(update) {
             bot_status = 'active',
             last_active_at = ?
         WHERE id = ?
-      `).run(tgId, username, nowIso, nowIso, staffUser.id);
+      `).run(tgId, rawUsername, nowIso, nowIso, staffUser.id);
 
       logAudit({
         actor_id: staffUser.id,
@@ -618,7 +688,7 @@ async function handleTelegramWebhook(update) {
         action: 'BOT_START',
         object_type: 'staff_user',
         object_id: staffUser.id,
-        after: { username, telegram_user_id: tgId }
+        after: { username: rawUsername, telegram_user_id: tgId }
       });
 
       let parsedRoles = [];
@@ -752,7 +822,7 @@ async function handleTelegramWebhook(update) {
 
     if (staff) {
       const now = new Date().toISOString();
-      const username = msg.from?.username ? `@${msg.from.username}` : null;
+      const rawUsername = msg.from?.username ? msg.from.username.replace(/^@/, '') : null;
       db.prepare(`
         UPDATE staff_user
         SET telegram_user_id = ?,
@@ -762,7 +832,7 @@ async function handleTelegramWebhook(update) {
             bot_status = 'active',
             last_active_at = ?
         WHERE id = ?
-      `).run(String(chatId), cleanPhone, username, now, now, staff.id);
+      `).run(String(chatId), cleanPhone, rawUsername, now, now, staff.id);
 
       logAudit({
         actor_id: staff.id,
@@ -878,5 +948,6 @@ module.exports = {
   startTelegramPolling,
   stopTelegramPolling,
   recordBotActivity,
-  broadcastNewEventToStudents
+  broadcastNewEventToStudents,
+  resolveTelegramChatInfo
 };

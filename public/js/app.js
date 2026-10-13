@@ -7859,16 +7859,16 @@ function renderStaffTableRows() {
           <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#EF4444;"></span> Mute / Blok
         </span>
         <div style="font-size:10.5px; color:#DC2626; margin-top:2px; font-weight:600;">
-          Xabar yetmayapti!
+          ${u.telegram_username ? `@${u.telegram_username.replace(/^@/, '')}` : (u.telegram_user_id ? `ID: ${u.telegram_user_id}` : 'Bloklangan')}
         </div>
       `;
     } else {
       tgBadge = `
         <span class="badge" style="background:#F1F5F9; color:#64748B; border:1px solid #CBD5E1; font-weight:600; display:inline-flex; align-items:center; gap:4px; font-size:11.5px;">
-          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#94A3B8;"></span> Ulanmagan
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#94A3B8;"></span> ${u.telegram_user_id ? 'Start kutilmoqda' : 'Ulanmagan'}
         </span>
-        <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">
-          Start bosmagan
+        <div style="font-size:10.5px; color:#64748B; margin-top:2px;">
+          ${u.telegram_username ? `<span style="color:#0284C7; font-weight:600;">@${u.telegram_username.replace(/^@/, '')}</span>` : (u.telegram_user_id ? `ID: <code>${u.telegram_user_id}</code>` : 'Start bosmagan')}
         </div>
       `;
     }
@@ -8013,16 +8013,22 @@ async function showCreateStaffModal() {
       </div>
 
       <!-- Telegram ma'lumotlari -->
-      <div class="grid grid-2 mb-3">
+      <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1.1fr 1fr 1fr; gap:10px;">
         <div class="form-group">
-          <label class="form-label">Telegram Username (@username)</label>
-          <div style="position:relative;">
-            <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
-            <input type="text" id="new-staff-tgusername" class="form-control" style="padding-left:26px;" placeholder="username">
-          </div>
+          <label class="form-label" style="font-weight:600;">Telegram User ID</label>
+          <input type="text" id="new-staff-tgid" class="form-control" placeholder="1202082857" onblur="autoFetchTgUsername('new-staff-tgid', 'new-staff-tgusername', 'new-staff-tgid-status')">
+          <div id="new-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">ID kiritilganda username botdan avtomatik olinadi</div>
         </div>
         <div class="form-group">
-          <label class="form-label">Telegram Telefon Raqami (Bot uchun)</label>
+          <label class="form-label">Telegram Username (@)</label>
+          <div style="position:relative;">
+            <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
+            <input type="text" id="new-staff-tgusername" class="form-control" style="padding-left:26px;" placeholder="avtomatik aniqlanadi">
+          </div>
+          <small class="text-muted" style="font-size:11px;">Avtomatik olinadi</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram Telefon Raqami</label>
           <input type="text" id="new-staff-tgphone" class="form-control" placeholder="+998901234567">
         </div>
       </div>
@@ -8077,6 +8083,7 @@ async function handleCreateStaffSubmit() {
   const full_name = document.getElementById('new-staff-fullname')?.value.trim();
   const email = document.getElementById('new-staff-email')?.value.trim();
   const phone = document.getElementById('new-staff-phone')?.value.trim();
+  const telegram_user_id = document.getElementById('new-staff-tgid')?.value.trim();
   const telegram_username = document.getElementById('new-staff-tgusername')?.value.trim();
   const telegram_phone = document.getElementById('new-staff-tgphone')?.value.trim();
   const photo_url = document.getElementById('new-staff-photourl')?.value.trim();
@@ -8108,6 +8115,7 @@ async function handleCreateStaffSubmit() {
         full_name,
         email,
         phone,
+        telegram_user_id: telegram_user_id || null,
         telegram_username: telegram_username || null,
         telegram_phone: telegram_phone || phone || null,
         photo_url: photo_url || null,
@@ -8231,8 +8239,9 @@ async function showEditStaffModal(userId) {
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Telegram User ID</label>
-          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857">
+          <label class="form-label" style="font-weight:600;">Telegram User ID</label>
+          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857" onblur="autoFetchTgUsername('edit-staff-tgid', 'edit-staff-tgusername', 'edit-staff-tgid-status')">
+          <div id="edit-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">ID kiritilganda username botdan avtomatik olinadi</div>
         </div>
       </div>
 
@@ -8596,12 +8605,27 @@ async function showStaffMonitoringModal(userId) {
 
           <div style="font-size:12.5px; color:#0C4A6E; line-height:1.7; margin-bottom:12px;">
             <div>🆔 <b>Telegram ID:</b> <code style="background:white; padding:2px 6px; border-radius:4px; font-weight:700; color:#0284C7;">${bot_info.telegram_user_id || 'Ulanmagan'}</code></div>
-            <div>👤 <b>Telegram Username:</b> ${bot_info.telegram_username ? `<a href="https://t.me/${bot_info.telegram_username.replace(/^@/, '')}" target="_blank" style="color:#0284C7; font-weight:700;">@${bot_info.telegram_username.replace(/^@/, '')}</a>` : '<span style="color:#64748B;">Kiritilmagan</span>'}</div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span>👤 <b>Telegram Username:</b></span>
+              ${bot_info.telegram_username ? `
+                <a href="https://t.me/${bot_info.telegram_username.replace(/^@/, '')}" target="_blank" style="color:#0284C7; font-weight:700; text-decoration:underline;">@${bot_info.telegram_username.replace(/^@/, '')}</a>
+                <button class="btn btn-xs" onclick="syncStaffTelegram('${user.id}')" title="Telegram API dan qayta tekshirish" style="padding:1px 6px; font-size:11px; background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; border-radius:4px; cursor:pointer; font-weight:600;">🔄 Yangilash</button>
+              ` : `
+                <span style="color:#D97706; font-weight:600;">Kutilmoqda (botga /start bosganda avtomatik ulanadi)</span>
+                <button class="btn btn-xs" onclick="syncStaffTelegram('${user.id}')" title="Telegram API dan qidirish" style="padding:2px 8px; font-size:11px; background:#0284C7; color:white; border:none; border-radius:4px; font-weight:600; cursor:pointer;">🔄 Telegramdan Olish</button>
+              `}
+            </div>
             <div>📱 <b>Telegram Telefon:</b> <b>${bot_info.telegram_phone || user.phone || 'Kiritilmagan'}</b></div>
             <div>⏱️ <b>Botga /start bosgan:</b> <b>${formatDateTimeUz(bot_info.bot_started_at)}</b></div>
             <div>⚡ <b>Oxirgi faollik:</b> <b>${formatDateTimeUz(bot_info.last_active_at)}</b></div>
             <div>📬 <b>Oxirgi bildirishnoma:</b> <b>${formatDateTimeUz(bot_info.last_notification_at)}</b></div>
           </div>
+
+          ${!bot_info.telegram_username ? `
+            <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:8px 12px; font-size:11.5px; color:#92400E; margin-bottom:12px; line-height:1.45;">
+              💡 <b>Telegram Qoidasi:</b> Telegram xavfsizlik siyosatiga binoan, bot foydalanuvchi ma'lumotlarini olishi uchun xodim kamida 1 marta rasmiy botga (<a href="https://t.me/akhu_talabalar_bot" target="_blank" style="color:#B45309; font-weight:700; text-decoration:underline;">@akhu_talabalar_bot</a>) <code>/start</code> bosishi shart. Xodim botga /start bosishi bilanoq username darhol tizimga birikadi!
+            </div>
+          ` : ''}
 
           <div style="font-size:11.5px; margin-bottom:12px;">
             ${botStatusDesc}
@@ -8612,9 +8636,9 @@ async function showStaffMonitoringModal(userId) {
             <button id="btn-send-staff-test-notif" class="btn btn-sm" onclick="sendStaffTestNotification('${user.id}')" style="background:#0284C7; color:white; border:none; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:6px; padding:6px 14px; box-shadow:0 2px 6px rgba(2,132,199,0.3);">
               <span>🔔</span> <span>Test Bildirishnoma Yuborish (Mute tekshiruvi)</span>
             </button>
-            <div style="font-size:11px; color:#0369A1; text-align:right;">
-              Jonli bot aloqasini tekshiradi
-            </div>
+            <button class="btn btn-sm" onclick="syncStaffTelegram('${user.id}')" style="background:white; color:#0369A1; border:1px solid #BAE6FD; font-weight:600; border-radius:6px; display:inline-flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;" title="Xodimning Telegram username va holatini qayta sinxronizatsiya qilish">
+              <span>🔄</span> <span>Telegramdan Olish</span>
+            </button>
           </div>
           <div id="staff-test-notif-result" style="margin-top:8px; display:none;"></div>
         </div>
@@ -8858,6 +8882,71 @@ async function sendStaffTestNotification(userId) {
   }
 }
 
+async function autoFetchTgUsername(inputId, targetUsernameId, statusId) {
+  const idInput = document.getElementById(inputId);
+  const uInput = document.getElementById(targetUsernameId);
+  const statusBox = document.getElementById(statusId);
+  if (!idInput || !idInput.value.trim()) return;
+
+  const val = idInput.value.trim();
+  if (statusBox) statusBox.innerHTML = '<span style="color:#2563EB;">🔍 Telegram tekshirilmoqda...</span>';
+
+  try {
+    const res = await apiFetch(`/api/admin/telegram-resolve?target=${encodeURIComponent(val)}`);
+    if (res.success && res.username) {
+      if (uInput) uInput.value = res.username;
+      if (statusBox) statusBox.innerHTML = `<span style="color:#059669; font-weight:600;">✅ Topildi: @${res.username} (${res.firstName || ''})</span>`;
+    } else if (res.not_started) {
+      if (statusBox) statusBox.innerHTML = `<span style="color:#D97706;">ℹ️ Xodim botga /start bosganda avtomatik ulanadi</span>`;
+    } else {
+      if (statusBox) statusBox.innerHTML = `<span style="color:#64748B;">ℹ️ ID kiritildi</span>`;
+    }
+  } catch(e) {
+    if (statusBox) statusBox.innerHTML = '';
+  }
+}
+
+async function syncStaffTelegram(userId) {
+  const resultBox = document.getElementById('staff-test-notif-result');
+  if (resultBox) {
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = `<div style="padding:8px 12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:6px; font-size:12px; color:#1E3A8A;"><span class="spinner" style="width:12px; height:12px; display:inline-block; border-width:2px; vertical-align:middle; margin-right:6px;"></span> Telegram API orqali ma'lumotlar olinmoqda...</div>`;
+  }
+
+  try {
+    const res = await apiFetch(`/api/admin/users/${userId}/sync-telegram`, { method: 'POST' });
+    if (res.success) {
+      if (resultBox) {
+        resultBox.innerHTML = `
+          <div style="padding:10px 14px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:6px; font-size:12.5px; color:#065F46; font-weight:700;">
+            ✅ ${res.message || 'Telegram ma\'lumotlari muvaffaqiyatli yangilandi!'}
+          </div>
+        `;
+      }
+      setTimeout(() => {
+        showStaffMonitoringModal(userId);
+        loadStaffUsersList();
+      }, 1200);
+    } else {
+      if (resultBox) {
+        resultBox.innerHTML = `
+          <div style="padding:10px 14px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; font-size:12px; color:#92400E; line-height:1.45;">
+            ℹ️ ${res.message || res.error || 'Chat topilmadi'}
+          </div>
+        `;
+      }
+    }
+  } catch (err) {
+    if (resultBox) {
+      resultBox.innerHTML = `
+        <div style="padding:10px 14px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; font-size:12.5px; color:#991B1B;">
+          ❌ <b>Xatolik:</b> ${err.message}
+        </div>
+      `;
+    }
+  }
+}
+
 window.showCreateStaffModal = showCreateStaffModal;
 window.handleCreateStaffSubmit = handleCreateStaffSubmit;
 window.showEditStaffModal = showEditStaffModal;
@@ -8868,6 +8957,8 @@ window.resetStaffFilters = resetStaffFilters;
 window.showStaffMonitoringModal = showStaffMonitoringModal;
 window.switchStaffMonitoringSubTab = switchStaffMonitoringSubTab;
 window.sendStaffTestNotification = sendStaffTestNotification;
+window.autoFetchTgUsername = autoFetchTgUsername;
+window.syncStaffTelegram = syncStaffTelegram;
 
 // ====================================================================
 // SUPERADMIN: XODIM SIFATIDA TIZIMNI TEKSHIRISH (IMPERSONATION)
