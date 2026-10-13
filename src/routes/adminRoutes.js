@@ -519,6 +519,16 @@ router.post('/students/:id/photo', authenticateSuperadminOrRegistrator, upload.s
     const student = db.prepare('SELECT * FROM student WHERE id = ?').get(req.params.id);
     if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
 
+    // Tyutor faqat o'ziga biriktirilgan talabalarni rasmini almashtirishi mumkin
+    if (req.staffUser.roles.includes('tutor') && !req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('dep_ob')) {
+      const tutorId = req.staffUser.id;
+      const tutorGroups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+      const isAssigned = (student.tutor_id === tutorId || (student.group_code && tutorGroups.includes(student.group_code)));
+      if (!isAssigned) {
+        return res.status(403).json({ error: 'Siz faqat o\'zingizga biriktirilgan talabaning fotosuratini o\'zgartirishingiz mumkin' });
+      }
+    }
+
     let photoUrl = null;
 
     if (req.file) {
@@ -575,6 +585,16 @@ router.delete('/students/:id/photo', authenticateSuperadminOrRegistrator, (req, 
   try {
     const student = db.prepare('SELECT * FROM student WHERE id = ?').get(req.params.id);
     if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    // Tyutor faqat o'ziga biriktirilgan talabalarni rasmini o'chira oladi
+    if (req.staffUser.roles.includes('tutor') && !req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('dep_ob')) {
+      const tutorId = req.staffUser.id;
+      const tutorGroups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(tutorId).map(g => g.group_code);
+      const isAssigned = (student.tutor_id === tutorId || (student.group_code && tutorGroups.includes(student.group_code)));
+      if (!isAssigned) {
+        return res.status(403).json({ error: 'Siz faqat o\'zingizga biriktirilgan talabaning fotosuratini o\'chira olasiz' });
+      }
+    }
 
     const now = new Date().toISOString();
     db.prepare('UPDATE student SET photo_url = NULL, updated_at = ? WHERE id = ?').run(now, student.id);
@@ -1136,6 +1156,8 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
 
     const {
+      username,
+      new_id,
       full_name,
       email,
       phone,
@@ -1150,10 +1172,24 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       password
     } = req.body;
 
+    const rawTargetUsername = (username !== undefined ? username : (new_id !== undefined ? new_id : user.id));
+    const targetUsername = rawTargetUsername ? String(rawTargetUsername).trim() : user.id;
+
+    if (!targetUsername) {
+      return res.status(400).json({ error: 'Foydalanuvchi nomi (login) bo\'sh bo\'lishi mumkin emas' });
+    }
+
+    if (targetUsername.toLowerCase() !== user.id.toLowerCase()) {
+      const existing = db.prepare(`SELECT id FROM staff_user WHERE LOWER(id) = LOWER(?) AND id != ?`).get(targetUsername, user.id);
+      if (existing) {
+        return res.status(400).json({ error: `"${targetUsername}" loginli xodim allaqachon mavjud! Boshqa login tanlang.` });
+      }
+    }
+
     const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
     const newEmail = email !== undefined ? String(email).trim() : user.email;
     const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
-    const newPhotoUrl = photo_url !== undefined ? String(photo_url).trim() : user.photo_url;
+    const newPhotoUrl = photo_url !== undefined ? (photo_url ? String(photo_url).trim() : null) : user.photo_url;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
@@ -1170,6 +1206,15 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         let arr = Array.isArray(roles) ? roles : [roles];
         arr = arr.filter(r => r && r !== 'undefined');
         updatedRoles = JSON.stringify(arr);
+      }
+
+      // Agar ID (login) o'zgargan bo'lsa
+      if (targetUsername !== user.id) {
+        db.prepare(`UPDATE staff_user SET id = ? WHERE id = ?`).run(targetUsername, user.id);
+        db.prepare(`UPDATE tutor_group SET tutor_id = ? WHERE tutor_id = ?`).run(targetUsername, user.id);
+        db.prepare(`UPDATE student SET tutor_id = ? WHERE tutor_id = ?`).run(targetUsername, user.id);
+        db.prepare(`UPDATE point_entry SET created_by = ? WHERE created_by = ?`).run(targetUsername, user.id);
+        db.prepare(`UPDATE point_entry SET approved_by = ? WHERE approved_by = ?`).run(targetUsername, user.id);
       }
 
       db.prepare(`
@@ -1192,16 +1237,16 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         tgId,
         activeVal,
         passHash,
-        req.params.id
+        targetUsername
       );
 
       // Tyutor guruhlarini va unga tegishli talabalarni sinxronlashtirish
       const currentRoles = typeof updatedRoles === 'string' ? JSON.parse(updatedRoles) : updatedRoles;
       const isTutorRole = Array.isArray(currentRoles) && currentRoles.includes('tutor');
       if (targetGroups !== undefined && Array.isArray(targetGroups)) {
-        syncTutorGroupsAndStudents(req.params.id, targetGroups, isTutorRole);
+        syncTutorGroupsAndStudents(targetUsername, targetGroups, isTutorRole);
       } else if (!isTutorRole) {
-        syncTutorGroupsAndStudents(req.params.id, [], false);
+        syncTutorGroupsAndStudents(targetUsername, [], false);
       }
 
       logAudit({
@@ -1209,14 +1254,18 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         actor_role: 'superadmin',
         action: 'UPDATE_STAFF_USER',
         object_type: 'staff_user',
-        object_id: req.params.id,
-        before: { full_name: user.full_name, roles: user.roles, active: user.active },
-        after: { full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups },
+        object_id: targetUsername,
+        before: { id: user.id, full_name: user.full_name, roles: user.roles, active: user.active },
+        after: { id: targetUsername, full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups, password_changed: Boolean(password && String(password).trim().length > 0) },
         ip: req.ip || '127.0.0.1'
       });
     })();
 
-    res.json({ success: true, message: 'Xodim ma\'lumotlari va rollari yangilandi' });
+    res.json({
+      success: true,
+      message: 'Xodim ma\'lumotlari, login va paroli muvaffaqiyatli yangilandi',
+      id: targetUsername
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

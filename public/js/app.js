@@ -5976,23 +5976,42 @@ async function showStudentModal(studentId) {
     const isFemale = st.gender === 'female' || st.gender === 'f';
     const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
     const avatarHtml = st.photo_url
-      ? `<img src="${st.photo_url}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="${st.first_name}">`
-      : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 60px; height: 60px; font-size: 22px;">${initials}</span>`;
+      ? `<img src="${st.photo_url}" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="${st.first_name}">`
+      : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 64px; height: 64px; font-size: 22px;">${initials}</span>`;
 
     modalTitle.textContent = `${st.first_name} ${st.last_name} (${st.group_code})`;
     modalBody.innerHTML = `
       <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-light);">
-        ${avatarHtml}
-        <div>
-          <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">${st.first_name} ${st.last_name}</h4>
-          <span class="badge badge-group">${st.external_id}</span>
-          <span class="badge badge-course">${st.course}-kurs • ${st.group_code}</span>
+        <div style="position: relative; display: inline-block;">
+          <div id="modal-student-avatar-wrap" onclick="document.getElementById('modal-student-photo-input').click()" style="cursor: pointer;" title="Rasmni almashtirish uchun bosing">
+            ${avatarHtml}
+          </div>
+          <button type="button" onclick="document.getElementById('modal-student-photo-input').click()" style="position: absolute; bottom: -2px; right: -2px; background: #2563EB; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="Rasmni almashtirish">
+            ${icon('upload', 13)}
+          </button>
+          <input type="file" id="modal-student-photo-input" accept="image/*" style="display: none;" onchange="uploadStudentPhotoDirect('${st.id}', this)">
+        </div>
+        <div style="flex: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
+            <div>
+              <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">${st.first_name} ${st.last_name}</h4>
+              <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                <span class="badge badge-group">${st.external_id}</span>
+                <span class="badge badge-course">${st.course}-kurs • ${st.group_code}</span>
+              </div>
+            </div>
+            <div>
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-student-photo-input').click()" style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 5px 12px; border-color: #93C5FD; color: #1D4ED8; background: #EFF6FF;">
+                ${icon('upload', 13)} <span>Rasmni Almashtirish</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="grid grid-2 mb-3">
         <div>
           <p><strong>Guruh:</strong> ${st.group_code}</p>
-          <p><strong>Kurs:</strong> ${st.course}-kurs (${st.level === 'bak' ? 'Bakalavriat' : 'Magistratura'})</p>
+          <p><strong>Kurs:</strong> ${st.course}-kurs (${st.level === 'mag' ? 'Magistratura' : 'Bakalavriat'})</p>
           <p><strong>Yo'nalish:</strong> ${st.program_code}</p>
           <p><strong>Tyutor:</strong> ${st.tutor_name || 'Biriktirilmagan'}</p>
         </div>
@@ -6032,6 +6051,46 @@ async function showStudentModal(studentId) {
     `;
   } catch (err) {
     modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+  }
+}
+
+async function uploadStudentPhotoDirect(studentId, fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const avatarWrap = document.getElementById('modal-student-avatar-wrap');
+  if (avatarWrap) avatarWrap.style.opacity = '0.5';
+
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  try {
+    const res = await fetch(`/api/admin/students/${studentId}/photo`, {
+      method: 'POST',
+      headers: {
+        'x-user-id': AppState.user.id
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Rasm yuklashda xatolik yuz berdi');
+
+    alert("Talabaning fotosurati muvaffaqiyatli almashtirildi!");
+    await showStudentModal(studentId);
+
+    // Tyutor yoki admin jadvalini fon rejimida yangilash
+    if (AppState.currentPage === 'tutor-students') {
+      const studRes = await apiFetch('/api/tutor/students');
+      window.tutorStudentsCache = studRes.students || [];
+      const tbody = document.getElementById('tutor-students-tbody');
+      if (tbody) tbody.innerHTML = renderTutorTableRowsHtml(window.tutorStudentsCache);
+    } else if (typeof loadAdminStudentsList === 'function') {
+      loadAdminStudentsList();
+    }
+  } catch (err) {
+    if (avatarWrap) avatarWrap.style.opacity = '1';
+    alert("Xatolik: " + err.message);
   }
 }
 
@@ -6878,8 +6937,37 @@ async function showEditStudentModal(studentId) {
     const data = await apiFetch(`/api/admin/students/${studentId}`);
     const st = data.student;
 
+    const isFemale = st.gender === 'female' || st.gender === 'f';
+    const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+    const avatarHtml = st.photo_url
+      ? `<img src="${st.photo_url}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="${st.first_name}">`
+      : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 56px; height: 56px; font-size: 20px;">${initials}</span>`;
+
     modalBody.innerHTML = `
       <form id="edit-student-form">
+        <!-- Fotosurat yuklash / almashtirish -->
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding: 12px; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border-light);">
+          <div id="edit-std-photo-preview-wrap">
+            ${avatarHtml}
+          </div>
+          <div style="flex: 1;">
+            <label class="form-label" style="font-weight: 600; margin-bottom: 4px;">Talaba Fotosurati (Profil Rasmi)</label>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <input type="file" id="edit-std-photo-file" accept="image/*" style="display: none;" onchange="handleStudentEditPhotoSelect('${st.id}', this)">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('edit-std-photo-file').click()" style="display: inline-flex; align-items: center; gap: 5px; background: white; font-size: 12px;">
+                ${icon('upload', 13)} <span>Kompyuterdan Rasm Tanlash</span>
+              </button>
+              <input type="hidden" id="edit-std-photourl" value="${st.photo_url || ''}">
+              ${st.photo_url ? `
+                <button type="button" class="btn btn-outline btn-sm text-danger" onclick="removeStudentPhotoInEdit('${st.id}')" style="padding: 4px 8px; font-size: 11px; border-color: #FCA5A5;">
+                  Rasmni O'chirish
+                </button>
+              ` : ''}
+            </div>
+            <small class="text-muted" style="font-size: 11px;">Rasm tanlanganda avtomatik ravishda yuklanadi</small>
+          </div>
+        </div>
+
         <div class="grid grid-2 mb-3">
           <div class="form-group">
             <label class="form-label">Talaba ID (External ID) *</label>
@@ -6975,6 +7063,58 @@ async function showEditStudentModal(studentId) {
   }
 }
 
+async function handleStudentEditPhotoSelect(studentId, input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  try {
+    const res = await fetch(`/api/admin/students/${studentId}/photo`, {
+      method: 'POST',
+      headers: { 'x-user-id': AppState.user.id },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Rasm yuklashda xatolik yuz berdi');
+
+    const previewWrap = document.getElementById('edit-std-photo-preview-wrap');
+    if (previewWrap && data.photo_url) {
+      previewWrap.innerHTML = `<img src="${data.photo_url}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="Foto">`;
+    }
+    const urlInp = document.getElementById('edit-std-photourl');
+    if (urlInp) urlInp.value = data.photo_url;
+
+    alert("Talaba fotosurati muvaffaqiyatli saqlandi!");
+  } catch (err) {
+    alert("Xatolik: " + err.message);
+  }
+}
+
+async function removeStudentPhotoInEdit(studentId) {
+  if (!confirm("Talaba fotosuratini o'chirmoqchimisiz?")) return;
+  try {
+    const res = await fetch(`/api/admin/students/${studentId}/photo`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': AppState.user.id }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Rasmni o'chirishda xatolik");
+
+    const previewWrap = document.getElementById('edit-std-photo-preview-wrap');
+    if (previewWrap) {
+      previewWrap.innerHTML = `<span class="avatar-badge" style="width: 56px; height: 56px; font-size: 20px;">👤</span>`;
+    }
+    const urlInp = document.getElementById('edit-std-photourl');
+    if (urlInp) urlInp.value = '';
+
+    alert("Fotosurat o'chirildi!");
+  } catch (err) {
+    alert("Xatolik: " + err.message);
+  }
+}
+
 async function handleEditStudentSubmit(studentId) {
   const external_id = document.getElementById('edit-std-external-id')?.value.trim();
   const group_code = document.getElementById('edit-std-group')?.value.trim();
@@ -6989,13 +7129,14 @@ async function handleEditStudentSubmit(studentId) {
   const email = document.getElementById('edit-std-email')?.value.trim();
   const status = document.getElementById('edit-std-status')?.value;
   const tutor_id = document.getElementById('edit-std-tutor')?.value || null;
+  const photo_url = document.getElementById('edit-std-photourl')?.value || undefined;
 
   try {
     await apiFetch(`/api/admin/students/${studentId}`, {
       method: 'PUT',
       body: JSON.stringify({
         external_id, group_code, first_name, last_name,
-        program_code, level, course, gender, phone, email, tutor_id, status
+        program_code, level, course, gender, phone, email, tutor_id, status, photo_url
       })
     });
 
@@ -7912,30 +8053,37 @@ async function showEditStaffModal(userId) {
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
+          <label class="form-label" style="font-weight: 600;">Foydalanuvchi Nomi (Login) *</label>
+          <input type="text" id="edit-staff-username" class="form-control" value="${user.username || user.id}" required placeholder="masalan: jasur_m">
+          <small class="text-muted" style="font-size: 11px;">Tizimga kirish uchun xodim logini</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 600;">Yangi Parol</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="edit-staff-password" class="form-control" placeholder="Yangi parol (o'zgartirish uchun)">
+            <button type="button" class="btn btn-outline btn-sm" onclick="generateStaffPassword('edit-staff-password')" title="Yangi parol generatsiya qilish" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">
+              Tasodifiy
+            </button>
+          </div>
+          <small class="text-muted" style="font-size: 11px;">Eski parolni saqlab qolish uchun bo'sh qoldiring</small>
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
           <label class="form-label">F.I.Sh (To'liq ismi) *</label>
           <input type="text" id="edit-staff-fullname" class="form-control" value="${user.full_name || ''}" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Yangi Parol (faqat o'zgartirish uchun)</label>
-          <input type="password" id="edit-staff-password" class="form-control" placeholder="Eski parolni saqlash uchun bo'sh qoldiring">
-        </div>
-      </div>
-
-      <div class="grid grid-2 mb-3">
-        <div class="form-group">
           <label class="form-label">Email *</label>
           <input type="email" id="edit-staff-email" class="form-control" value="${user.email || ''}">
         </div>
-        <div class="form-group">
-          <label class="form-label">Telefon Raqami</label>
-          <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
-        </div>
       </div>
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Foydalanuvchi Nomi (Login)</label>
-          <input type="text" class="form-control" value="${user.username || user.id}" disabled style="background:#F1F5F9; color:#64748B;">
+          <label class="form-label">Telefon Raqami</label>
+          <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
         </div>
         <div class="form-group">
           <label class="form-label">Telegram User ID (Xabarnomalar uchun)</label>
@@ -7999,6 +8147,17 @@ async function showEditStaffModal(userId) {
   openModal();
 }
 
+function generateStaffPassword(targetId) {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let pass = 'akhu_';
+  for (let i = 0; i < 5; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  const inp = document.getElementById(targetId);
+  if (inp) {
+    inp.value = pass;
+    inp.focus();
+  }
+}
+
 async function handleAdminStaffPhotoUpload(fileInput, targetUrlId, previewId) {
   const file = fileInput.files[0];
   if (!file) return;
@@ -8038,8 +8197,9 @@ function updateAdminStaffPhotoPreview(url, previewId) {
 }
 
 async function handleEditStaffSubmit(userId) {
+  const username = document.getElementById('edit-staff-username')?.value.trim();
   const full_name = document.getElementById('edit-staff-fullname')?.value.trim();
-  const password = document.getElementById('edit-staff-password')?.value;
+  const password = document.getElementById('edit-staff-password')?.value?.trim();
   const email = document.getElementById('edit-staff-email')?.value.trim();
   const phone = document.getElementById('edit-staff-phone')?.value.trim();
   const photo_url = document.getElementById('edit-staff-photourl')?.value.trim();
@@ -8054,6 +8214,11 @@ async function handleEditStaffSubmit(userId) {
     .map(cb => cb.value.trim())
     .filter(Boolean);
 
+  if (!username) {
+    alert("Foydalanuvchi nomi (login) kiritilishi shart!");
+    return;
+  }
+
   if (!full_name) {
     alert("F.I.Sh kiritilishi shart!");
     return;
@@ -8066,6 +8231,7 @@ async function handleEditStaffSubmit(userId) {
 
   try {
     const payload = {
+      username,
       full_name,
       email,
       phone,
@@ -8077,17 +8243,24 @@ async function handleEditStaffSubmit(userId) {
       tutor_groups,
       groups: tutor_groups
     };
-    if (password && String(password).trim().length > 0) {
-      payload.password = String(password).trim();
+    if (password && password.length > 0) {
+      payload.password = password;
     }
 
-    await apiFetch(`/api/admin/users/${userId}`, {
+    const res = await apiFetch(`/api/admin/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
 
+    if (AppState.user && String(AppState.user.id) === String(userId)) {
+      AppState.user.id = username;
+      AppState.user.name = full_name;
+      AppState.user.full_name = full_name;
+      localStorage.setItem('akhu_auth_user', JSON.stringify(AppState.user));
+    }
+
     closeModal();
-    alert("Xodim ma'lumotlari, fotosurati va rollari muvaffaqiyatli yangilandi!");
+    alert(res?.message || "Xodim ma'lumotlari muvaffaqiyatli saqlandi!");
     await loadStaffUsersList();
   } catch (err) {
     alert(err.message);
