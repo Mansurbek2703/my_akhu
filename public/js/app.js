@@ -7038,7 +7038,7 @@ async function handleStudentEditPhotoSelect(studentId, input) {
     const urlInp = document.getElementById('edit-std-photourl');
     if (urlInp) urlInp.value = data.photo_url;
 
-    alert("Talaba fotosurati muvaffaqiyatli saqlandi!");
+    // Rasm preview darhol yangilandi, alohida alert shart emas
   } catch (err) {
     alert("Xatolik: " + err.message);
   }
@@ -7060,8 +7060,7 @@ async function removeStudentPhotoInEdit(studentId) {
     }
     const urlInp = document.getElementById('edit-std-photourl');
     if (urlInp) urlInp.value = '';
-
-    alert("Fotosurat o'chirildi!");
+    // Rasm olib tashlandi, qo'shimcha alert shart emas
   } catch (err) {
     alert("Xatolik: " + err.message);
   }
@@ -7092,6 +7091,13 @@ async function handleEditStudentSubmit(studentId) {
     payload.tutor_id = tutor_id;
   }
 
+  const submitBtn = document.querySelector('#common-modal .modal-footer .btn-primary');
+  const originalBtnHtml = submitBtn ? submitBtn.innerHTML : null;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `Saqlanmoqda...`;
+  }
+
   try {
     await apiFetch(`/api/admin/students/${studentId}`, {
       method: 'PUT',
@@ -7099,15 +7105,30 @@ async function handleEditStudentSubmit(studentId) {
     });
 
     closeModal();
-    alert("Talaba ma'lumotlari muvaffaqiyatli yangilandi!");
-    if (typeof loadAdminStudentsList === 'function') {
+
+    // Tyutor kabinetidagi talabalar ro'yxati ochiq bo'lsa darhol yangilash
+    const tutorTbody = document.getElementById('tutor-students-tbody');
+    if (tutorTbody) {
+      try {
+        const studRes = await apiFetch('/api/tutor/students');
+        window.tutorStudentsCache = studRes.students || [];
+        if (typeof handleTutorStudentFilter === 'function') {
+          handleTutorStudentFilter();
+        } else {
+          tutorTbody.innerHTML = renderTutorTableRowsHtml(window.tutorStudentsCache);
+        }
+      } catch (e) {}
+    }
+
+    // Admin talabalar ro'yxati ochiq bo'lsa yangilash
+    if (typeof loadAdminStudentsList === 'function' && document.getElementById('admin-students-tbody')) {
       try { await loadAdminStudentsList(); } catch (e) {}
     }
-    const mainContent = document.getElementById('main-content');
-    if (mainContent && (AppState.currentSection === 'tutor-my-students' || AppState.user?.roles?.includes('tutor'))) {
-      try { await renderTutorStudents(mainContent); } catch (e) {}
-    }
   } catch (err) {
+    if (submitBtn && originalBtnHtml) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHtml;
+    }
     alert(err.message);
   }
 }
