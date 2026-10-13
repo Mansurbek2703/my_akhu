@@ -2097,6 +2097,63 @@ function handleTutorStudentFilter() {
 }
 
 // -------------------------------------------------------------
+// DALIL HUJJATLARI PREVIEW YORDAMCHISI (THUMBNAIL & LINK)
+// -------------------------------------------------------------
+function renderEvidenceThumbnailHtml(url, originalName) {
+  if (!url) return '';
+  const cleanUrl = String(url).trim();
+  const isImage = (/\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(cleanUrl) || cleanUrl.startsWith('data:image/'));
+  const isPdf = /\.pdf($|\?)/i.test(cleanUrl);
+  const displayName = originalName || cleanUrl.split('/').pop().split('?')[0] || 'Hujjat fayli';
+
+  if (isImage) {
+    return `
+      <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px; padding: 8px 12px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px;">
+        <a href="${cleanUrl}" target="_blank" title="Kattalashtirib ko'rish" style="display: block; flex-shrink: 0;">
+          <img src="${cleanUrl}" style="width: 58px; height: 58px; object-fit: cover; border-radius: 6px; border: 1px solid #94A3B8; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" alt="Dalil fotosurati">
+        </a>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${displayName}">${displayName}</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Dalil fotosurati / skanerlangan rasm</div>
+          <a href="${cleanUrl}" target="_blank" class="btn btn-outline btn-sm" style="margin-top: 5px; padding: 2px 8px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; background: white; color: #2563EB; border-color: #93C5FD;">
+            ${icon('eye', 12)} To'liq ochish
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  if (isPdf) {
+    return `
+      <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px; padding: 8px 12px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px;">
+        <div style="width: 48px; height: 48px; border-radius: 6px; background: #FEE2E2; border: 1px solid #FCA5A5; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+          📄
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${displayName}">${displayName}</div>
+          <div style="font-size: 11px; color: #DC2626; font-weight: 500;">PDF Hujjat</div>
+          <a href="${cleanUrl}" target="_blank" class="btn btn-outline btn-sm" style="margin-top: 5px; padding: 2px 8px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; background: white; color: #DC2626; border-color: #FCA5A5;">
+            ${icon('externalLink', 12)} PDF Hujjatni Ochish
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="margin-top: 6px; padding: 8px 12px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+      ${icon('link', 14)}
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Tashqi dalil havolasi:</div>
+        <a href="${cleanUrl}" target="_blank" style="color: #2563EB; font-size: 12.5px; word-break: break-all; font-weight: 600; text-decoration: underline;">
+          ${cleanUrl}
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // SAHIFA: TYUTOR BALL KIRITISH (R-01, R-02, R-04, R-06)
 // -------------------------------------------------------------
 async function renderTutorAddPoints(container) {
@@ -2105,32 +2162,70 @@ async function renderTutorAddPoints(container) {
     const students = studRes.students || [];
     const catRes = await apiFetch('/api/observe/catalog');
     const items = (catRes.items || []).filter(i => !i.is_auto);
+    const groups = studRes.available_groups || Array.from(new Set(students.map(s => s.group_code).filter(Boolean))).sort();
+
+    const selectedStudentIds = new Set();
+    let currentUploadedFile = null; // { url, file_id, name, size }
 
     let html = `
-      <div class="card" style="max-width: 800px; margin: 0 auto;">
-        <div class="card-header">
-          <h3>Talabalarga Ball Kiritish Formasi</h3>
-          <span style="font-size: 12px; color: var(--text-muted);">Bir nechta talabani tanlash mumkin (R-01)</span>
+      <div class="card" style="max-width: 820px; margin: 0 auto; box-shadow: 0 4px 16px rgba(0,0,0,0.06); border-radius: 12px;">
+        <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding: 18px 24px;">
+          <div>
+            <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Talabalarga Ball Kiritish Formasi</h3>
+            <span style="font-size: 12.5px; color: var(--text-muted);">Qulay qidiruv orqali talabalarni tanlang va dalil bilan tasdiqqa yuboring (R-01, R-04)</span>
+          </div>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="padding: 24px;">
           <form id="tutor-entry-form">
-            <!-- 1. TALABALARNI TANLASH -->
-            <div class="form-group mb-3">
-              <label class="form-label">Talabalarni tanlang (Bir yoki bir nechta):</label>
-              <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border); padding: 8px; border-radius: 6px;">
-                ${students.map(s => `
-                  <label style="display: block; font-size: 13px; margin-bottom: 4px; cursor: pointer;">
-                    <input type="checkbox" name="selected_students" value="${s.id}">
-                    ${s.first_name} ${s.last_name} (${s.group_code})
-                  </label>
-                `).join('')}
+            <!-- 1. TALABALARNI TANLASH BO'LIMI -->
+            <div style="background: #F8FAFC; border: 1px solid var(--border-light); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <label class="form-label" style="font-weight: 700; font-size: 13.5px; margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <span>Talabalarni tanlang:</span>
+                  <span id="selected-students-count-badge" class="badge" style="background: #E2E8F0; color: #475569; font-size: 12px; padding: 3px 8px; border-radius: 20px;">0 ta tanlandi</span>
+                </label>
+                <div style="display: flex; gap: 6px;">
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-select-all-students" style="font-size: 11.5px; padding: 3px 10px; background: white;">
+                    ✓ Barchasini tanlash
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-clear-selected-students" style="font-size: 11.5px; padding: 3px 10px; background: white; color: var(--text-muted);">
+                    ✕ Tozalash
+                  </button>
+                </div>
+              </div>
+
+              <!-- Qidiruv va Guruh filtri -->
+              <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 220px; position: relative;">
+                  <input type="text" id="entry-student-search" class="form-control" placeholder="🔍 F.I.Sh, Talaba ID yoki guruh bo'yicha qidirish..." style="font-size: 13px; padding-left: 12px;">
+                </div>
+                <div style="min-width: 150px;">
+                  <select id="entry-student-group-filter" class="form-select" style="font-size: 13px;">
+                    <option value="">Barcha guruhlar (${students.length} nafar)</option>
+                    ${groups.map(g => `<option value="${g}">${g} guruhi</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+
+              <!-- Tanlangan talabalar mini-chips paneli -->
+              <div id="selected-students-chips-wrap" style="display: none; margin-bottom: 10px; padding: 8px 10px; background: white; border: 1px dashed #93C5FD; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span id="chips-summary-text" style="font-size: 11.5px; font-weight: 600; color: #1E40AF;">Tanlangan talabalar:</span>
+                  <button type="button" id="btn-clear-chips" style="background:none; border:none; color:#DC2626; font-size:11px; cursor:pointer; font-weight:500;">Hammasini tozalash</button>
+                </div>
+                <div id="selected-students-chips-list" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 80px; overflow-y: auto;"></div>
+              </div>
+
+              <!-- Talabalar ro'yxati -->
+              <div id="entry-students-list-container" style="max-height: 240px; overflow-y: auto; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 6px;">
+                <!-- Dinamik chiqariladi -->
               </div>
             </div>
 
             <!-- 2. KATALOG BANDINI TANLASH -->
             <div class="form-group mb-3">
-              <label class="form-label">Katalog bandi:</label>
-              <select id="entry-item-id" class="form-control" required>
+              <label class="form-label" style="font-weight: 600;">Katalog bandi *</label>
+              <select id="entry-item-id" class="form-select" required style="font-size: 13.5px;">
                 <option value="">-- Bandni tanlang --</option>
                 ${items.map(it => `
                   <option value="${it.id}" data-scale="${it.is_scale}" data-base="${it.base_points}" data-hint="${it.evidence_hint || ''}">
@@ -2141,10 +2236,10 @@ async function renderTutorAddPoints(container) {
             </div>
 
             <!-- 3. SHKALA BO'LSA: DARAJA VA ROL -->
-            <div id="scale-fields-box" class="grid grid-2 mb-3" style="display: none;">
+            <div id="scale-fields-box" class="grid grid-2 mb-3" style="display: none; gap: 12px;">
               <div class="form-group">
-                <label class="form-label">Musobaqa Darajasi:</label>
-                <select id="entry-scale-level" class="form-control">
+                <label class="form-label" style="font-weight: 600;">Musobaqa Darajasi:</label>
+                <select id="entry-scale-level" class="form-select">
                   <option value="universitet">Universitet</option>
                   <option value="viloyat">Viloyat</option>
                   <option value="respublika">Respublika</option>
@@ -2152,8 +2247,8 @@ async function renderTutorAddPoints(container) {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Egallangan o'rin (Rol):</label>
-                <select id="entry-scale-role" class="form-control">
+                <label class="form-label" style="font-weight: 600;">Egallangan o'rin (Rol):</label>
+                <select id="entry-scale-role" class="form-select">
                   <option value="ishtirok">Ishtirok</option>
                   <option value="sovrindor">Sovrindor (2-3 o'rin)</option>
                   <option value="golib">G'olib (1-o'rin)</option>
@@ -2161,32 +2256,58 @@ async function renderTutorAddPoints(container) {
               </div>
             </div>
 
-            <!-- 4. BALL MIQDORI -->
+            <!-- 4. BALL MIQDORI VA SANA -->
+            <div class="grid grid-2 mb-3" style="gap: 12px;">
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">
+                  Ball miqdori * <span id="points-range-hint" style="color: #2563EB; font-size: 12px; font-weight: normal;"></span>
+                </label>
+                <input type="number" id="entry-points" class="form-control" required placeholder="Masalan: 10">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Tadbir / Faollik sanasi *</label>
+                <input type="date" id="entry-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+              </div>
+            </div>
+
+            <!-- 5. IZOH / ASOS -->
             <div class="form-group mb-3">
-              <label class="form-label">Ball miqdori: <span id="points-range-hint" style="color: #2563EB; font-size: 12px;"></span></label>
-              <input type="number" id="entry-points" class="form-control" required>
+              <label class="form-label" style="font-weight: 600;">Izoh / Asos (Ball mazmuni):</label>
+              <textarea id="entry-note" class="form-control" rows="2" placeholder="Masalan: 'Universitet shaxmat turnirida 1-o'rinni egalladi'"></textarea>
             </div>
 
-            <!-- 5. SANA -->
-            <div class="form-group mb-3">
-              <label class="form-label">Tadbir / Faollik sanasi:</label>
-              <input type="date" id="entry-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+            <!-- 6. DALIL HUJJATI: FAYL YUKLASH VA HAVOLA -->
+            <div class="form-group mb-4" style="background: #F8FAFC; border: 1px solid var(--border-light); border-radius: 10px; padding: 14px;">
+              <label class="form-label" style="font-weight: 700; font-size: 13.5px; margin-bottom: 2px;">
+                Dalil Hujjati / Fayl / Havola <span style="font-weight: normal; color: var(--text-muted); font-size: 11.5px;">(|ball| > 10 bo'lsa majburiy - R-04)</span>
+              </label>
+              <small id="evidence-hint-text" style="color: #2563EB; display: block; margin-bottom: 10px; font-size: 12px; font-weight: 500;"></small>
+
+              <div class="grid grid-2" style="gap: 12px;">
+                <!-- Fayl yuklash -->
+                <div>
+                  <label class="form-label" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">📁 Kompyuterdan fayl yuklash:</label>
+                  <input type="file" id="entry-file-input" accept=".pdf,image/png,image/jpeg,image/jpg" style="display: none;">
+                  <button type="button" id="btn-trigger-file-upload" class="btn btn-outline btn-sm w-100" style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; background: white; border: 1.5px dashed #93C5FD; color: #1D4ED8; font-weight: 600; font-size: 12px;">
+                    ${icon('upload', 14)} <span id="upload-btn-text">Fayl tanlash (Rasm yoki PDF)</span>
+                  </button>
+                  <small class="text-muted" style="font-size: 10.5px; display: block; margin-top: 3px;">JPG, PNG, PDF (max 10MB)</small>
+                </div>
+
+                <!-- Havola kiritish -->
+                <div>
+                  <label class="form-label" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🔗 Yoki tashqi havola (link):</label>
+                  <input type="url" id="entry-evidence-url" class="form-control" placeholder="https://drive.google.com/... yoki havola" style="font-size: 12.5px; padding: 7px 10px;">
+                  <small class="text-muted" style="font-size: 10.5px; display: block; margin-top: 3px;">Google Drive, veb-sahifa yoki boshqa link</small>
+                </div>
+              </div>
+
+              <!-- Yuklangan fayl Details (kichik ko'rinib turishi) -->
+              <div id="uploaded-file-details-box" style="display: none; margin-top: 10px; padding: 10px 12px; background: white; border: 1px solid #BFDBFE; border-radius: 8px;"></div>
             </div>
 
-            <!-- 6. IZOH VA DALIL HAVOLASI -->
-            <div class="form-group mb-3">
-              <label class="form-label">Izoh / Asos:</label>
-              <textarea id="entry-note" class="form-control" rows="2" placeholder="Masalan: 'Universitet shaxmat turnirida 1-o'rin'"></textarea>
-            </div>
-
-            <div class="form-group mb-4">
-              <label class="form-label">Dalil hujjati / fayl havolasi (|ball| > 10 bo'lsa majburiy - R-04):</label>
-              <input type="url" id="entry-evidence-url" class="form-control" placeholder="https://... yoki fayl havolasi">
-              <small id="evidence-hint-text" style="color: var(--text-muted); display: block; margin-top: 4px;"></small>
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width: 100%;">
-              ${icon('check', 15)} Ball Yozuvini Yuborish (Tasdiqqa)
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              ${icon('check', 16)} <span>Ball Yozuvini Yuborish (Tasdiqqa)</span>
             </button>
           </form>
         </div>
@@ -2240,11 +2361,230 @@ async function renderTutorAddPoints(container) {
       }
     }
 
+    // Fayl yuklash boshqaruvi
+    const fileInput = document.getElementById('entry-file-input');
+    const triggerBtn = document.getElementById('btn-trigger-file-upload');
+    const uploadBtnText = document.getElementById('upload-btn-text');
+    const fileDetailsBox = document.getElementById('uploaded-file-details-box');
+
+    triggerBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        alert("Fayl hajmi 10 MB dan oshmasligi kerak!");
+        fileInput.value = '';
+        return;
+      }
+
+      uploadBtnText.textContent = "Yuklanmoqda...";
+      triggerBtn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/files', {
+          method: 'POST',
+          headers: { 'x-user-id': AppState.user.id },
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Fayl yuklashda xatolik yuz berdi');
+
+        currentUploadedFile = {
+          url: data.url,
+          file_id: data.file_id,
+          name: file.name,
+          size: file.size
+        };
+
+        uploadBtnText.textContent = "Boshqa fayl tanlash";
+        triggerBtn.disabled = false;
+        renderUploadedFileDetails();
+      } catch (err) {
+        uploadBtnText.textContent = "Fayl tanlash (Rasm yoki PDF)";
+        triggerBtn.disabled = false;
+        alert("Fayl yuklashda xatolik: " + err.message);
+      }
+    });
+
+    function renderUploadedFileDetails() {
+      if (!currentUploadedFile) {
+        fileDetailsBox.style.display = 'none';
+        fileDetailsBox.innerHTML = '';
+        return;
+      }
+
+      const isImage = (/\.(jpg|jpeg|png|webp)$/i.test(currentUploadedFile.name) || currentUploadedFile.url.match(/\.(jpg|jpeg|png|webp)/i));
+      const sizeKb = Math.round(currentUploadedFile.size / 1024);
+
+      fileDetailsBox.style.display = 'block';
+      fileDetailsBox.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          ${isImage ? `
+            <a href="${currentUploadedFile.url}" target="_blank" title="Kattalashtirib ko'rish" style="display: block; flex-shrink: 0;">
+              <img src="${currentUploadedFile.url}" style="width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid #CBD5E1; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            </a>
+          ` : `
+            <div style="width: 44px; height: 44px; border-radius: 6px; background: #FEF2F2; border: 1px solid #FECACA; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+              📄
+            </div>
+          `}
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${currentUploadedFile.name}">
+              ${currentUploadedFile.name}
+            </div>
+            <div style="font-size: 11px; color: #059669; font-weight: 500;">
+              ✓ Muvaffaqiyatli yuklandi (${sizeKb} KB)
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 3px;">
+              <a href="${currentUploadedFile.url}" target="_blank" style="font-size: 11.5px; color: #2563EB; font-weight: 600;">
+                ${isImage ? 'Kattalashtirib ko\'rish' : 'PDF ni ochish'}
+              </a>
+              <button type="button" id="btn-remove-evidence-file" style="background: none; border: none; color: #DC2626; font-size: 11.5px; cursor: pointer; padding: 0; font-weight: 500;">
+                ✕ O'chirish
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('btn-remove-evidence-file')?.addEventListener('click', () => {
+        currentUploadedFile = null;
+        fileInput.value = '';
+        uploadBtnText.textContent = "Fayl tanlash (Rasm yoki PDF)";
+        renderUploadedFileDetails();
+      });
+    }
+
+    // Talabalarni saralash va tanlash boshqaruvi
+    const searchInput = document.getElementById('entry-student-search');
+    const groupFilter = document.getElementById('entry-student-group-filter');
+    const listContainer = document.getElementById('entry-students-list-container');
+    const countBadge = document.getElementById('selected-students-count-badge');
+    const chipsWrap = document.getElementById('selected-students-chips-wrap');
+    const chipsList = document.getElementById('selected-students-chips-list');
+    const chipsSummary = document.getElementById('chips-summary-text');
+
+    function getFilteredStudents() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      const g = groupFilter.value;
+      return students.filter(s => {
+        const matchesGroup = !g || s.group_code === g;
+        if (!matchesGroup) return false;
+        if (!q) return true;
+        const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+        const ext = (s.external_id || '').toLowerCase();
+        const grp = (s.group_code || '').toLowerCase();
+        return name.includes(q) || ext.includes(q) || grp.includes(q);
+      });
+    }
+
+    function renderStudentsList() {
+      const filtered = getFilteredStudents();
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px;">Qidiruv bo'yicha talaba topilmadi</div>`;
+        return;
+      }
+
+      listContainer.innerHTML = filtered.map(s => {
+        const isSelected = selectedStudentIds.has(s.id);
+        const isFemale = s.gender === 'female' || s.gender === 'f';
+        const initials = `${(s.first_name || '').charAt(0)}${(s.last_name || '').charAt(0)}`.toUpperCase();
+        const avatarHtml = s.photo_url
+          ? `<img src="${s.photo_url}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #CBD5E1;">`
+          : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 32px; height: 32px; font-size: 11px; flex-shrink: 0;">${initials}</span>`;
+
+        return `
+          <div class="entry-student-item" data-id="${s.id}" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; transition: all 0.15s ease; border: 1.5px solid ${isSelected ? '#2563EB' : '#F1F5F9'}; background: ${isSelected ? '#EFF6FF' : '#FFFFFF'};">
+            <input type="checkbox" class="student-item-cb" value="${s.id}" ${isSelected ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #2563EB; cursor: pointer; pointer-events: none;">
+            ${avatarHtml}
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${s.first_name} ${s.last_name}
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-top: 1px;">
+                <span class="badge badge-group" style="font-size: 10px; padding: 1px 5px;">${s.group_code || '-'}</span>
+                <span style="font-family: monospace; font-size: 10.5px; color: var(--text-muted);">${s.external_id || s.id}</span>
+                ${s.course ? `<span style="font-size: 10.5px; color: var(--text-muted);">${s.course}-kurs</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateSelectionUI() {
+      const count = selectedStudentIds.size;
+      countBadge.textContent = `${count} ta tanlandi`;
+      if (count > 0) {
+        countBadge.className = 'badge badge-primary';
+        chipsWrap.style.display = 'block';
+        chipsSummary.textContent = `Tanlangan talabalar (${count} nafar):`;
+        const selectedList = students.filter(s => selectedStudentIds.has(s.id));
+        chipsList.innerHTML = selectedList.map(s => `
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #DBEAFE; color: #1E40AF; padding: 2px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 500;">
+            ${s.first_name} ${s.last_name} (${s.group_code})
+            <span class="chip-remove-btn" data-id="${s.id}" style="cursor: pointer; font-weight: 700; margin-left: 2px; color: #1E40AF;" title="O'chirish">✕</span>
+          </span>
+        `).join('');
+      } else {
+        countBadge.className = 'badge badge-secondary';
+        chipsWrap.style.display = 'none';
+        chipsList.innerHTML = '';
+      }
+      renderStudentsList();
+    }
+
+    listContainer.addEventListener('click', (e) => {
+      const item = e.target.closest('.entry-student-item');
+      if (!item) return;
+      const id = item.getAttribute('data-id');
+      if (selectedStudentIds.has(id)) {
+        selectedStudentIds.delete(id);
+      } else {
+        selectedStudentIds.add(id);
+      }
+      updateSelectionUI();
+    });
+
+    chipsList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.chip-remove-btn');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      selectedStudentIds.delete(id);
+      updateSelectionUI();
+    });
+
+    document.getElementById('btn-clear-chips')?.addEventListener('click', () => {
+      selectedStudentIds.clear();
+      updateSelectionUI();
+    });
+
+    document.getElementById('btn-select-all-students').addEventListener('click', () => {
+      const filtered = getFilteredStudents();
+      filtered.forEach(s => selectedStudentIds.add(s.id));
+      updateSelectionUI();
+    });
+
+    document.getElementById('btn-clear-selected-students').addEventListener('click', () => {
+      selectedStudentIds.clear();
+      updateSelectionUI();
+    });
+
+    searchInput.addEventListener('input', () => renderStudentsList());
+    groupFilter.addEventListener('change', () => renderStudentsList());
+
+    // Dastlabki render
+    renderStudentsList();
+
     // Form topshirish
     document.getElementById('tutor-entry-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const checkboxes = document.querySelectorAll('input[name="selected_students"]:checked');
-      const studentIds = Array.from(checkboxes).map(c => c.value);
+      const studentIds = Array.from(selectedStudentIds);
 
       if (studentIds.length === 0) {
         alert('Iltimos, kamida bitta talabani tanlang!');
@@ -2252,11 +2592,35 @@ async function renderTutorAddPoints(container) {
       }
 
       const itemId = itemSelect.value;
+      if (!itemId) {
+        alert('Iltimos, katalog bandini tanlang!');
+        return;
+      }
+
       const points = Number(pointsInput.value);
       const isScale = itemSelect.selectedOptions[0].getAttribute('data-scale') === '1';
       const date = document.getElementById('entry-date').value;
       const note = document.getElementById('entry-note').value;
-      const evidenceUrl = document.getElementById('entry-evidence-url').value;
+      
+      const uploadedUrl = currentUploadedFile ? currentUploadedFile.url : null;
+      const uploadedFileId = currentUploadedFile ? currentUploadedFile.file_id : null;
+      const manualUrl = (document.getElementById('entry-evidence-url')?.value || '').trim();
+
+      const evidenceUrl = uploadedUrl || (manualUrl ? manualUrl : null);
+      const evidenceFileId = uploadedFileId || null;
+
+      // R-04 tekshiruvi: |ball| > 10 bo'lsa dalil majburiy
+      if (Math.abs(points) > 10 && !evidenceUrl && !evidenceFileId) {
+        alert('Ball 10 dan yuqori bo\'lgani sababli dalil fayli yuklash yoki havola kiritish majburiy (R-04)');
+        return;
+      }
+
+      const submitBtn = document.querySelector('#tutor-entry-form button[type="submit"]');
+      const originalBtnHtml = submitBtn ? submitBtn.innerHTML : null;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span>Yuborilmoqda...</span>`;
+      }
 
       try {
         const payload = {
@@ -2266,8 +2630,9 @@ async function renderTutorAddPoints(container) {
           scale_level: isScale ? document.getElementById('entry-scale-level').value : null,
           scale_role: isScale ? document.getElementById('entry-scale-role').value : null,
           event_date: date,
-          note,
-          evidence_url: evidenceUrl || null
+          note: note ? note.trim() : null,
+          evidence_file_id: evidenceFileId,
+          evidence_url: evidenceUrl
         };
 
         const res = await apiFetch('/api/tutor/entries', {
@@ -2275,9 +2640,12 @@ async function renderTutorAddPoints(container) {
           body: JSON.stringify(payload)
         });
 
-        alert(`Muvaffaqiyatli saqlandi! Yaratilgan yozuvlar soni: ${res.created_entries.length}`);
         navigateTo('tutor-history');
       } catch (err) {
+        if (submitBtn && originalBtnHtml) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnHtml;
+        }
         alert(`Xatolik: ${err.message}`);
       }
     });
@@ -2319,7 +2687,14 @@ async function renderTutorHistory(container) {
                   <tr>
                     <td><small>${e.event_date}</small></td>
                     <td><strong>${e.first_name} ${e.last_name}</strong> (${e.group_code})</td>
-                    <td>${e.item_name}</td>
+                    <td>
+                      <div>${e.item_name}</div>
+                      ${(e.evidence_url || e.evidence_file_id) ? `
+                        <a href="${e.evidence_url || `/api/files/${e.evidence_file_id}`}" target="_blank" style="font-size: 11px; color: #2563EB; display: inline-flex; align-items: center; gap: 3px; margin-top: 2px;">
+                          ${icon('link', 11)} <span>Dalil hujjati</span>
+                        </a>
+                      ` : ''}
+                    </td>
                     <td><strong style="color: ${e.points > 0 ? '#059669' : '#DC2626'};">${e.points > 0 ? '+' : ''}${e.points}</strong></td>
                     <td>
                       <span class="status-badge status-${e.status}">
@@ -2405,12 +2780,15 @@ async function renderDeptApprovals(container) {
               <div class="card-body">
                 <p style="font-size: 13px; margin-bottom: 8px;">
                   ${icon('calendar', 13)} <strong>Sana:</strong> ${e.event_date} &nbsp;|&nbsp; 
-                  ${icon('fileText', 13)} <strong>Izoh:</strong> ${e.note || 'Ko\'rsatilmagan'}
+                  ${icon('fileText', 13)} <strong>Izoh / Mazmuni:</strong> ${e.note || 'Ko\'rsatilmagan'}
                 </p>
-                ${e.evidence_url ? `
-                  <p style="font-size: 13px; margin-bottom: 12px;">
-                    ${icon('link', 13)} <strong>Dalil:</strong> <a href="${e.evidence_url}" target="_blank" style="color: #2563EB; word-break: break-all;">${e.evidence_url}</a>
-                  </p>
+                ${(e.evidence_url || e.evidence_file_id) ? `
+                  <div style="margin-bottom: 12px;">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
+                      ${icon('fileText', 12)} <span>Dalil Hujjati / Fayli:</span>
+                    </div>
+                    ${renderEvidenceThumbnailHtml(e.evidence_url || `/api/files/${e.evidence_file_id}`)}
+                  </div>
                 ` : ''}
 
                 <div style="display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 12px;">

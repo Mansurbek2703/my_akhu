@@ -27,16 +27,27 @@ router.get('/', authenticateStaff, (req, res) => {
   let whereClauses = [];
   let params = [];
 
-  // Prorektor bo'lsa pending_pv va approver_role='prorektor' ni ko'radi
-  if (user.roles.includes('prorektor')) {
-    whereClauses.push("(pe.status = 'pending_pv' OR (pe.status = 'pending' AND pe.approver_role = 'prorektor'))");
-  } else if (user.roles.includes('superadmin')) {
+  // Superadmin barcha kutayotgan arizalarni ko'radi
+  if (user.roles.includes('superadmin')) {
     whereClauses.push("pe.status IN ('pending', 'pending_pv')");
+  } else if (user.roles.includes('prorektor')) {
+    whereClauses.push("(pe.status = 'pending_pv' OR (pe.status = 'pending' AND pe.approver_role = 'prorektor'))");
   } else {
-    // Muayyan bo'lim xodimi
-    const userRole = role || user.roles[0];
-    whereClauses.push("pe.status = 'pending' AND pe.approver_role = ?");
-    params.push(userRole);
+    // Muayyan bo'lim xodimi (xodimning barcha bo'lim rollari bo'yicha)
+    const deptRoles = (Array.isArray(user.roles) ? user.roles : []).filter(r => r.startsWith('dep_') || r === 'prorektor');
+    if (deptRoles.length > 0) {
+      if (role && deptRoles.includes(role)) {
+        whereClauses.push("pe.status = 'pending' AND pe.approver_role = ?");
+        params.push(role);
+      } else {
+        whereClauses.push(`pe.status = 'pending' AND pe.approver_role IN (${deptRoles.map(() => '?').join(',')})`);
+        params.push(...deptRoles);
+      }
+    } else {
+      const userRole = role || (user.roles && user.roles[0]);
+      whereClauses.push("pe.status = 'pending' AND pe.approver_role = ?");
+      params.push(userRole || 'none');
+    }
   }
 
   if (category) {

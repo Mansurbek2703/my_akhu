@@ -269,6 +269,15 @@ router.post('/entries', authenticateStaff, (req, res) => {
       return res.status(400).json({ error: 'Band, ball va sana to\'ldirilishi shart' });
     }
 
+    let finalEvidenceUrl = evidence_url || null;
+    let finalEvidenceFileId = evidence_file_id || null;
+    if (finalEvidenceFileId && !finalEvidenceUrl) {
+      finalEvidenceUrl = `/api/files/${finalEvidenceFileId}`;
+    }
+    if (finalEvidenceUrl && !finalEvidenceFileId && finalEvidenceUrl.includes('/api/files/')) {
+      finalEvidenceFileId = finalEvidenceUrl.split('/api/files/')[1].split('?')[0];
+    }
+
     const createdIds = createPointEntries({
       student_ids,
       item_id,
@@ -277,8 +286,8 @@ router.post('/entries', authenticateStaff, (req, res) => {
       scale_role,
       event_date,
       note,
-      evidence_file_id,
-      evidence_url,
+      evidence_file_id: finalEvidenceFileId,
+      evidence_url: finalEvidenceUrl,
       creator_user: req.staffUser,
       ip: req.ip || '127.0.0.1'
     });

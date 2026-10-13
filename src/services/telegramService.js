@@ -509,18 +509,43 @@ async function notifyApproversForNewPoints(entryIds, creatorUser) {
 
     for (const [role, roleEntries] of Object.entries(byRole)) {
       const totalPoints = roleEntries.reduce((s, e) => s + (e.points || 0), 0);
-      const studentNames = roleEntries.slice(0, 3).map(e => `${e.first_name} ${e.last_name} (${e.group_code})`).join(', ');
-      const extraCount = roleEntries.length > 3 ? ` va yana ${roleEntries.length - 3} nafar talaba` : '';
       const sampleItem = roleEntries[0].item_name;
       const deptName = roleTitles[role] || roleEntries[0].category_name || role;
+      const sampleDate = roleEntries[0].event_date;
+      const sampleNote = roleEntries[0].note ? roleEntries[0].note.trim() : '';
+      const sampleEvidence = roleEntries[0].evidence_url || '';
 
+      let evidenceText = '';
+      if (sampleEvidence) {
+        const fullEvidenceUrl = sampleEvidence.startsWith('http') ? sampleEvidence : `${config.baseUrl}${sampleEvidence}`;
+        evidenceText = `\n📎 <b>Dalil hujjati / havola:</b> <a href="${fullEvidenceUrl}">Hujjatni ko'rish / ochish</a>`;
+      }
+
+      let noteText = '';
+      if (sampleNote) {
+        noteText = `\n📝 <b>Ball mazmuni (Asos/Izoh):</b> ${sampleNote}`;
+      }
+
+      let studentsListText = '';
+      if (roleEntries.length === 1) {
+        studentsListText = `👤 <b>Talaba:</b> ${roleEntries[0].first_name} ${roleEntries[0].last_name} (${roleEntries[0].group_code || '-'})`;
+      } else {
+        studentsListText = `👥 <b>Talabalar (${roleEntries.length} nafar):</b>\n` +
+          roleEntries.slice(0, 8).map((e, idx) => `  ${idx + 1}. ${e.first_name} ${e.last_name} (${e.group_code || '-'})`).join('\n') +
+          (roleEntries.length > 8 ? `\n  <i>...va yana ${roleEntries.length - 8} nafar talaba</i>` : '');
+      }
+
+      const pointsPerStudent = roleEntries[0].points;
       const title = `Yangi ball tasdiqlash uchun: ${roleEntries.length} ta ariza (+${totalPoints} ball)`;
       const message = `🔔 <b>YANGI BALL TASDIQLASH UCHUN KELDI!</b>\n\n` +
         `👨‍🏫 <b>Kiritgan tyutor:</b> ${creatorUser.full_name || creatorUser.id}\n` +
         `🏢 <b>Mas'ul bo'lim:</b> ${deptName}\n` +
-        `🎯 <b>Band / Yo'nalish:</b> ${sampleItem}\n` +
-        `⭐ <b>Jami ball miqdori:</b> +${totalPoints} ball\n` +
-        `👥 <b>Talabalar (${roleEntries.length} nafar):</b> ${studentNames}${extraCount}\n\n` +
+        `🎯 <b>Faollik yo'nalishi:</b> ${sampleItem}\n` +
+        `⭐ <b>Ball miqdori:</b> +${pointsPerStudent} ball${roleEntries.length > 1 ? ` (jami: +${totalPoints} ball)` : ''}\n` +
+        `📅 <b>Faollik sanasi:</b> ${sampleDate}` +
+        noteText +
+        evidenceText + `\n\n` +
+        studentsListText + `\n\n` +
         `<i>Iltimos, arizalarni tekshirish va tasdiqlash uchun tasdiq portaliga kiring.</i>`;
 
       // Mas'ul xodimlarni topish (ushbu rolga ega xodimlar yoki superadmin)
@@ -540,7 +565,7 @@ async function notifyApproversForNewPoints(entryIds, creatorUser) {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: '📥 Tasdiqlash portalini ochish', url: `${config.baseUrl}/#approvals` }
+                { text: '📥 Tasdiqlash portalini ochish', url: `${config.baseUrl}/#dept-approvals` }
               ]
             ]
           }
