@@ -547,11 +547,24 @@ router.put('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
       : student.gender;
     const normPhone = phone !== undefined ? normalizePhoneNumber(phone) : student.phone;
 
-    let finalTutorId = tutor_id !== undefined ? tutor_id : student.tutor_id;
-    if (!finalTutorId && (group_code || student.group_code)) {
-      const gCode = group_code || student.group_code;
-      const tg = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ?`).get(gCode);
-      if (tg) finalTutorId = tg.tutor_id;
+    const isSuperadmin = Boolean(
+      req.staffUser && (
+        req.staffUser.id === 'superadmin' ||
+        (Array.isArray(req.staffUser.roles) && req.staffUser.roles.includes('superadmin'))
+      )
+    );
+
+    let finalTutorId = student.tutor_id;
+    if (isSuperadmin) {
+      finalTutorId = tutor_id !== undefined ? tutor_id : student.tutor_id;
+      if (!finalTutorId && (group_code || student.group_code)) {
+        const gCode = group_code || student.group_code;
+        const tg = db.prepare(`SELECT tutor_id FROM tutor_group WHERE group_code = ?`).get(gCode);
+        if (tg) finalTutorId = tg.tutor_id;
+      }
+    } else {
+      // Tyutor yoki boshqa vakolatsiz xodim talabaning biriktirilgan tyutorini o'zgartira olmaydi
+      finalTutorId = student.tutor_id;
     }
 
     const now = new Date().toISOString();

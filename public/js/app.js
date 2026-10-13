@@ -6869,11 +6869,20 @@ async function showEditStudentModal(studentId) {
   openModal();
 
   try {
+    const isSuperadmin = Boolean(
+      AppState.user && (
+        AppState.user.id === 'superadmin' ||
+        (Array.isArray(AppState.user.roles) && AppState.user.roles.includes('superadmin'))
+      )
+    );
+
     let tutors = [];
-    try {
-      const tutRes = await apiFetch('/api/admin/tutors');
-      tutors = tutRes.tutors || [];
-    } catch(e) {}
+    if (isSuperadmin) {
+      try {
+        const tutRes = await apiFetch('/api/admin/tutors');
+        tutors = tutRes.tutors || [];
+      } catch(e) {}
+    }
 
     const data = await apiFetch(`/api/admin/students/${studentId}`);
     const st = data.student;
@@ -6982,13 +6991,15 @@ async function showEditStudentModal(studentId) {
           </div>
         </div>
 
-        <div class="form-group mb-3">
-          <label class="form-label" style="font-weight: 600;">Biriktirilgan Tyutor (Mas'ul)</label>
-          <select id="edit-std-tutor" class="form-select">
-            <option value="">-- Tyutor biriktirilmagan --</option>
-            ${tutors.map(t => `<option value="${t.id}" ${String(st.tutor_id) === String(t.id) ? 'selected' : ''}>${t.full_name} (${(t.groups || []).join(', ') || t.id})</option>`).join('')}
-          </select>
-        </div>
+        ${isSuperadmin ? `
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-weight: 600;">Biriktirilgan Tyutor (Mas'ul)</label>
+            <select id="edit-std-tutor" class="form-select">
+              <option value="">-- Tyutor biriktirilmagan --</option>
+              ${tutors.map(t => `<option value="${t.id}" ${String(st.tutor_id) === String(t.id) ? 'selected' : ''}>${t.full_name} (${(t.groups || []).join(', ') || t.id})</option>`).join('')}
+            </select>
+          </div>
+        ` : ''}
       </form>
     `;
 
@@ -7069,16 +7080,22 @@ async function handleEditStudentSubmit(studentId) {
   const phone = normalizeStudentPhone(rawPhone);
   const email = document.getElementById('edit-std-email')?.value.trim();
   const status = document.getElementById('edit-std-status')?.value;
-  const tutor_id = document.getElementById('edit-std-tutor')?.value || null;
+  const tutorSelectEl = document.getElementById('edit-std-tutor');
+  const tutor_id = tutorSelectEl ? (tutorSelectEl.value || null) : undefined;
   const photo_url = document.getElementById('edit-std-photourl')?.value || undefined;
+
+  const payload = {
+    external_id, group_code, first_name, last_name,
+    program_code, level, course, gender, phone, email, status, photo_url
+  };
+  if (tutor_id !== undefined) {
+    payload.tutor_id = tutor_id;
+  }
 
   try {
     await apiFetch(`/api/admin/students/${studentId}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        external_id, group_code, first_name, last_name,
-        program_code, level, course, gender, phone, email, tutor_id, status, photo_url
-      })
+      body: JSON.stringify(payload)
     });
 
     closeModal();
