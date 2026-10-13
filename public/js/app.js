@@ -3868,10 +3868,10 @@ async function submitEditEvent(eventId) {
     });
 
     closeModal();
-    alert("Tadbir muvaffaqiyatli tahrirlandi!");
+    showToast("Tadbir muvaffaqiyatli tahrirlandi!");
     renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
   } catch (err) {
-    alert("Xatolik: " + err.message);
+    showToast("Xatolik: " + err.message, 'error');
   }
 }
 
@@ -4395,10 +4395,10 @@ async function deleteEvent(eventId) {
   }
   try {
     const res = await apiFetch(`/api/events/${eventId}`, { method: 'DELETE' });
-    alert(res.message || "Tadbir muvaffaqiyatli o'chirildi!");
+    showToast(res.message || "Tadbir muvaffaqiyatli o'chirildi!");
     renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
   } catch (err) {
-    alert(`Xatolik: ${err.message}`);
+    showToast(`Xatolik: ${err.message}`, 'error');
   }
 }
 
@@ -4541,10 +4541,10 @@ async function handleStaffProfileSave(event) {
     localStorage.setItem('akhu_auth_user', JSON.stringify(AppState.user));
 
     updateAuthUI();
-    alert("Profil ma'lumotlaringiz muvaffaqiyatli saqlandi!");
+    showToast("Profil ma'lumotlaringiz muvaffaqiyatli saqlandi!");
     renderStaffProfile(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
   } catch (err) {
-    alert(`Xatolik: ${err.message}`);
+    showToast(`Xatolik: ${err.message}`, 'error');
   }
 }
 
@@ -5169,12 +5169,12 @@ async function submitAddCatalogItem() {
       })
     });
     closeModal();
-    alert(res.message || "Yangi mezon muvaffaqiyatli qo'shildi!");
+    showToast(res.message || "Yangi mezon muvaffaqiyatli qo'shildi!");
     const refreshData = await apiFetch('/api/admin/catalog');
     adminCatalogState.items = refreshData.items || [];
     renderAdminCatalogRows();
   } catch (err) {
-    alert('Xatolik: ' + err.message);
+    showToast('Xatolik: ' + err.message, 'error');
   }
 }
 
@@ -5291,7 +5291,7 @@ async function saveCatalogItem(id, version_from) {
   const saveMode = document.querySelector('input[name="edit-cat-save-mode"]:checked')?.value || 'update';
 
   if (!name) {
-    alert('Band nomi kiritilishi shart!');
+    showToast('Band nomi kiritilishi shart!', 'warning');
     return;
   }
 
@@ -5315,12 +5315,12 @@ async function saveCatalogItem(id, version_from) {
       })
     });
     closeModal();
-    alert(res.message || "Muvaffaqiyatli saqlandi!");
+    showToast(res.message || "Muvaffaqiyatli saqlandi!");
     const refreshData = await apiFetch('/api/admin/catalog');
     adminCatalogState.items = refreshData.items || [];
     renderAdminCatalogRows();
   } catch (e) {
-    alert('Xatolik: ' + e.message);
+    showToast('Xatolik: ' + e.message, 'error');
   }
 }
 
@@ -5338,12 +5338,12 @@ async function deleteCatalogItem(id, version_from) {
       method: 'DELETE'
     });
     closeModal();
-    alert(res.message || "Mezon muvaffaqiyatli o'chirildi!");
+    showToast(res.message || "Mezon muvaffaqiyatli o'chirildi!");
     const refreshData = await apiFetch('/api/admin/catalog');
     adminCatalogState.items = refreshData.items || [];
     renderAdminCatalogRows();
   } catch (err) {
-    alert('Xatolik: ' + err.message);
+    showToast('Xatolik: ' + err.message, 'error');
   }
 }
 
@@ -6269,6 +6269,51 @@ function closeModal() {
 
 window.openModal = openModal;
 window.closeModal = closeModal;
+
+/**
+ * Zamonaviy, sahifani muzlatmaydigan (non-blocking) bildirishnoma (Toast)
+ */
+function showToast(message, type = 'success', duration = 3000) {
+  if (!message) return;
+  let toastContainer = document.getElementById('app-toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'app-toast-container';
+    toastContainer.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:999999; display:flex; flex-direction:column; gap:8px; pointer-events:none; max-width:420px;';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  const bg = type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : '#10B981';
+  const iconSym = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅';
+  toast.style.cssText = `background:${bg}; color:white; padding:12px 18px; border-radius:10px; font-size:13.5px; font-weight:500; box-shadow:0 10px 25px rgba(0,0,0,0.18); display:flex; align-items:center; gap:10px; pointer-events:auto; opacity:0; transform:translateY(12px); transition:all 0.25s cubic-bezier(0.16, 1, 0.3, 1);`;
+  
+  const iconSpan = document.createElement('span');
+  iconSpan.style.fontSize = '16px';
+  iconSpan.textContent = iconSym;
+  
+  const msgSpan = document.createElement('span');
+  msgSpan.style.lineHeight = '1.4';
+  msgSpan.textContent = String(message);
+  
+  toast.appendChild(iconSpan);
+  toast.appendChild(msgSpan);
+  toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(12px)';
+    setTimeout(() => {
+      try { toast.remove(); } catch (e) {}
+    }, 250);
+  }, duration);
+}
+window.showToast = showToast;
 
 // Talaba profil modalini ochish
 async function showStudentModal(studentId) {
@@ -7203,7 +7248,7 @@ async function handleCreateStudentSubmit() {
   const email = document.getElementById('new-std-email')?.value.trim();
 
   if (!external_id || !group_code || !first_name || !last_name) {
-    alert("Talaba ID, Guruh, Ism va Familiya to'ldirilishi shart!");
+    showToast("Talaba ID, Guruh, Ism va Familiya to'ldirilishi shart!", "warning");
     return;
   }
 
@@ -7228,10 +7273,10 @@ async function handleCreateStudentSubmit() {
     }
 
     closeModal();
-    alert('Talaba muvaffaqiyatli saqlandi!');
+    showToast('Talaba muvaffaqiyatli saqlandi!');
     await loadAdminStudentsList();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 
@@ -8448,12 +8493,12 @@ async function handleCreateStaffSubmit() {
     .filter(Boolean);
 
   if (!username || !password || !full_name) {
-    alert("Login, Parol va F.I.Sh kiritilishi shart!");
+    showToast("Login, Parol va F.I.Sh kiritilishi shart!", "warning");
     return;
   }
 
   if (roles.length === 0) {
-    alert("Kamida bitta rol tanlanishi shart!");
+    showToast("Kamida bitta rol tanlanishi shart!", "warning");
     return;
   }
 
@@ -8477,10 +8522,10 @@ async function handleCreateStaffSubmit() {
     });
 
     closeModal();
-    alert('Xodim muvaffaqiyatli yaratildi!');
+    showToast('Xodim muvaffaqiyatli yaratildi!');
     await loadStaffUsersList();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 
@@ -8699,9 +8744,9 @@ async function handleAdminStaffPhotoUpload(fileInput, targetUrlId, previewId) {
       urlInput.value = data.url;
       updateAdminStaffPhotoPreview(data.url, previewId);
     }
-    alert('Rasm muvaffaqiyatli yuklandi!');
+    showToast('Rasm muvaffaqiyatli yuklandi!');
   } catch (err) {
-    alert(`Xatolik: ${err.message}`);
+    showToast(`Xatolik: ${err.message}`, 'error');
   }
 }
 
@@ -8738,18 +8783,25 @@ async function handleEditStaffSubmit(userId) {
     .filter(Boolean);
 
   if (!username) {
-    alert("Foydalanuvchi nomi (login) kiritilishi shart!");
+    showToast("Foydalanuvchi nomi (login) kiritilishi shart!", "warning");
     return;
   }
 
   if (!full_name) {
-    alert("F.I.Sh kiritilishi shart!");
+    showToast("F.I.Sh kiritilishi shart!", "warning");
     return;
   }
 
   if (roles.length === 0) {
-    alert("Kamida bitta rol tanlanishi shart!");
+    showToast("Kamida bitta rol tanlanishi shart!", "warning");
     return;
+  }
+
+  const submitBtn = document.querySelector('#common-modal .modal-footer .btn-primary');
+  const originalBtnHtml = submitBtn ? submitBtn.innerHTML : null;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `Saqlanmoqda...`;
   }
 
   try {
@@ -8786,10 +8838,14 @@ async function handleEditStaffSubmit(userId) {
     }
 
     closeModal();
-    alert(res?.message || "Xodim ma'lumotlari muvaffaqiyatli saqlandi!");
+    showToast(res?.message || "Xodim ma'lumotlari muvaffaqiyatli saqlandi!");
     await loadStaffUsersList();
   } catch (err) {
-    alert(err.message);
+    if (submitBtn && originalBtnHtml) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHtml;
+    }
+    showToast(err.message, 'error');
   }
 }
 
@@ -8804,10 +8860,10 @@ async function toggleStaffStatus(userId, currentActive) {
       method: 'POST',
       body: JSON.stringify({ active: newActive })
     });
-    alert(`Xodim holati ${newActive ? 'faollashtirildi' : 'bloklandi'}!`);
+    showToast(`Xodim holati ${newActive ? 'faollashtirildi' : 'bloklandi'}!`);
     await loadStaffUsersList();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 
@@ -8821,10 +8877,10 @@ async function deleteStaffUser(userId) {
     await apiFetch(`/api/admin/users/${userId}`, {
       method: 'DELETE'
     });
-    alert("Xodim muvaffaqiyatli o'chirildi!");
+    showToast("Xodim muvaffaqiyatli o'chirildi!");
     await loadStaffUsersList();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 

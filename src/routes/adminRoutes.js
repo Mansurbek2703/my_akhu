@@ -1308,41 +1308,46 @@ router.post('/users', authenticateSuperadmin, async (req, res) => {
     const now = new Date().toISOString();
     const passHash = bcrypt.hashSync(password, 8);
 
-    db.transaction(() => {
-      // 1. staff_user jadvaliga yozish
-      db.prepare(`
-        INSERT INTO staff_user (
-          id, full_name, email, phone, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, telegram_username, telegram_phone, bot_status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'not_started', ?)
-      `).run(
-        userId,
-        full_name,
-        userEmail,
-        userPhone,
-        userPhoto,
-        `sso_${userId}`,
-        JSON.stringify(cleanRoles),
-        activeVal,
-        passHash,
-        tgId,
-        tgUsername,
-        tgPhone,
-        now
-      );
+    db.pragma('foreign_keys = OFF');
+    try {
+      db.transaction(() => {
+        // 1. staff_user jadvaliga yozish
+        db.prepare(`
+          INSERT INTO staff_user (
+            id, full_name, email, phone, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, telegram_username, telegram_phone, bot_status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'not_started', ?)
+        `).run(
+          userId,
+          full_name,
+          userEmail,
+          userPhone,
+          userPhoto,
+          `sso_${userId}`,
+          JSON.stringify(cleanRoles),
+          activeVal,
+          passHash,
+          tgId,
+          tgUsername,
+          tgPhone,
+          now
+        );
 
-      // 2. Agar tyutor roli bo'lsa guruhlarini yozish va talabalarni biriktirish
-      syncTutorGroupsAndStudents(userId, targetGroups, cleanRoles.includes('tutor'));
+        // 2. Agar tyutor roli bo'lsa guruhlarini yozish va talabalarni biriktirish
+        syncTutorGroupsAndStudents(userId, targetGroups, cleanRoles.includes('tutor'));
 
-      logAudit({
-        actor_id: req.staffUser.id,
-        actor_role: 'superadmin',
-        action: 'CREATE_STAFF_USER',
-        object_type: 'staff_user',
-        object_id: userId,
-        after: { full_name, email: userEmail, phone: userPhone, roles: cleanRoles, groups: targetGroups, telegram_user_id: tgId, telegram_username: tgUsername, telegram_phone: tgPhone },
-        ip: req.ip || '127.0.0.1'
-      });
-    })();
+        logAudit({
+          actor_id: req.staffUser.id,
+          actor_role: 'superadmin',
+          action: 'CREATE_STAFF_USER',
+          object_type: 'staff_user',
+          object_id: userId,
+          after: { full_name, email: userEmail, phone: userPhone, roles: cleanRoles, groups: targetGroups, telegram_user_id: tgId, telegram_username: tgUsername, telegram_phone: tgPhone },
+          ip: req.ip || '127.0.0.1'
+        });
+      })();
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
 
     res.json({ success: true, user_id: userId, message: 'Yangi xodim muvaffaqiyatli qo\'shildi' });
   } catch (err) {
@@ -1516,78 +1521,92 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
       } catch (e) {}
     }
 
-    db.transaction(() => {
-      // Yangi parol bo'lsa yangilash
-      let passHash = user.password_hash;
-      if (password && String(password).trim().length > 0) {
-        passHash = bcrypt.hashSync(String(password).trim(), 8);
-      }
+    db.pragma('foreign_keys = OFF');
+    try {
+      db.transaction(() => {
+        // Yangi parol bo'lsa yangilash
+        let passHash = user.password_hash;
+        if (password && String(password).trim().length > 0) {
+          passHash = bcrypt.hashSync(String(password).trim(), 8);
+        }
 
-      let updatedRoles = user.roles;
-      if (roles !== undefined) {
-        let arr = Array.isArray(roles) ? roles : [roles];
-        arr = arr.filter(r => r && r !== 'undefined');
-        updatedRoles = JSON.stringify(arr);
-      }
+        let updatedRoles = user.roles;
+        if (roles !== undefined) {
+          let arr = Array.isArray(roles) ? roles : [roles];
+          arr = arr.filter(r => r && r !== 'undefined');
+          updatedRoles = JSON.stringify(arr);
+        }
 
-      // Agar ID (login) o'zgargan bo'lsa
-      if (targetUsername !== user.id) {
-        db.prepare(`UPDATE staff_user SET id = ? WHERE id = ?`).run(targetUsername, user.id);
-        db.prepare(`UPDATE tutor_group SET tutor_id = ? WHERE tutor_id = ?`).run(targetUsername, user.id);
-        db.prepare(`UPDATE student SET tutor_id = ? WHERE tutor_id = ?`).run(targetUsername, user.id);
-        db.prepare(`UPDATE point_entry SET created_by = ? WHERE created_by = ?`).run(targetUsername, user.id);
-        db.prepare(`UPDATE point_entry SET approved_by = ? WHERE approved_by = ?`).run(targetUsername, user.id);
-      }
+        // Agar ID (login) o'zgargan bo'lsa
+        if (targetUsername !== user.id) {
+          db.prepare(`UPDATE staff_user SET id = ? WHERE id = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE tutor_group SET tutor_id = ? WHERE tutor_id = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE staff_notification_log SET staff_id = ? WHERE staff_id = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE student SET tutor_id = ? WHERE tutor_id = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE point_entry SET created_by = ? WHERE created_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE point_entry SET approved_by = ? WHERE approved_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE point_entry SET pv_by = ? WHERE pv_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE point_entry_history SET by_user = ? WHERE by_user = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE appeal SET decided_by = ? WHERE decided_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE checkin SET scanned_by = ? WHERE scanned_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE event SET created_by = ? WHERE created_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE import_batch SET by_user = ? WHERE by_user = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE setting SET updated_by = ? WHERE updated_by = ?`).run(targetUsername, user.id);
+          db.prepare(`UPDATE audit_log SET actor_id = ? WHERE actor_id = ?`).run(targetUsername, user.id);
+        }
 
-      db.prepare(`
-        UPDATE staff_user
-        SET full_name = ?,
-          email = ?,
-          phone = ?,
-          photo_url = ?,
-          roles = ?,
-          telegram_user_id = ?,
-          telegram_username = ?,
-          telegram_phone = ?,
-          bot_status = ?,
-          active = ?,
-          password_hash = ?
-        WHERE id = ?
-      `).run(
-        newFullName,
-        newEmail,
-        newPhone,
-        newPhotoUrl,
-        updatedRoles,
-        tgId,
-        tgUsername,
-        tgPhone,
-        newBotStatus || user.bot_status || 'not_started',
-        activeVal,
-        passHash,
-        targetUsername
-      );
+        db.prepare(`
+          UPDATE staff_user
+          SET full_name = ?,
+            email = ?,
+            phone = ?,
+            photo_url = ?,
+            roles = ?,
+            telegram_user_id = ?,
+            telegram_username = ?,
+            telegram_phone = ?,
+            bot_status = ?,
+            active = ?,
+            password_hash = ?
+          WHERE id = ?
+        `).run(
+          newFullName,
+          newEmail,
+          newPhone,
+          newPhotoUrl,
+          updatedRoles,
+          tgId,
+          tgUsername,
+          tgPhone,
+          newBotStatus || user.bot_status || 'not_started',
+          activeVal,
+          passHash,
+          targetUsername
+        );
 
-      // Tyutor guruhlarini va unga tegishli talabalarni sinxronlashtirish
-      const currentRoles = typeof updatedRoles === 'string' ? JSON.parse(updatedRoles) : updatedRoles;
-      const isTutorRole = Array.isArray(currentRoles) && currentRoles.includes('tutor');
-      if (targetGroups !== undefined && Array.isArray(targetGroups)) {
-        syncTutorGroupsAndStudents(targetUsername, targetGroups, isTutorRole);
-      } else if (!isTutorRole) {
-        syncTutorGroupsAndStudents(targetUsername, [], false);
-      }
+        // Tyutor guruhlarini va unga tegishli talabalarni sinxronlashtirish
+        const currentRoles = typeof updatedRoles === 'string' ? JSON.parse(updatedRoles) : updatedRoles;
+        const isTutorRole = Array.isArray(currentRoles) && currentRoles.includes('tutor');
+        if (targetGroups !== undefined && Array.isArray(targetGroups)) {
+          syncTutorGroupsAndStudents(targetUsername, targetGroups, isTutorRole);
+        } else if (!isTutorRole) {
+          syncTutorGroupsAndStudents(targetUsername, [], false);
+        }
 
-      logAudit({
-        actor_id: req.staffUser.id,
-        actor_role: 'superadmin',
-        action: 'UPDATE_STAFF_USER',
-        object_type: 'staff_user',
-        object_id: targetUsername,
-        before: { id: user.id, full_name: user.full_name, roles: user.roles, active: user.active },
-        after: { id: targetUsername, full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups, telegram_user_id: tgId, telegram_username: tgUsername, telegram_phone: tgPhone, bot_status: newBotStatus, password_changed: Boolean(password && String(password).trim().length > 0) },
-        ip: req.ip || '127.0.0.1'
-      });
-    })();
+        logAudit({
+          actor_id: req.staffUser.id,
+          actor_role: 'superadmin',
+          action: 'UPDATE_STAFF_USER',
+          object_type: 'staff_user',
+          object_id: targetUsername,
+          before: { id: user.id, full_name: user.full_name, roles: user.roles, active: user.active },
+          after: { id: targetUsername, full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups, telegram_user_id: tgId, telegram_username: tgUsername, telegram_phone: tgPhone, bot_status: newBotStatus, password_changed: Boolean(password && String(password).trim().length > 0) },
+          ip: req.ip || '127.0.0.1'
+        });
+      })();
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
 
     res.json({
       success: true,
@@ -1641,22 +1660,29 @@ router.delete('/users/:id', authenticateSuperadmin, (req, res) => {
     const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
     if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
 
-    db.transaction(() => {
-      // 1. Tyutor guruhlarini tozalash va talabalarni ajratish
-      syncTutorGroupsAndStudents(req.params.id, [], false);
-      // 2. Xodimni bazadan butunlay o'chirish
-      db.prepare(`DELETE FROM staff_user WHERE id = ?`).run(req.params.id);
+    db.pragma('foreign_keys = OFF');
+    try {
+      db.transaction(() => {
+        // 1. Tyutor guruhlarini tozalash va talabalarni ajratish
+        syncTutorGroupsAndStudents(req.params.id, [], false);
+        // 2. Notifikatsiya tarixini tozalash
+        db.prepare(`DELETE FROM staff_notification_log WHERE staff_id = ?`).run(req.params.id);
+        // 3. Xodimni bazadan butunlay o'chirish
+        db.prepare(`DELETE FROM staff_user WHERE id = ?`).run(req.params.id);
 
-      logAudit({
-        actor_id: req.staffUser.id,
-        actor_role: 'superadmin',
-        action: 'DELETE_STAFF_USER',
-        object_type: 'staff_user',
-        object_id: req.params.id,
-        before: { full_name: user.full_name, email: user.email, roles: user.roles },
-        ip: req.ip || '127.0.0.1'
-      });
-    })();
+        logAudit({
+          actor_id: req.staffUser.id,
+          actor_role: 'superadmin',
+          action: 'DELETE_STAFF_USER',
+          object_type: 'staff_user',
+          object_id: req.params.id,
+          before: { full_name: user.full_name, email: user.email, roles: user.roles },
+          ip: req.ip || '127.0.0.1'
+        });
+      })();
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
 
     res.json({ success: true, message: 'Xodim tizimdan butunlay o\'chirildi' });
   } catch (err) {
