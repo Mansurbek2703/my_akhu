@@ -1308,57 +1308,232 @@ router.get('/catalog', authenticateSuperadmin, (req, res) => {
 });
 
 /**
+ * POST /api/admin/catalog/item
+ * Yangi mezon qo'shish (Superadmin)
+ */
+router.post('/catalog/item', authenticateSuperadmin, (req, res) => {
+  try {
+    let { id, category_id, name, base_points, is_scale, is_auto, approver_role, evidence_hint, limit_rule } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Mezon (band nomi) kiritilishi shart' });
+    }
+    if (!category_id) {
+      return res.status(400).json({ error: 'Soha / Kategoriya tanlanishi shart' });
+    }
+
+    if (!id || !id.trim()) {
+      const prefix = category_id === '1' ? 'i' :
+                     category_id === '2' ? 'm' :
+                     category_id === '3' ? 'a' :
+                     category_id === '4' ? 's' :
+                     category_id === '5' ? 'p' :
+                     category_id === '6' ? 'c' :
+                     category_id === '7' ? 'pr' :
+                     category_id === '8' ? 'l' : 'item';
+      const existing = db.prepare(`SELECT id FROM catalog_item WHERE id LIKE ?`).all(`${prefix}%`);
+      let maxNum = 0;
+      for (const ex of existing) {
+        const numPart = parseInt(ex.id.replace(prefix, ''), 10);
+        if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+      }
+      id = `${prefix}${maxNum + 1}`;
+    } else {
+      id = id.trim();
+    }
+
+    const exists = db.prepare(`SELECT * FROM catalog_item WHERE id = ?`).get(id);
+    if (exists) {
+      return res.status(400).json({ error: `"${id}" identifikatorli mezon allaqachon mavjud! Boshqa ID kiriting.` });
+    }
+
+    if (!approver_role) {
+      const cat = db.prepare(`SELECT approver_role FROM catalog_category WHERE id = ?`).get(category_id);
+      approver_role = cat ? cat.approver_role : 'dep_yb';
+    }
+
+    db.prepare(`
+      INSERT INTO catalog_item (
+        id, category_id, name, base_points, is_scale, is_auto, approver_role,
+        evidence_hint, limit_rule, version_from, version_to, archived
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, 0)
+    `).run(
+      id,
+      category_id,
+      name.trim(),
+      is_scale ? null : (base_points !== null && base_points !== undefined ? Number(base_points) : 0),
+      is_scale ? 1 : 0,
+      is_auto ? 1 : 0,
+      approver_role,
+      evidence_hint ? evidence_hint.trim() : null,
+      limit_rule ? (typeof limit_rule === 'object' ? JSON.stringify(limit_rule) : limit_rule.trim()) : null
+    );
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: 'superadmin',
+      action: 'CREATE_CATALOG_ITEM',
+      object_type: 'catalog_item',
+      object_id: id,
+      after: { id, category_id, name, base_points, approver_role },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: `Yangi mezon (#${id}) muvaffaqiyatli qo'shildi!`, id });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * PUT /api/admin/catalog/item/:id
+ * Mezonni tahrirlash (Superadmin: to'g'ridan-to'g'ri yangilash yoki yangi versiya yaratish)
  */
 router.put('/catalog/item/:id', authenticateSuperadmin, (req, res) => {
   try {
-    const { name, base_points, approver_role, evidence_hint, limit_rule } = req.body;
-    const currentItem = db.prepare(`
-      SELECT * FROM catalog_item WHERE id = ? AND archived = 0 ORDER BY version_from DESC LIMIT 1
-    `).get(req.params.id);
+    const {
+      name,
+      category_id,
+      base_points,
+      is_scale,
+      is_auto,
+      approver_role,
+      evidence_hint,
+      limit_rule,
+      version_from,
+      create_new_version
+    } = req.body;
+
+    let currentItem;
+    if (version_from) {
+      currentItem = db.prepare(`
+        SELECT * FROM catalog_item WHERE id = ? AND version_from = ?
+      `).get(req.params.id, Number(version_from));
+    }
+    if (!currentItem) {
+      currentItem = db.prepare(`
+        SELECT * FROM catalog_item WHERE id = ? AND archived = 0 ORDER BY version_from DESC LIMIT 1
+      `).get(req.params.id);
+    }
 
     if (!currentItem) return res.status(404).json({ error: 'Katalog bandi topilmadi' });
 
-    const newVersion = (currentItem.version_from || 1) + 1;
+    if (create_new_version) {
+      const newVersion = (currentItem.version_from || 1) + 1;
 
-    db.transaction(() => {
-      db.prepare(`UPDATE catalog_item SET version_to = ? WHERE id = ? AND version_from = ?`).run(
-        newVersion - 1,
-        currentItem.id,
-        currentItem.version_from
-      );
+      db.transaction(() => {
+        db.prepare(`UPDATE catalog_item SET version_to = ?, archived = 1 WHERE id = ? AND version_from = ?`).run(
+          newVersion - 1,
+          currentItem.id,
+          currentItem.version_from
+        );
 
-      db.prepare(`
-        INSERT INTO catalog_item (
-          id, category_id, name, base_points, is_scale, is_auto, approver_role,
-          evidence_hint, limit_rule, version_from, version_to, archived
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0)
-      `).run(
-        currentItem.id,
-        currentItem.category_id,
-        name !== undefined ? name : currentItem.name,
-        base_points !== undefined ? Number(base_points) : currentItem.base_points,
-        currentItem.is_scale,
-        currentItem.is_auto,
-        approver_role !== undefined ? approver_role : currentItem.approver_role,
-        evidence_hint !== undefined ? evidence_hint : currentItem.evidence_hint,
-        limit_rule !== undefined ? JSON.stringify(limit_rule) : currentItem.limit_rule,
-        newVersion
-      );
+        db.prepare(`
+          INSERT INTO catalog_item (
+            id, category_id, name, base_points, is_scale, is_auto, approver_role,
+            evidence_hint, limit_rule, version_from, version_to, archived
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0)
+        `).run(
+          currentItem.id,
+          category_id !== undefined ? category_id : currentItem.category_id,
+          name !== undefined ? name.trim() : currentItem.name,
+          is_scale ? null : (base_points !== undefined ? Number(base_points) : currentItem.base_points),
+          is_scale !== undefined ? (is_scale ? 1 : 0) : currentItem.is_scale,
+          is_auto !== undefined ? (is_auto ? 1 : 0) : currentItem.is_auto,
+          approver_role !== undefined ? approver_role : currentItem.approver_role,
+          evidence_hint !== undefined ? evidence_hint : currentItem.evidence_hint,
+          limit_rule !== undefined ? (typeof limit_rule === 'object' ? JSON.stringify(limit_rule) : limit_rule) : currentItem.limit_rule,
+          newVersion
+        );
 
-      logAudit({
-        actor_id: req.staffUser.id,
-        actor_role: 'superadmin',
-        action: 'UPDATE_CATALOG_ITEM',
-        object_type: 'catalog_item',
-        object_id: currentItem.id,
-        before: { base_points: currentItem.base_points, version: currentItem.version_from },
-        after: { base_points, version: newVersion },
-        ip: req.ip || '127.0.0.1'
-      });
-    })();
+        logAudit({
+          actor_id: req.staffUser.id,
+          actor_role: 'superadmin',
+          action: 'VERSION_CATALOG_ITEM',
+          object_type: 'catalog_item',
+          object_id: currentItem.id,
+          before: { base_points: currentItem.base_points, version: currentItem.version_from },
+          after: { base_points, version: newVersion },
+          ip: req.ip || '127.0.0.1'
+        });
+      })();
 
-    res.json({ success: true, new_version: newVersion, message: `Band yangilandi (v${newVersion})` });
+      return res.json({ success: true, new_version: newVersion, message: `Yangi versiya yaratildi (v${newVersion})` });
+    }
+
+    // Default: To'g'ridan-to'g'ri o'sha bandni yangilash (in-place update)
+    db.prepare(`
+      UPDATE catalog_item SET
+        category_id = COALESCE(?, category_id),
+        name = COALESCE(?, name),
+        base_points = ?,
+        is_scale = COALESCE(?, is_scale),
+        is_auto = COALESCE(?, is_auto),
+        approver_role = COALESCE(?, approver_role),
+        evidence_hint = ?,
+        limit_rule = ?
+      WHERE id = ? AND version_from = ?
+    `).run(
+      category_id || currentItem.category_id,
+      name ? name.trim() : currentItem.name,
+      is_scale ? null : (base_points !== undefined && base_points !== null ? Number(base_points) : currentItem.base_points),
+      is_scale !== undefined ? (is_scale ? 1 : 0) : currentItem.is_scale,
+      is_auto !== undefined ? (is_auto ? 1 : 0) : currentItem.is_auto,
+      approver_role || currentItem.approver_role,
+      evidence_hint !== undefined ? (evidence_hint ? evidence_hint.trim() : null) : currentItem.evidence_hint,
+      limit_rule !== undefined ? (limit_rule ? (typeof limit_rule === 'object' ? JSON.stringify(limit_rule) : limit_rule.trim()) : null) : currentItem.limit_rule,
+      currentItem.id,
+      currentItem.version_from
+    );
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: 'superadmin',
+      action: 'UPDATE_CATALOG_ITEM',
+      object_type: 'catalog_item',
+      object_id: currentItem.id,
+      before: { name: currentItem.name, base_points: currentItem.base_points },
+      after: { name, base_points },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: `Mezon (#${currentItem.id}) muvaffaqiyatli yangilandi!` });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/catalog/item/:id
+ * Mezonni yoki uning ma'lum versiyasini o'chirish (Superadmin)
+ */
+router.delete('/catalog/item/:id', authenticateSuperadmin, (req, res) => {
+  try {
+    const id = req.params.id;
+    const versionFrom = req.query.version_from || req.body?.version_from;
+
+    let result;
+    if (versionFrom) {
+      result = db.prepare(`DELETE FROM catalog_item WHERE id = ? AND version_from = ?`).run(id, Number(versionFrom));
+    } else {
+      result = db.prepare(`DELETE FROM catalog_item WHERE id = ?`).run(id);
+    }
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'O\'chirish uchun mezon topilmadi' });
+    }
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: 'superadmin',
+      action: 'DELETE_CATALOG_ITEM',
+      object_type: 'catalog_item',
+      object_id: id,
+      before: { version_from: versionFrom || 'all' },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: `Mezon (#${id}${versionFrom ? `, v${versionFrom}` : ''}) muvaffaqiyatli o'chirildi!` });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

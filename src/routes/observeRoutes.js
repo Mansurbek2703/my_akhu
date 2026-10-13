@@ -256,6 +256,9 @@ router.get('/catalog', (req, res) => {
     FROM catalog_item ci
     LEFT JOIN catalog_category cc ON ci.category_id = cc.id
     WHERE ci.archived = 0
+      AND ci.version_from = (
+        SELECT MAX(ci2.version_from) FROM catalog_item ci2 WHERE ci2.id = ci.id AND ci2.archived = 0
+      )
     ORDER BY ci.category_id, ci.id ASC
   `).all();
   const scale = db.prepare(`SELECT * FROM scale_matrix`).all();

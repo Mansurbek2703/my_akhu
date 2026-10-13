@@ -48,6 +48,7 @@ function formatApproverRole(role) {
 // RASMIY UNIVERSITET VEKTOR SVG BELGILARI (ICONS SYSTEM)
 // ====================================================================
 const ICONS = {
+  plus: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
   users: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
   user: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
   userPlus: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>`,
@@ -4582,29 +4583,33 @@ async function renderAdminCatalog(container) {
           <div>
             <div class="admin-hero-title">
               <span style="color: #60A5FA;">${icon('settings', 22)}</span>
-              <span>Ball Katalogi Sozlamalari & Versiyalash</span>
+              <span>Ball Katalogi Sozlamalari & Mezonlar Boshqaruvi</span>
               <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 11px;">Superadmin</span>
             </div>
             <p class="admin-hero-desc">
-              Katalog mezonlarini tahrirlash uchun jadvaldagi ixtiyoriy band ustiga bosing. 
-              Har bir o'zgartirish tizimda o'zgarmas versiya sifatida saqlanadi va audit qilinadi.
+              Katalog mezonlarini qo'shish, tahrirlash yoki o'chirish. O'zgartirishlar to'g'ridan-to'g'ri yangilanishi yoki audit uchun yangi versiya sifatida saqlanishi mumkin.
             </p>
+          </div>
+          <div>
+            <button class="btn btn-primary" onclick="showAddCatalogModal()" style="display:inline-flex; align-items:center; gap:8px; font-weight:600; padding:10px 18px; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
+              ${icon('plus', 16)} Yangi Mezon Qo'shish
+            </button>
           </div>
         </div>
       </div>
 
       <!-- TOOLBAR -->
-      <div class="admin-toolbar">
-        <div class="admin-search-box">
-          ${icon('search', 16)}
-          <input type="text" id="admin-cat-search" class="admin-search-input" placeholder="Mezon nomi bo'yicha tezkor qidiruv...">
-        </div>
-        <div class="admin-filters-group">
-          <select id="admin-cat-filter-cat" class="admin-filter-select">
+      <div class="admin-toolbar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
+          <div class="admin-search-box" style="flex: 1;">
+            ${icon('search', 16)}
+            <input type="text" id="admin-cat-search" class="admin-search-input" placeholder="Mezon nomi bo'yicha tezkor qidiruv...">
+          </div>
+          <select id="admin-cat-filter-cat" class="admin-filter-select" style="min-width: 180px;">
             <option value="">Barcha kategoriyalar</option>
             ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
           </select>
-          <button class="btn btn-outline btn-sm" onclick="resetAdminCatalogFilters()" style="display:inline-flex; align-items:center; gap:4px;">
+          <button class="btn btn-outline btn-sm" onclick="resetAdminCatalogFilters()" style="display:inline-flex; align-items:center; gap:4px; white-space: nowrap;">
             ${icon('refresh', 13)} Tozalash
           </button>
         </div>
@@ -4612,9 +4617,12 @@ async function renderAdminCatalog(container) {
 
       <!-- DATA TABLE -->
       <div class="card">
-        <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border-light);">
+        <div class="card-header" style="background: #F8FAFC; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
           <span style="font-size: 12.5px; color: var(--text-secondary); font-weight: 600;">
-            Maslahat: Mezonni tahrirlash uchun qatordan ixtiyoriy joyiga bosing.
+            Maslahat: Mezonni tahrirlash uchun qatordan ixtiyoriy joyiga yoki "Tahrirlash" tugmasiga bosing.
+          </span>
+          <span class="badge badge-light" id="admin-cat-count-badge" style="font-size: 11.5px; font-weight: 600;">
+            Jami: ${adminCatalogState.items.length} ta band
           </span>
         </div>
         <div class="table-responsive">
@@ -4628,6 +4636,7 @@ async function renderAdminCatalog(container) {
                 <th>Versiya</th>
                 <th>Tasdiqlovchi Rol</th>
                 <th>Dalil Talabi</th>
+                <th style="text-align: right; width: 110px;">Amallar</th>
               </tr>
             </thead>
             <tbody id="admin-cat-table-body">
@@ -4678,8 +4687,13 @@ function renderAdminCatalogRows() {
     filtered = filtered.filter(it => (it.name || '').toLowerCase().includes(q));
   }
 
+  const countBadge = document.getElementById('admin-cat-count-badge');
+  if (countBadge) {
+    countBadge.textContent = `${filtered.length} ta band`;
+  }
+
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">Mezonlar topilmadi</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">Mezonlar topilmadi</td></tr>`;
     return;
   }
 
@@ -4688,7 +4702,7 @@ function renderAdminCatalogRows() {
     const catName = it.category_name || `Kategoriya #${it.category_id}`;
 
     return `
-      <tr class="student-table-row" onclick="showEditCatalogModal('${it.id}')" style="cursor: pointer;" title="Tahrirlash uchun bosing">
+      <tr class="student-table-row" onclick="showEditCatalogModal('${it.id}', ${it.version_from || 1})" style="cursor: pointer;" title="Tahrirlash uchun bosing">
         <td><span class="badge badge-group">#${it.id}</span></td>
         <td>
           <span class="badge" style="background: ${catColor}15; color: ${catColor}; border: 1px solid ${catColor}30; font-weight: 600;">
@@ -4706,36 +4720,209 @@ function renderAdminCatalogRows() {
         <td><span class="badge badge-neutral">v${it.version_from || 1}</span></td>
         <td><span class="badge badge-group" style="font-weight: 600;">${formatApproverRole(it.approver_role)}</span></td>
         <td><span style="font-size: 11.5px; color: var(--text-muted);">${it.evidence_hint || 'Majburiy emas'}</span></td>
+        <td style="text-align: right;" onclick="event.stopPropagation();">
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button class="btn btn-outline btn-sm" onclick="showEditCatalogModal('${it.id}', ${it.version_from || 1})" title="Tahrirlash" style="padding: 4px 8px; font-size: 11px;">
+              ${icon('edit', 14)}
+            </button>
+            <button class="btn btn-outline btn-sm text-danger" onclick="deleteCatalogItem('${it.id}', ${it.version_from || 1})" title="O'chirish" style="padding: 4px 8px; font-size: 11px; border-color: #FCA5A5;">
+              ${icon('trash', 14)}
+            </button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
 }
 
-async function showEditCatalogModal(id) {
-  const item = adminCatalogState.items.find(i => String(i.id) === String(id));
-  if (!item) return;
+function togglePointsInput(typeVal, inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  if (typeVal === 'scale') {
+    inp.disabled = true;
+    inp.value = '';
+  } else {
+    inp.disabled = false;
+    if (!inp.value || inp.value === '0') inp.value = '10';
+  }
+}
 
+function showAddCatalogModal() {
+  const categories = adminCatalogState.categories || [];
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Mezonni Tahrirlash: #${item.id}</span>`;
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('plus', 18)} Yangi Mezon Qo'shish</span>`;
   modalBody.innerHTML = `
-    <form id="edit-cat-form">
+    <form id="add-cat-form" onsubmit="event.preventDefault(); submitAddCatalogItem();">
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Band Kodi (ID) <small class="text-muted">(ixtiyoriy, masalan: i10, a7)</small></label>
+          <input type="text" id="add-cat-id" class="form-control" placeholder="Avtomatik generatsiya qilinadi">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Soha / Kategoriya *</label>
+          <select id="add-cat-category" class="form-select" required>
+            ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Mezon (Band Nomi) *</label>
+        <textarea id="add-cat-name" class="form-control" rows="2" placeholder="Masalan: Respublika ilmiy maqolasi chop etildi" required></textarea>
+      </div>
+
+      <div class="grid grid-3 mb-3">
+        <div class="form-group">
+          <label class="form-label">Mezon Turi</label>
+          <select id="add-cat-type" class="form-select" onchange="togglePointsInput(this.value, 'add-cat-points')">
+            <option value="points" selected>Arizaviy (ball berish)</option>
+            <option value="auto">Avtomatik (QR/Tizim)</option>
+            <option value="scale">Musobaqa shkalasi bo'yicha</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Baza Balli</label>
+          <input type="number" id="add-cat-points" class="form-control" value="10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tasdiqlovchi Mas'ul Bo'lim *</label>
+          <select id="add-cat-role" class="form-select">
+            <option value="dep_yb">Yoshlar bo'limi (dep_yb)</option>
+            <option value="dep_mb">Ma'naviyat bo'limi (dep_mb)</option>
+            <option value="dep_ob">O'quv bo'limi (dep_ob)</option>
+            <option value="dep_ib">Ilmiy bo'lim (dep_ib)</option>
+            <option value="dep_sb">Sanoat hamkorlik (dep_sb)</option>
+            <option value="dep_pb">Matbuot (PR) (dep_pb)</option>
+            <option value="prorektor">Prorektor</option>
+            <option value="tutor">Tyutor</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Dalil Talabi (Yo'riqnoma)</label>
+        <input type="text" id="add-cat-evidence" class="form-control" placeholder="Masalan: Maqola havolasi yoki PDF nusxasi">
+      </div>
+
+      <div class="form-group mb-2">
+        <label class="form-label">Limit Qoidasi</label>
+        <input type="text" id="add-cat-limit" class="form-control" placeholder="Masalan: semestrda 2 marta">
+      </div>
+    </form>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+    <button class="btn btn-primary" onclick="submitAddCatalogItem()" style="display:inline-flex; align-items:center; gap:6px;">
+      ${icon('check', 14)} Mezonni Qo'shish
+    </button>
+  `;
+
+  openModal();
+}
+
+async function submitAddCatalogItem() {
+  const id = document.getElementById('add-cat-id')?.value.trim();
+  const category_id = document.getElementById('add-cat-category')?.value;
+  const name = document.getElementById('add-cat-name')?.value.trim();
+  const type = document.getElementById('add-cat-type')?.value;
+  const base_points = Number(document.getElementById('add-cat-points')?.value || 0);
+  const approver_role = document.getElementById('add-cat-role')?.value;
+  const evidence_hint = document.getElementById('add-cat-evidence')?.value.trim();
+  const limit_rule = document.getElementById('add-cat-limit')?.value.trim();
+
+  if (!name) {
+    alert('Mezon (band nomi) kiritilishi shart!');
+    return;
+  }
+
+  const is_scale = type === 'scale' ? 1 : 0;
+  const is_auto = type === 'auto' ? 1 : 0;
+
+  try {
+    const res = await apiFetch('/api/admin/catalog/item', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: id || undefined,
+        category_id,
+        name,
+        base_points: is_scale ? null : base_points,
+        is_scale,
+        is_auto,
+        approver_role,
+        evidence_hint,
+        limit_rule
+      })
+    });
+    closeModal();
+    alert(res.message || "Yangi mezon muvaffaqiyatli qo'shildi!");
+    const refreshData = await apiFetch('/api/admin/catalog');
+    adminCatalogState.items = refreshData.items || [];
+    renderAdminCatalogRows();
+  } catch (err) {
+    alert('Xatolik: ' + err.message);
+  }
+}
+
+async function showEditCatalogModal(id, version_from) {
+  const item = adminCatalogState.items.find(i => String(i.id) === String(id) && Number(i.version_from || 1) === Number(version_from || 1)) 
+            || adminCatalogState.items.find(i => String(i.id) === String(id));
+  if (!item) return;
+
+  const categories = adminCatalogState.categories || [];
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Mezonni Tahrirlash: #${item.id} <span class="badge badge-neutral" style="font-size:11px;">v${item.version_from || 1}</span></span>`;
+  modalBody.innerHTML = `
+    <form id="edit-cat-form" onsubmit="event.preventDefault(); saveCatalogItem('${item.id}', ${item.version_from || 1});">
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Band Kodi (ID)</label>
+          <input type="text" class="form-control" value="#${item.id}" disabled style="background:#F1F5F9; font-weight:600;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Soha / Kategoriya *</label>
+          <select id="edit-cat-category" class="form-select" required>
+            ${categories.map(c => `<option value="${c.id}" ${String(c.id) === String(item.category_id) ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
       <div class="form-group mb-3">
         <label class="form-label">Mezon (Band Nomi) *</label>
         <textarea id="edit-cat-name" class="form-control" rows="2" required>${item.name}</textarea>
       </div>
 
-      <div class="grid grid-2 mb-3">
+      <div class="grid grid-3 mb-3">
+        <div class="form-group">
+          <label class="form-label">Mezon Turi</label>
+          <select id="edit-cat-type" class="form-select" onchange="togglePointsInput(this.value, 'edit-cat-points')">
+            <option value="points" ${!item.is_scale && !item.is_auto ? 'selected' : ''}>Arizaviy (ball berish)</option>
+            <option value="auto" ${item.is_auto ? 'selected' : ''}>Avtomatik (QR/Tizim)</option>
+            <option value="scale" ${item.is_scale ? 'selected' : ''}>Musobaqa shkalasi bo'yicha</option>
+          </select>
+        </div>
         <div class="form-group">
           <label class="form-label">Baza Balli</label>
           <input type="number" id="edit-cat-points" class="form-control" value="${item.base_points !== null ? item.base_points : 0}" ${item.is_scale ? 'disabled' : ''}>
-          ${item.is_scale ? `<small class="text-muted">Bu band musobaqa shkalasi bo'yicha hisoblanadi</small>` : ''}
         </div>
         <div class="form-group">
-          <label class="form-label">Tasdiqlovchi Mas'ul Rol</label>
-          <input type="text" id="edit-cat-role" class="form-control" value="${item.approver_role || ''}">
+          <label class="form-label">Tasdiqlovchi Mas'ul Bo'lim *</label>
+          <select id="edit-cat-role" class="form-select">
+            <option value="dep_yb" ${item.approver_role === 'dep_yb' ? 'selected' : ''}>Yoshlar bo'limi (dep_yb)</option>
+            <option value="dep_mb" ${item.approver_role === 'dep_mb' ? 'selected' : ''}>Ma'naviyat bo'limi (dep_mb)</option>
+            <option value="dep_ob" ${item.approver_role === 'dep_ob' ? 'selected' : ''}>O'quv bo'limi (dep_ob)</option>
+            <option value="dep_ib" ${item.approver_role === 'dep_ib' ? 'selected' : ''}>Ilmiy bo'lim (dep_ib)</option>
+            <option value="dep_sb" ${item.approver_role === 'dep_sb' ? 'selected' : ''}>Sanoat hamkorlik (dep_sb)</option>
+            <option value="dep_pb" ${item.approver_role === 'dep_pb' ? 'selected' : ''}>Matbuot (PR) (dep_pb)</option>
+            <option value="prorektor" ${item.approver_role === 'prorektor' ? 'selected' : ''}>Prorektor</option>
+            <option value="tutor" ${item.approver_role === 'tutor' ? 'selected' : ''}>Tyutor</option>
+          </select>
         </div>
       </div>
 
@@ -4744,45 +4931,108 @@ async function showEditCatalogModal(id) {
         <input type="text" id="edit-cat-evidence" class="form-control" value="${item.evidence_hint || ''}">
       </div>
 
-      <div class="form-group mb-2">
+      <div class="form-group mb-3">
         <label class="form-label">Limit Qoidasi</label>
         <input type="text" id="edit-cat-limit" class="form-control" value="${item.limit_rule || ''}" placeholder="Masalan: semestrda 2 marta">
+      </div>
+
+      <div class="form-group mb-2" style="background: #F8FAFC; border: 1px solid var(--border-light); padding: 12px; border-radius: 8px;">
+        <label class="form-label" style="font-weight: 600; margin-bottom: 6px;">Saqlash usuli</label>
+        <div style="display: flex; gap: 20px; font-size: 13px;">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="radio" name="edit-cat-save-mode" value="update" checked>
+            <span>To'g'ridan-to'g'ri yangilash (v${item.version_from || 1} ni tahrirlash)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="radio" name="edit-cat-save-mode" value="new_version">
+            <span>Yangi versiya yaratish (v${(item.version_from || 1) + 1})</span>
+          </label>
+        </div>
       </div>
     </form>
   `;
 
   modalFooter.innerHTML = `
-    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
-    <button class="btn btn-primary" onclick="saveCatalogItem('${id}')" style="display:inline-flex; align-items:center; gap:6px;">
-      ${icon('check', 14)} Saqlash
-    </button>
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <button class="btn btn-outline text-danger" onclick="deleteCatalogItem('${item.id}', ${item.version_from || 1})" style="border-color: #FCA5A5; display: inline-flex; align-items: center; gap: 6px;">
+        ${icon('trash', 14)} Ushbu Mezonni O'chirish
+      </button>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
+        <button class="btn btn-primary" onclick="saveCatalogItem('${item.id}', ${item.version_from || 1})" style="display:inline-flex; align-items:center; gap:6px;">
+          ${icon('check', 14)} Saqlash
+        </button>
+      </div>
+    </div>
   `;
 
   openModal();
 }
 
-async function saveCatalogItem(id) {
+async function saveCatalogItem(id, version_from) {
+  const category_id = document.getElementById('edit-cat-category')?.value;
   const name = document.getElementById('edit-cat-name')?.value.trim();
+  const type = document.getElementById('edit-cat-type')?.value;
   const base_points = Number(document.getElementById('edit-cat-points')?.value || 0);
-  const approver_role = document.getElementById('edit-cat-role')?.value.trim();
+  const approver_role = document.getElementById('edit-cat-role')?.value;
   const evidence_hint = document.getElementById('edit-cat-evidence')?.value.trim();
   const limit_rule = document.getElementById('edit-cat-limit')?.value.trim();
+  const saveMode = document.querySelector('input[name="edit-cat-save-mode"]:checked')?.value || 'update';
 
   if (!name) {
     alert('Band nomi kiritilishi shart!');
     return;
   }
 
+  const is_scale = type === 'scale' ? 1 : 0;
+  const is_auto = type === 'auto' ? 1 : 0;
+
   try {
     const res = await apiFetch(`/api/admin/catalog/item/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, base_points, approver_role, evidence_hint, limit_rule })
+      body: JSON.stringify({
+        category_id,
+        name,
+        base_points: is_scale ? null : base_points,
+        is_scale,
+        is_auto,
+        approver_role,
+        evidence_hint,
+        limit_rule,
+        version_from,
+        create_new_version: saveMode === 'new_version'
+      })
     });
     closeModal();
     alert(res.message || "Muvaffaqiyatli saqlandi!");
-    await renderAdminCatalog(document.getElementById('app-content-area'));
+    const refreshData = await apiFetch('/api/admin/catalog');
+    adminCatalogState.items = refreshData.items || [];
+    renderAdminCatalogRows();
   } catch (e) {
-    alert(e.message);
+    alert('Xatolik: ' + e.message);
+  }
+}
+
+async function deleteCatalogItem(id, version_from) {
+  const item = adminCatalogState.items.find(i => String(i.id) === String(id) && Number(i.version_from || 1) === Number(version_from || 1))
+            || adminCatalogState.items.find(i => String(i.id) === String(id));
+  const itemName = item ? item.name : `#${id}`;
+
+  if (!confirm(`Haqiqatan ham "${itemName}" (#${id}, v${version_from || 1}) mezonini tizimdan o'chirmoqchimisiz?`)) {
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`/api/admin/catalog/item/${id}?version_from=${version_from || 1}`, {
+      method: 'DELETE'
+    });
+    closeModal();
+    alert(res.message || "Mezon muvaffaqiyatli o'chirildi!");
+    const refreshData = await apiFetch('/api/admin/catalog');
+    adminCatalogState.items = refreshData.items || [];
+    renderAdminCatalogRows();
+  } catch (err) {
+    alert('Xatolik: ' + err.message);
   }
 }
 
