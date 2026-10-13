@@ -351,6 +351,156 @@ async function notifyStaffDept(deptRole, pendingCount, lateCount) {
 }
 
 /**
+ * Xodimga Telegram orqali rasmiy bildirishnoma yuborish va audit jurnaliga qayd etish
+ */
+async function sendStaffTelegramNotification({ staff_id, type = 'system_alert', title = '', message, reply_markup = null }) {
+  const staff = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staff_id);
+  if (!staff) return { success: false, error: 'Xodim topilmadi' };
+
+  const now = new Date().toISOString();
+
+  if (!staff.telegram_user_id) {
+    db.prepare(`
+      INSERT INTO staff_notification_log (staff_id, telegram_user_id, notification_type, title, message, status, error_message, sent_at)
+      VALUES (?, NULL, ?, ?, ?, 'failed', 'Telegram ID biriktirilmagan (Botga start bosmagan)', ?)
+    `).run(staff.id, type, title, message, now);
+    return { success: false, error: 'Telegram ID biriktirilmagan' };
+  }
+
+  const tgId = String(staff.telegram_user_id);
+  const res = await sendTelegramMessage(tgId, message, reply_markup ? { reply_markup } : {});
+
+  if (res && res.ok) {
+    db.prepare(`
+      UPDATE staff_user 
+      SET bot_status = 'active', last_notification_at = ?, last_active_at = COALESCE(last_active_at, ?)
+      WHERE id = ?
+    `).run(now, now, staff.id);
+
+    db.prepare(`
+      INSERT INTO staff_notification_log (staff_id, telegram_user_id, notification_type, title, message, status, error_message, sent_at)
+      VALUES (?, ?, ?, ?, ?, 'delivered', NULL, ?)
+    `).run(staff.id, tgId, type, title, message, now);
+
+    logAudit({
+      actor_id: 'system',
+      actor_role: 'system',
+      action: 'STAFF_NOTIF_DELIVERED',
+      object_type: 'staff_user',
+      object_id: staff.id,
+      after: { type, title, delivered_to: tgId }
+    });
+
+    return { success: true, delivered: true };
+  } else {
+    const errorDesc = res && res.description ? res.description : 'Xabar yuborishda xatolik';
+    const isBlocked = errorDesc.includes('blocked') || errorDesc.includes('deactivated') || errorDesc.includes('chat not found');
+    const status = isBlocked ? 'blocked' : 'failed';
+
+    if (isBlocked) {
+      db.prepare(`UPDATE staff_user SET bot_status = 'blocked', last_notification_at = ? WHERE id = ?`).run(now, staff.id);
+    }
+
+    db.prepare(`
+      INSERT INTO staff_notification_log (staff_id, telegram_user_id, notification_type, title, message, status, error_message, sent_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(staff.id, tgId, type, title, message, status, errorDesc, now);
+
+    logAudit({
+      actor_id: 'system',
+      actor_role: 'system',
+      action: isBlocked ? 'STAFF_NOTIF_BLOCKED' : 'STAFF_NOTIF_FAILED',
+      object_type: 'staff_user',
+      object_id: staff.id,
+      after: { type, title, error: errorDesc }
+    });
+
+    return { success: false, blocked: isBlocked, error: errorDesc };
+  }
+}
+
+/**
+ * Tyutor ball kiritganda mas'ul bo'lim xodimlariga va superadminga avtomatik Telegram bildirishnoma yuborish
+ */
+async function notifyApproversForNewPoints(entryIds, creatorUser) {
+  if (!entryIds || entryIds.length === 0) return;
+  try {
+    const placeholders = entryIds.map(() => '?').join(',');
+    const entries = db.prepare(`
+      SELECT pe.*, st.first_name, st.last_name, st.group_code, ci.name as item_name, cc.name as category_name
+      FROM point_entry pe
+      JOIN student st ON pe.student_id = st.id
+      JOIN catalog_item ci ON pe.item_id = ci.id
+      JOIN catalog_category cc ON pe.category_id = cc.id
+      WHERE pe.id IN (${placeholders})
+    `).all(...entryIds);
+
+    if (!entries || entries.length === 0) return;
+
+    // Approver_role bo'yicha guruhlash
+    const byRole = {};
+    for (const e of entries) {
+      const role = e.approver_role || 'dep_yb';
+      if (!byRole[role]) byRole[role] = [];
+      byRole[role].push(e);
+    }
+
+    const roleTitles = {
+      'dep_yb': "Yoshlar bilan ishlash bo'limi",
+      'dep_mb': "Ma'naviyat va ma'rifat bo'limi",
+      'dep_ob': "O'quv-uslubiy boshqarma (Registrator)",
+      'dep_ib': "Ilmiy va innovatsiyalar bo'limi",
+      'dep_sb': "Sanoat bilan hamkorlik bo'limi",
+      'dep_pb': "Matbuot xizmati (PR)",
+      'prorektor': "Yoshlar masalalari bo'yicha prorektor"
+    };
+
+    for (const [role, roleEntries] of Object.entries(byRole)) {
+      const totalPoints = roleEntries.reduce((s, e) => s + (e.points || 0), 0);
+      const studentNames = roleEntries.slice(0, 3).map(e => `${e.first_name} ${e.last_name} (${e.group_code})`).join(', ');
+      const extraCount = roleEntries.length > 3 ? ` va yana ${roleEntries.length - 3} nafar talaba` : '';
+      const sampleItem = roleEntries[0].item_name;
+      const deptName = roleTitles[role] || roleEntries[0].category_name || role;
+
+      const title = `Yangi ball tasdiqlash uchun: ${roleEntries.length} ta ariza (+${totalPoints} ball)`;
+      const message = `🔔 <b>YANGI BALL TASDIQLASH UCHUN KELDI!</b>\n\n` +
+        `👨‍🏫 <b>Kiritgan tyutor:</b> ${creatorUser.full_name || creatorUser.id}\n` +
+        `🏢 <b>Mas'ul bo'lim:</b> ${deptName}\n` +
+        `🎯 <b>Band / Yo'nalish:</b> ${sampleItem}\n` +
+        `⭐ <b>Jami ball miqdori:</b> +${totalPoints} ball\n` +
+        `👥 <b>Talabalar (${roleEntries.length} nafar):</b> ${studentNames}${extraCount}\n\n` +
+        `<i>Iltimos, arizalarni tekshirish va tasdiqlash uchun tasdiq portaliga kiring.</i>`;
+
+      // Mas'ul xodimlarni topish (ushbu rolga ega xodimlar yoki superadmin)
+      const approverStaff = db.prepare(`
+        SELECT * FROM staff_user 
+        WHERE active = 1 AND (roles LIKE ? OR roles LIKE '%superadmin%' OR id = 'superadmin')
+      `).all(`%"${role}"%`);
+
+      for (const staff of approverStaff) {
+        if (staff.id === creatorUser.id && !staff.roles.includes('superadmin')) continue;
+
+        await sendStaffTelegramNotification({
+          staff_id: staff.id,
+          type: 'pending_approval',
+          title,
+          message,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '📥 Tasdiqlash portalini ochish', url: `${config.baseUrl}/#approvals` }
+              ]
+            ]
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('notifyApproversForNewPoints error:', err.message);
+  }
+}
+
+/**
  * Superadmin klaviaturasi
  */
 function getSuperadminKeyboard() {
@@ -430,37 +580,116 @@ async function handleTelegramWebhook(update) {
 
   // 1. /start buyrug'i
   if (text.startsWith('/start')) {
+    const tgId = String(chatId);
+    const username = msg.from?.username ? `@${msg.from.username}` : null;
+    const nowIso = new Date().toISOString();
+
     recordBotActivity(chatId, 'command_start', `/start buyrug'i yuborildi`, {
       username: msg.from?.username,
       firstName: msg.from?.first_name,
       lastName: msg.from?.last_name
     });
 
-    // Agar Superadmin bo'lsa (Mansurbek Qazaqov)
+    // A. Xodim tekshiruvi: superadmin, telegram_user_id bo'yicha yoki username bo'yicha
+    let staffUser = null;
     if (isSuperadmin) {
-      // Superadminni bazada telegram_user_id ga bog'lash
-      db.prepare(`UPDATE staff_user SET telegram_user_id = ? WHERE id = 'superadmin'`).run(SUPERADMIN_TG_ID);
-      db.prepare(`UPDATE student SET telegram_user_id = ? WHERE id = 'std_mansurbek'`).run(SUPERADMIN_TG_ID);
+      staffUser = db.prepare(`SELECT * FROM staff_user WHERE id = 'superadmin'`).get();
+    } else {
+      staffUser = db.prepare(`SELECT * FROM staff_user WHERE telegram_user_id = ?`).get(tgId);
+      if (!staffUser && msg.from?.username) {
+        staffUser = db.prepare(`SELECT * FROM staff_user WHERE LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)`).get(msg.from.username, `@${msg.from.username}`);
+      }
+    }
 
-      const totalStudents = db.prepare(`SELECT COUNT(*) as c FROM student WHERE status = 'active'`).get().c;
-      const pendingCount = db.prepare(`SELECT COUNT(*) as c FROM point_entry WHERE status IN ('pending', 'pending_pv')`).get().c;
-      const totalPoints = db.prepare(`SELECT COALESCE(SUM(season), 0) as s FROM student_score`).get().s;
+    if (staffUser) {
+      db.prepare(`
+        UPDATE staff_user 
+        SET telegram_user_id = ?,
+            telegram_username = COALESCE(?, telegram_username),
+            bot_started_at = COALESCE(bot_started_at, ?),
+            bot_status = 'active',
+            last_active_at = ?
+        WHERE id = ?
+      `).run(tgId, username, nowIso, nowIso, staffUser.id);
 
-      const adminWelcome = `🏛️ <b>Assalomu alaykum, Mansurbek Qazaqov!</b>\n` +
-        `Siz AKHU Talabalar reytingi tizimi <b>Superadmini</b> sifatida tasdiqlangansiz (ID: <code>${chatId}</code>).\n\n` +
-        `📊 <b>Tizimning joriy holati:</b>\n` +
-        `• Faol talabalar: <b>${totalStudents} nafar</b>\n` +
-        `• Kutilayotgan tasdiqlar: <b>${pendingCount} ta</b>\n` +
-        `• Mavsumning jami ballari: <b>${totalPoints.toLocaleString()} ball</b>\n\n` +
-        `Tizimni boshqarish va sinovdan o'tkazish uchun pastdagi tugmalardan foydalaning:`;
+      logAudit({
+        actor_id: staffUser.id,
+        actor_role: 'staff',
+        action: 'BOT_START',
+        object_type: 'staff_user',
+        object_id: staffUser.id,
+        after: { username, telegram_user_id: tgId }
+      });
 
-      await sendTelegramMessage(chatId, adminWelcome, {
-        reply_markup: getSuperadminKeyboard()
+      let parsedRoles = [];
+      try { parsedRoles = JSON.parse(staffUser.roles); } catch(e) { parsedRoles = [staffUser.roles]; }
+      const isSuper = parsedRoles.includes('superadmin') || staffUser.id === 'superadmin';
+
+      if (isSuper) {
+        const totalStudents = db.prepare(`SELECT COUNT(*) as c FROM student WHERE status = 'active'`).get().c;
+        const pendingCount = db.prepare(`SELECT COUNT(*) as c FROM point_entry WHERE status IN ('pending', 'pending_pv')`).get().c;
+        const totalPoints = db.prepare(`SELECT COALESCE(SUM(season), 0) as s FROM student_score`).get().s;
+
+        const adminWelcome = `🏛️ <b>Assalomu alaykum, ${staffUser.full_name}!</b>\n` +
+          `Siz AKHU Talabalar reytingi tizimi <b>Superadmini</b> sifatida tasdiqlangansiz (ID: <code>${chatId}</code>).\n\n` +
+          `📊 <b>Tizimning joriy holati:</b>\n` +
+          `• Faol talabalar: <b>${totalStudents} nafar</b>\n` +
+          `• Kutilayotgan tasdiqlar: <b>${pendingCount} ta</b>\n` +
+          `• Mavsumning jami ballari: <b>${totalPoints.toLocaleString()} ball</b>\n\n` +
+          `Tizimni boshqarish va nazorat qilish uchun pastdagi tugmalardan foydalaning:`;
+
+        await sendTelegramMessage(chatId, adminWelcome, {
+          reply_markup: getSuperadminKeyboard()
+        });
+        return;
+      }
+
+      // Mas'ul xodim (Tyutor yoki Bo'lim)
+      const roleTitles = {
+        'tutor': 'Akademik Tyutor',
+        'dep_yb': "Yoshlar bilan ishlash bo'limi",
+        'dep_mb': "Ma'naviyat va ma'rifat bo'limi",
+        'dep_ob': "O'quv-uslubiy boshqarma (Registrator)",
+        'dep_ib': "Ilmiy va innovatsiyalar bo'limi",
+        'dep_sb': "Sanoat bilan hamkorlik bo'limi",
+        'dep_pb': "Matbuot xizmati (PR)",
+        'prorektor': "Yoshlar masalalari bo'yicha prorektor"
+      };
+      const displayRoles = parsedRoles.map(r => roleTitles[r] || r).join(', ');
+
+      let pendingForMe = 0;
+      if (parsedRoles.length > 0) {
+        const placeholders = parsedRoles.map(() => '?').join(',');
+        pendingForMe = db.prepare(`
+          SELECT COUNT(*) as c FROM point_entry 
+          WHERE status IN ('pending', 'pending_pv') AND (approver_role IN (${placeholders}))
+        `).get(...parsedRoles)?.c || 0;
+      }
+
+      const staffWelcome = `🏛️ <b>Assalomu alaykum, ${staffUser.full_name}!</b>\n\n` +
+        `Siz AKHU tizimida mas'ul xodim sifatida tasdiqlandingiz:\n` +
+        `👔 <b>Lavozim/Rol:</b> ${displayRoles}\n` +
+        `🆔 <b>Telegram ID:</b> <code>${chatId}</code>\n` +
+        `📥 <b>Tasdiqlash kutilayotgan arizalar:</b> <b>${pendingForMe} ta</b>\n\n` +
+        `✅ <b>Telegram Bot faollashtirildi!</b> Endi tyutorlar ball kiritganda va muhim arizalar tushganda sizga avtomatik tezkor xabarnomalar shu yerga yetkaziladi.\n\n` +
+        `Tizim portaliga o'tish uchun pastdagi tugmani bosing:`;
+
+      await sendTelegramMessage(chatId, staffWelcome, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💻 Tasdiqlash va Boshqaruv Portali', url: `${config.baseUrl}/#approvals` }
+            ],
+            [
+              { text: '📥 Kutilayotgan arizalar', callback_data: 'admin_pending' }
+            ]
+          ]
+        }
       });
       return;
     }
 
-    // Oddiy talaba yoki foydalanuvchi
+    // B. Oddiy talaba yoki foydalanuvchi
     const student = db.prepare(`SELECT * FROM student WHERE telegram_user_id = ?`).get(String(chatId));
 
     if (student) {
@@ -508,6 +737,57 @@ async function handleTelegramWebhook(update) {
   // 2. Contact yuborilganda (Telefon raqam orqali bog'lash)
   if (msg.contact) {
     const phone = msg.contact.phone_number;
+    let cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
+    const phoneWithoutPlus = cleanPhone.replace('+', '');
+    const last9 = cleanPhone.slice(-9);
+
+    // 1. Avval xodimlar orasidan telefon bo'yicha qidirish
+    const staff = db.prepare(`
+      SELECT * FROM staff_user
+      WHERE phone = ? OR phone = ? OR phone LIKE ? 
+         OR telegram_phone = ? OR telegram_phone LIKE ?
+      LIMIT 1
+    `).get(cleanPhone, phoneWithoutPlus, `%${last9}`, cleanPhone, `%${last9}`);
+
+    if (staff) {
+      const now = new Date().toISOString();
+      const username = msg.from?.username ? `@${msg.from.username}` : null;
+      db.prepare(`
+        UPDATE staff_user
+        SET telegram_user_id = ?,
+            telegram_phone = ?,
+            telegram_username = COALESCE(?, telegram_username),
+            bot_started_at = COALESCE(bot_started_at, ?),
+            bot_status = 'active',
+            last_active_at = ?
+        WHERE id = ?
+      `).run(String(chatId), cleanPhone, username, now, now, staff.id);
+
+      logAudit({
+        actor_id: staff.id,
+        actor_role: 'staff',
+        action: 'BOT_LINK_STAFF',
+        object_type: 'staff_user',
+        object_id: staff.id,
+        after: { telegram_user_id: String(chatId), phone: cleanPhone, username }
+      });
+
+      await sendTelegramMessage(chatId, `🎉 <b>Tabriklaymiz, ${staff.full_name}!</b>\n\n` +
+        `Sizning xodim hisobingiz Telegram botga muvaffaqiyatli bog'landi! ✅\n` +
+        `Endi talabalarning barcha yangi ball arizalari bo'yicha bildirishnomalarni to'g'ridan-to'g'ri shu bot orqali qabul qilasiz.`, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💻 Boshqaruv / Tasdiqlash Portali', url: `${config.baseUrl}/#approvals` }
+            ]
+          ]
+        }
+      });
+      return;
+    }
+
+    // 2. Aks holda talaba bog'lanishi (Student logic)
     const result = linkStudentTelegramAccount(chatId, phone);
 
     recordBotActivity(chatId, 'share_contact', `Telefon yuborildi: ${phone} (${result.success ? 'Muvaffaqiyatli bog\'landi' : 'Topilmadi'})`, {
@@ -592,6 +872,8 @@ module.exports = {
   linkStudentTelegramAccount,
   notifyStudent,
   notifyStaffDept,
+  sendStaffTelegramNotification,
+  notifyApproversForNewPoints,
   handleTelegramWebhook,
   startTelegramPolling,
   stopTelegramPolling,

@@ -7552,6 +7552,7 @@ async function handleStudentExcelUpload() {
 let adminStaffState = {
   search: '',
   role: '',
+  botStatus: '',
   users: []
 };
 
@@ -7563,14 +7564,14 @@ async function renderStaffUsersManagement(container) {
         <div>
           <div class="admin-hero-title">
             <span style="color: #F87171;">${icon('shield', 22)}</span>
-            <span>Universitet Xodimlari & Tizim Rollari Boshqaruvi</span>
+            <span>Universitet Xodimlari, Rollar & Telegram Bot Nazorati</span>
             <span class="badge" style="background: rgba(248, 113, 113, 0.2); color: #FCA5A5; border: 1px solid rgba(248, 113, 113, 0.4); font-size: 11px;">
               Superadmin Full Access
             </span>
           </div>
           <p class="admin-hero-desc">
-            Barcha tizim foydalanuvchilari (Tyutorlar, Bo'lim xodimlari, Registratorlar, Prorektor) reyestri. 
-            Ixtiyoriy xodimga rollarni biriktirish, yangi xodimlarni ro'yxatdan o'tkazish yoki faollik holatini boshqarish.
+            Barcha tizim foydalanuvchilari (Tyutorlar, Bo'lim xodimlari, Registratorlar, Prorektor) reyestri va Telegram bot holati.
+            Har bir xodimning botga ulanishi (/start), xabarlarni o'qishi, mute holati va tizimda qilgan barcha amallarini to'liq nazorat qiling.
           </p>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
@@ -7581,8 +7582,8 @@ async function renderStaffUsersManagement(container) {
       </div>
     </div>
 
-    <!-- METRIKALAR -->
-    <div class="metrics-grid mb-4">
+    <!-- METRIKALAR (6 ta blok) -->
+    <div class="metrics-grid mb-4" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px;">
       <div class="stat-card">
         <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
         <div class="stat-data">
@@ -7596,7 +7597,23 @@ async function renderStaffUsersManagement(container) {
         <div class="stat-data">
           <span class="stat-label">Faol Xodimlar</span>
           <h3 class="stat-val" id="stat-staff-active">-</h3>
-          <span class="stat-sub">Tizimga kirish huquqiga ega</span>
+          <span class="stat-sub">Kirish ruxsati bor</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 3px solid #10B981;">
+        <div class="stat-icon" style="background:#ECFDF5; color:#059669; font-size:16px;">🟢</div>
+        <div class="stat-data">
+          <span class="stat-label">Botda Faol</span>
+          <h3 class="stat-val" id="stat-staff-tg-active" style="color:#059669;">-</h3>
+          <span class="stat-sub">Start bosgan / Ulangan</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 3px solid #EF4444;">
+        <div class="stat-icon" style="background:#FEF2F2; color:#DC2626; font-size:16px;">🔴</div>
+        <div class="stat-data">
+          <span class="stat-label">Mute / Bloklangan</span>
+          <h3 class="stat-val" id="stat-staff-tg-blocked" style="color:#DC2626;">-</h3>
+          <span class="stat-sub">Xabar yetib bormaydi</span>
         </div>
       </div>
       <div class="stat-card">
@@ -7612,7 +7629,7 @@ async function renderStaffUsersManagement(container) {
         <div class="stat-data">
           <span class="stat-label">Bo'lim Mas'ullari</span>
           <h3 class="stat-val" id="stat-staff-depts">-</h3>
-          <span class="stat-sub">Yoshlar, Ilmiy, Ma'naviyat va b.</span>
+          <span class="stat-sub">Tasdiqlovchi organlar</span>
         </div>
       </div>
     </div>
@@ -7621,7 +7638,7 @@ async function renderStaffUsersManagement(container) {
     <div class="admin-toolbar">
       <div class="admin-search-box">
         ${icon('search', 16)}
-        <input type="text" id="filter-staff-search" class="admin-search-input" placeholder="Ism, login yoki email bo'yicha qidiruv...">
+        <input type="text" id="filter-staff-search" class="admin-search-input" placeholder="Ism, login, telefon yoki email bo'yicha qidiruv...">
       </div>
       <div class="admin-filters-group">
         <select id="filter-staff-role" class="admin-filter-select">
@@ -7629,11 +7646,19 @@ async function renderStaffUsersManagement(container) {
           <option value="superadmin">Superadmin</option>
           <option value="prorektor">Prorektor</option>
           <option value="tutor">Tyutor</option>
-          <option value="dep_yb">Yoshlar bilan ishlash</option>
+          <option value="dep_yb">Yoshlar bo'limi</option>
           <option value="dep_ob">O'quv bo'limi</option>
           <option value="dep_mb">Ma'naviyat bo'limi</option>
           <option value="dep_ib">Ilmiy bo'lim</option>
+          <option value="dep_sb">Sanoat hamkorlik</option>
+          <option value="dep_pb">Matbuot (PR)</option>
           <option value="observer">Kuzatuvchi</option>
+        </select>
+        <select id="filter-staff-bot" class="admin-filter-select">
+          <option value="">Barcha Telegram holatlari</option>
+          <option value="active">🟢 Bot Faol (Start bosgan)</option>
+          <option value="blocked">🔴 Mute / Bloklangan</option>
+          <option value="not_started">⚪ Start bosmagan</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="resetStaffFilters()" title="Tozalash" style="display:inline-flex; align-items:center; gap:4px;">
           ${icon('refresh', 13)} Tozalash
@@ -7651,13 +7676,14 @@ async function renderStaffUsersManagement(container) {
               <th>Biriktirilgan Rollar</th>
               <th>Tyutor Guruhlari</th>
               <th>Aloqa (Email / Tel)</th>
-              <th>Holati</th>
-              <th style="text-align: right; width: 120px;">Amallar</th>
+              <th>Telegram Bot Nazorati</th>
+              <th>Tizim Holati</th>
+              <th style="text-align: right; width: 150px;">Amallar</th>
             </tr>
           </thead>
           <tbody id="admin-staff-table-body">
             <tr>
-              <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
                 <div class="spinner"></div>
                 <p style="margin-top: 8px;">Xodimlar yuklanmoqda...</p>
               </td>
@@ -7671,18 +7697,31 @@ async function renderStaffUsersManagement(container) {
   // Qidiruv va filtrlar
   const searchInput = document.getElementById('filter-staff-search');
   let searchTimer;
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      adminStaffState.search = e.target.value.trim().toLowerCase();
-      renderStaffTableRows();
-    }, 300);
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        adminStaffState.search = e.target.value.trim().toLowerCase();
+        renderStaffTableRows();
+      }, 300);
+    });
+  }
 
-  document.getElementById('filter-staff-role').addEventListener('change', (e) => {
-    adminStaffState.role = e.target.value;
-    renderStaffTableRows();
-  });
+  const roleSelect = document.getElementById('filter-staff-role');
+  if (roleSelect) {
+    roleSelect.addEventListener('change', (e) => {
+      adminStaffState.role = e.target.value;
+      renderStaffTableRows();
+    });
+  }
+
+  const botSelect = document.getElementById('filter-staff-bot');
+  if (botSelect) {
+    botSelect.addEventListener('change', (e) => {
+      adminStaffState.botStatus = e.target.value;
+      renderStaffTableRows();
+    });
+  }
 
   await loadStaffUsersList();
 }
@@ -7690,10 +7729,13 @@ async function renderStaffUsersManagement(container) {
 function resetStaffFilters() {
   adminStaffState.search = '';
   adminStaffState.role = '';
+  adminStaffState.botStatus = '';
   const s = document.getElementById('filter-staff-search');
   if (s) s.value = '';
   const r = document.getElementById('filter-staff-role');
   if (r) r.value = '';
+  const b = document.getElementById('filter-staff-bot');
+  if (b) b.value = '';
   renderStaffTableRows();
 }
 
@@ -7706,23 +7748,29 @@ async function loadStaffUsersList() {
     // Metrikalar
     const total = adminStaffState.users.length;
     const active = adminStaffState.users.filter(u => (u.is_active !== undefined ? Boolean(u.is_active) : (u.active === 1))).length;
+    const tgActive = adminStaffState.users.filter(u => (u.bot_status === 'active') || (!u.bot_status && u.telegram_user_id)).length;
+    const tgBlocked = adminStaffState.users.filter(u => u.bot_status === 'blocked' || u.bot_status === 'muted').length;
     const tutors = adminStaffState.users.filter(u => (u.roles || []).includes('tutor')).length;
     const depts = adminStaffState.users.filter(u => (u.roles || []).some(r => r.startsWith('dep_'))).length;
 
     const elTotal = document.getElementById('stat-staff-total');
     const elActive = document.getElementById('stat-staff-active');
+    const elTgActive = document.getElementById('stat-staff-tg-active');
+    const elTgBlocked = document.getElementById('stat-staff-tg-blocked');
     const elTutors = document.getElementById('stat-staff-tutors');
     const elDepts = document.getElementById('stat-staff-depts');
 
     if (elTotal) elTotal.textContent = total;
     if (elActive) elActive.textContent = active;
+    if (elTgActive) elTgActive.textContent = tgActive;
+    if (elTgBlocked) elTgBlocked.textContent = tgBlocked;
     if (elTutors) elTutors.textContent = tutors;
     if (elDepts) elDepts.textContent = depts;
 
     renderStaffTableRows();
   } catch (err) {
     const tbody = document.getElementById('admin-staff-table-body');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center; padding:20px;">${err.message}</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align:center; padding:20px;">${err.message}</td></tr>`;
   }
 }
 
@@ -7737,7 +7785,10 @@ function renderStaffTableRows() {
     filtered = filtered.filter(u =>
       (u.full_name || '').toLowerCase().includes(q) ||
       (u.username || '').toLowerCase().includes(q) ||
-      (u.email || '').toLowerCase().includes(q)
+      (u.id || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.phone || '').toLowerCase().includes(q) ||
+      (u.telegram_username || '').toLowerCase().includes(q)
     );
   }
 
@@ -7745,10 +7796,20 @@ function renderStaffTableRows() {
     filtered = filtered.filter(u => (u.roles || []).includes(adminStaffState.role));
   }
 
+  if (adminStaffState.botStatus) {
+    filtered = filtered.filter(u => {
+      const bStatus = u.bot_status || (u.telegram_user_id ? 'active' : 'not_started');
+      if (adminStaffState.botStatus === 'active') return bStatus === 'active';
+      if (adminStaffState.botStatus === 'blocked') return bStatus === 'blocked' || bStatus === 'muted';
+      if (adminStaffState.botStatus === 'not_started') return bStatus === 'not_started' || (!u.bot_status && !u.telegram_user_id);
+      return true;
+    });
+  }
+
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
           <div style="font-size: 28px; margin-bottom: 8px;">${icon('shield', 28)}</div>
           <p style="font-weight: 600;">Xodimlar topilmadi</p>
         </td>
@@ -7780,28 +7841,66 @@ function renderStaffTableRows() {
 
     const groupBadges = groups.map(g => `<span class="badge badge-group" style="margin-right:4px;">${g}</span>`).join('') || '<span style="color:#94A3B8; font-size:11px;">-</span>';
 
+    // Telegram bot status badge
+    let tgBadge = '';
+    const bStatus = u.bot_status || (u.telegram_user_id ? 'active' : 'not_started');
+    if (bStatus === 'active') {
+      tgBadge = `
+        <span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-weight:700; display:inline-flex; align-items:center; gap:4px; font-size:11.5px;">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10B981;"></span> Bot Faol
+        </span>
+        <div style="font-size:11px; color:#475569; margin-top:3px;">
+          ${u.telegram_username ? `<span style="color:#0284C7; font-weight:600;">@${u.telegram_username.replace(/^@/, '')}</span>` : (u.telegram_user_id ? `ID: <code>${u.telegram_user_id}</code>` : '')}
+        </div>
+      `;
+    } else if (bStatus === 'blocked' || bStatus === 'muted') {
+      tgBadge = `
+        <span class="badge" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-weight:700; display:inline-flex; align-items:center; gap:4px; font-size:11.5px;">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#EF4444;"></span> Mute / Blok
+        </span>
+        <div style="font-size:10.5px; color:#DC2626; margin-top:2px; font-weight:600;">
+          Xabar yetmayapti!
+        </div>
+      `;
+    } else {
+      tgBadge = `
+        <span class="badge" style="background:#F1F5F9; color:#64748B; border:1px solid #CBD5E1; font-weight:600; display:inline-flex; align-items:center; gap:4px; font-size:11.5px;">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#94A3B8;"></span> Ulanmagan
+        </span>
+        <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">
+          Start bosmagan
+        </div>
+      `;
+    }
+
     return `
       <tr>
         <td>
-          <div class="table-student-name">
+          <div class="table-student-name" style="cursor:pointer;" onclick="showStaffMonitoringModal('${u.id}')" title="Xodimning to'liq monitoringi, Telegram holati va doimiy arxivini ko'rish uchun bosing">
             ${u.photo_url ? `
-              <img src="${u.photo_url}" class="avatar-badge" style="object-fit:cover; border-radius:50%; width:32px; height:32px;" onerror="this.outerHTML='<span class=\\'avatar-badge\\'>${initials || 'X'}</span>'">
+              <img src="${u.photo_url}" class="avatar-badge" style="object-fit:cover; border-radius:50%; width:34px; height:34px; border:2px solid #3B82F6;" onerror="this.outerHTML='<span class=\\'avatar-badge\\'>${initials || 'X'}</span>'">
             ` : `
               <span class="avatar-badge">${initials || 'X'}</span>
             `}
             <div>
-              <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${u.full_name}</div>
+              <div style="font-weight: 700; color: #1E293B; font-size: 13px; display:flex; align-items:center; gap:6px;">
+                <span>${u.full_name}</span>
+                <span style="color:#2563EB; font-size:11px;" title="Monitoring">${icon('eye', 13)}</span>
+              </div>
               <div class="table-sub-text">@${u.username || u.id}</div>
             </div>
           </div>
         </td>
         <td>
-          <div style="display: flex; flex-wrap: wrap; max-width: 280px;">${roleBadges || '<span class="text-muted">Rollar biriktirilmagan</span>'}</div>
+          <div style="display: flex; flex-wrap: wrap; max-width: 260px;">${roleBadges || '<span class="text-muted">Rollar biriktirilmagan</span>'}</div>
         </td>
         <td>${groupBadges}</td>
         <td>
-          <div style="font-size: 12px; color: var(--text-main);">${u.email || '-'}</div>
-          <div class="table-sub-text">${u.phone || '<span style="color:#94A3B8;">Tel kiritilmagan</span>'}</div>
+          <div style="font-size: 12px; color: var(--text-main); font-weight:500;">${u.email || '-'}</div>
+          <div class="table-sub-text">${u.phone || '<span style="color:#94A3B8;">Tel yo\'q</span>'}</div>
+        </td>
+        <td>
+          ${tgBadge}
         </td>
         <td>
           <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
@@ -7810,10 +7909,13 @@ function renderStaffTableRows() {
         </td>
         <td style="text-align: right;">
           <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+            <button class="btn-action" style="background:#0284C7; color:white; border:1px solid #0369A1;" onclick="showStaffMonitoringModal('${u.id}')" title="Xodim Monitoringi, Bot holati va o'chmas faoliyat jurnali">
+              ${icon('shield', 14)}
+            </button>
             <button class="btn-action" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" onclick="impersonateStaffUser('${u.id}')" title="Ushbu xodim nomidan tizimni tekshirish (Check / Kirish)">
               ${icon('eye', 14)}
             </button>
-            <button class="btn-action btn-action-primary" onclick="showEditStaffModal('${u.id}')" title="Tahrirlash / Rollar">
+            <button class="btn-action btn-action-primary" onclick="showEditStaffModal('${u.id}')" title="Tahrirlash / Rollar / Login / Parol">
               ${icon('edit', 14)}
             </button>
             <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStaffStatus('${u.id}', ${isActive ? 1 : 0})" title="${isActive ? 'Bloklash' : 'Faollashtirish'}">
@@ -7905,8 +8007,23 @@ async function showCreateStaffModal() {
           <input type="email" id="new-staff-email" class="form-control" placeholder="staff@akhu.uz">
         </div>
         <div class="form-group">
-          <label class="form-label">Telefon Raqami</label>
+          <label class="form-label">Asosiy Telefon</label>
           <input type="text" id="new-staff-phone" class="form-control" placeholder="+998901234567">
+        </div>
+      </div>
+
+      <!-- Telegram ma'lumotlari -->
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Telegram Username (@username)</label>
+          <div style="position:relative;">
+            <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
+            <input type="text" id="new-staff-tgusername" class="form-control" style="padding-left:26px;" placeholder="username">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram Telefon Raqami (Bot uchun)</label>
+          <input type="text" id="new-staff-tgphone" class="form-control" placeholder="+998901234567">
         </div>
       </div>
 
@@ -7960,6 +8077,8 @@ async function handleCreateStaffSubmit() {
   const full_name = document.getElementById('new-staff-fullname')?.value.trim();
   const email = document.getElementById('new-staff-email')?.value.trim();
   const phone = document.getElementById('new-staff-phone')?.value.trim();
+  const telegram_username = document.getElementById('new-staff-tgusername')?.value.trim();
+  const telegram_phone = document.getElementById('new-staff-tgphone')?.value.trim();
   const photo_url = document.getElementById('new-staff-photourl')?.value.trim();
 
   const roles = Array.from(document.querySelectorAll(`input[name="new-staff-roles-checkbox"]:checked`))
@@ -7984,7 +8103,17 @@ async function handleCreateStaffSubmit() {
     await apiFetch('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify({
-        username, password, full_name, email, phone, photo_url: photo_url || null, roles, tutor_groups, groups: tutor_groups
+        username,
+        password,
+        full_name,
+        email,
+        phone,
+        telegram_username: telegram_username || null,
+        telegram_phone: telegram_phone || phone || null,
+        photo_url: photo_url || null,
+        roles,
+        tutor_groups,
+        groups: tutor_groups
       })
     });
 
@@ -8008,6 +8137,8 @@ async function showEditStaffModal(userId) {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
+  const modalContent = document.querySelector('#common-modal .modal-content');
+  if (modalContent) modalContent.style.maxWidth = '680px';
 
   modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Xodimni Tahrirlash: ${user.full_name}</span>`;
 
@@ -8086,14 +8217,37 @@ async function showEditStaffModal(userId) {
         </div>
       </div>
 
-      <div class="grid grid-2 mb-3">
+      <!-- Telegram va Aloqa Parametrlari -->
+      <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
         <div class="form-group">
-          <label class="form-label">Telefon Raqami</label>
+          <label class="form-label">Asosiy Telefon</label>
           <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
         </div>
         <div class="form-group">
-          <label class="form-label">Telegram User ID (Xabarnomalar uchun)</label>
-          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="masalan: 1202082857">
+          <label class="form-label">Telegram Username (@)</label>
+          <div style="position:relative;">
+            <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
+            <input type="text" id="edit-staff-tgusername" class="form-control" style="padding-left:26px;" value="${user.telegram_username ? user.telegram_username.replace(/^@/, '') : ''}" placeholder="username">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram User ID</label>
+          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857">
+        </div>
+      </div>
+
+      <div class="grid grid-2 mb-3">
+        <div class="form-group">
+          <label class="form-label">Telegram Telefon Raqami (Bot bilan bog'langan)</label>
+          <input type="text" id="edit-staff-tgphone" class="form-control" value="${user.telegram_phone || user.phone || ''}" placeholder="+998901234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram Bot Holati</label>
+          <select id="edit-staff-botstatus" class="form-control">
+            <option value="active" ${user.bot_status === 'active' ? 'selected' : ''}>🟢 Faol (Xabarlar yetib bormoqda)</option>
+            <option value="not_started" ${(!user.bot_status || user.bot_status === 'not_started') ? 'selected' : ''}>⚪ Botga kirmagan / Start bosmagan</option>
+            <option value="blocked" ${user.bot_status === 'blocked' ? 'selected' : ''}>🔴 Mute / Bot bloklangan</option>
+          </select>
         </div>
       </div>
 
@@ -8210,6 +8364,9 @@ async function handleEditStaffSubmit(userId) {
   const phone = document.getElementById('edit-staff-phone')?.value.trim();
   const photo_url = document.getElementById('edit-staff-photourl')?.value.trim();
   const telegram_user_id = document.getElementById('edit-staff-tgid')?.value.trim();
+  const telegram_username = document.getElementById('edit-staff-tgusername')?.value.trim();
+  const telegram_phone = document.getElementById('edit-staff-tgphone')?.value.trim();
+  const bot_status = document.getElementById('edit-staff-botstatus')?.value;
   const is_active = document.getElementById('edit-staff-active')?.checked ? 1 : 0;
 
   const roles = Array.from(document.querySelectorAll(`input[name="edit-staff-roles-checkbox"]:checked`))
@@ -8243,6 +8400,9 @@ async function handleEditStaffSubmit(userId) {
       phone,
       photo_url: photo_url || null,
       telegram_user_id: telegram_user_id || null,
+      telegram_username: telegram_username || null,
+      telegram_phone: telegram_phone || phone || null,
+      bot_status: bot_status || undefined,
       active: is_active,
       is_active: is_active === 1,
       roles,
@@ -8308,6 +8468,396 @@ async function deleteStaffUser(userId) {
   }
 }
 
+// ====================================================================
+// SUPERADMIN: XODIM MONITORINGI, TELEGRAM BOT VA O'CHMAS JURNAL
+// ====================================================================
+function formatDateTimeUz(isoStr) {
+  if (!isoStr) return '-';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    return d.toLocaleString('uz-UZ', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return isoStr;
+  }
+}
+
+async function showStaffMonitoringModal(userId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+  const modalContent = document.querySelector('#common-modal .modal-content');
+  if (modalContent) modalContent.style.maxWidth = '920px';
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('shield', 20)} <span style="color:#2563EB;">Xodim Nazorati & Jonli Faoliyati</span></span>`;
+  modalBody.innerHTML = `
+    <div style="text-align:center; padding:50px; color:var(--text-muted);">
+      <div class="spinner"></div>
+      <p style="margin-top:12px; font-weight:600; font-size:14px;">Xodim ma'lumotlari, Telegram bot holati va doimiy arxiv yuklanmoqda...</p>
+    </div>
+  `;
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  openModal();
+
+  try {
+    const res = await apiFetch(`/api/admin/users/${userId}/monitoring`);
+    const { user, bot_info, stats, notifications = [], audit_logs = [] } = res;
+
+    const initials = (user.full_name || '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    const isActive = user.is_active !== undefined ? Boolean(user.is_active) : (user.active === 1);
+
+    const validRoles = (user.roles || []).filter(r => r && r !== 'undefined');
+    const roleBadges = validRoles.map(r => {
+      let bg = '#F1F5F9', color = '#475569', label = r;
+      if (r === 'superadmin') { bg = '#FEF2F2'; color = '#DC2626'; label = 'Superadmin'; }
+      else if (r === 'prorektor') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Prorektor'; }
+      else if (r === 'tutor') { bg = '#ECFDF5'; color = '#059669'; label = 'Tyutor'; }
+      else if (r === 'dep_yb') { bg = '#EFF6FF'; color = '#2563EB'; label = 'Yoshlar bo\'limi'; }
+      else if (r === 'dep_mb') { bg = '#FAF5FF'; color = '#9333EA'; label = 'Ma\'naviyat bo\'limi'; }
+      else if (r === 'dep_ob') { bg = '#F0FDF4'; color = '#16A34A'; label = 'O\'quv bo\'limi'; }
+      else if (r === 'dep_ib') { bg = '#FFFBEB'; color = '#D97706'; label = 'Ilmiy bo\'lim'; }
+      else if (r === 'dep_sb') { bg = '#ECFEFF'; color = '#0891B2'; label = 'Sanoat hamkorlik'; }
+      else if (r === 'dep_pb') { bg = '#FDF2F8'; color = '#DB2777'; label = 'Matbuot (PR)'; }
+      else if (r === 'observer') { bg = '#F8FAFC'; color = '#475569'; label = 'Kuzatuvchi'; }
+      return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.08); font-weight:600;">${label}</span>`;
+    }).join('') || '<span class="text-muted">Rollar biriktirilmagan</span>';
+
+    // Bot status badge & description
+    let botStatusBadge = '';
+    let botStatusDesc = '';
+    const bStatus = bot_info.bot_status || (bot_info.telegram_user_id ? 'active' : 'not_started');
+
+    if (bStatus === 'active') {
+      botStatusBadge = `<span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-size:12.5px; padding:4px 10px; font-weight:700;">🟢 Faol (Start bosgan)</span>`;
+      botStatusDesc = `<span style="color:#059669; font-weight:500;">Xodim botga ulangan va barcha arizalar hamda tizim xabarlarini qabul qiladi.</span>`;
+    } else if (bStatus === 'blocked' || bStatus === 'muted') {
+      botStatusBadge = `<span class="badge" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-size:12.5px; padding:4px 10px; font-weight:700;">🔴 Mute / Bloklangan</span>`;
+      botStatusDesc = `<span style="color:#DC2626; font-weight:700;">DIQQAT: Xodim Telegram botini o'chirib qo'ygan yoki bloklagan! Bot yuborgan bildirishnomalar yetib bormayapti.</span>`;
+    } else {
+      botStatusBadge = `<span class="badge" style="background:#F1F5F9; color:#64748B; border:1px solid #CBD5E1; font-size:12.5px; padding:4px 10px; font-weight:700;">⚪ Start bosmagan</span>`;
+      botStatusDesc = `<span style="color:#64748B;">Xodim hali universitet Telegram botiga /start buyrug'ini yubormagan.</span>`;
+    }
+
+    modalTitle.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="color:#2563EB;">${icon('shield', 22)}</span>
+        <div>
+          <div style="font-size:16px; font-weight:700; color:var(--text-main);">${user.full_name}</div>
+          <div style="font-size:12px; color:var(--text-muted); font-weight:normal;">Login: <b>@${user.id}</b> | Nazorat & Monitoring</div>
+        </div>
+      </div>
+    `;
+
+    modalBody.innerHTML = `
+      <!-- TOP STAFF INFO & TELEGRAM CARD -->
+      <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:16px; margin-bottom:20px;">
+        <!-- Karta 1: Xodim Asosiy Ma'lumotlari -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:16px;">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+            ${user.photo_url ? `
+              <img src="${user.photo_url}" style="width:52px; height:52px; border-radius:50%; object-fit:cover; border:2px solid #3B82F6;" onerror="this.outerHTML='<span class=\\'avatar-badge\\' style=\\'width:52px;height:52px;font-size:18px;\\'>${initials || 'X'}</span>'">
+            ` : `
+              <span class="avatar-badge" style="width:52px; height:52px; font-size:18px;">${initials || 'X'}</span>
+            `}
+            <div>
+              <div style="font-weight:700; font-size:15px; color:#1E293B;">${user.full_name}</div>
+              <div style="font-size:12px; color:#64748B;">Login: <b>${user.id}</b></div>
+              <div style="margin-top:2px;">
+                <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}" style="font-size:10.5px; padding:2px 8px;">
+                  ${isActive ? 'Tizimda Faol' : 'Bloklangan'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:12.5px; color:#334155; line-height:1.7; border-top:1px solid #E2E8F0; padding-top:10px;">
+            <div>📧 <b>Email:</b> ${user.email || '<span style="color:#94A3B8;">Mavjud emas</span>'}</div>
+            <div>📞 <b>Asosiy Tel:</b> ${user.phone || '<span style="color:#94A3B8;">Kiritilmagan</span>'}</div>
+            <div style="margin-top:8px;">
+              <div style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px;">Biriktirilgan Rollar:</div>
+              <div style="display:flex; flex-wrap:wrap; gap:4px;">${roleBadges}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Karta 2: Telegram Bot Nazorati -->
+        <div style="background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%); border:1px solid #BAE6FD; border-radius:12px; padding:16px; position:relative;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="font-weight:700; font-size:13.5px; color:#0369A1; display:flex; align-items:center; gap:6px;">
+              <span>🤖</span> <span>TELEGRAM BOT NAZORATI</span>
+            </div>
+            <div>${botStatusBadge}</div>
+          </div>
+
+          <div style="font-size:12.5px; color:#0C4A6E; line-height:1.7; margin-bottom:12px;">
+            <div>🆔 <b>Telegram ID:</b> <code style="background:white; padding:2px 6px; border-radius:4px; font-weight:700; color:#0284C7;">${bot_info.telegram_user_id || 'Ulanmagan'}</code></div>
+            <div>👤 <b>Telegram Username:</b> ${bot_info.telegram_username ? `<a href="https://t.me/${bot_info.telegram_username.replace(/^@/, '')}" target="_blank" style="color:#0284C7; font-weight:700;">@${bot_info.telegram_username.replace(/^@/, '')}</a>` : '<span style="color:#64748B;">Kiritilmagan</span>'}</div>
+            <div>📱 <b>Telegram Telefon:</b> <b>${bot_info.telegram_phone || user.phone || 'Kiritilmagan'}</b></div>
+            <div>⏱️ <b>Botga /start bosgan:</b> <b>${formatDateTimeUz(bot_info.bot_started_at)}</b></div>
+            <div>⚡ <b>Oxirgi faollik:</b> <b>${formatDateTimeUz(bot_info.last_active_at)}</b></div>
+            <div>📬 <b>Oxirgi bildirishnoma:</b> <b>${formatDateTimeUz(bot_info.last_notification_at)}</b></div>
+          </div>
+
+          <div style="font-size:11.5px; margin-bottom:12px;">
+            ${botStatusDesc}
+          </div>
+
+          <!-- Jonli Test Xabari Yuborish Tugmasi -->
+          <div style="border-top:1px solid #BAE6FD; padding-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <button id="btn-send-staff-test-notif" class="btn btn-sm" onclick="sendStaffTestNotification('${user.id}')" style="background:#0284C7; color:white; border:none; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:6px; padding:6px 14px; box-shadow:0 2px 6px rgba(2,132,199,0.3);">
+              <span>🔔</span> <span>Test Bildirishnoma Yuborish (Mute tekshiruvi)</span>
+            </button>
+            <div style="font-size:11px; color:#0369A1; text-align:right;">
+              Jonli bot aloqasini tekshiradi
+            </div>
+          </div>
+          <div id="staff-test-notif-result" style="margin-top:8px; display:none;"></div>
+        </div>
+      </div>
+
+      <!-- KPI METRIKALARI -->
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:20px;">
+        <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:12px; border-left:4px solid #3B82F6;">
+          <div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Kiritgan Ballari</div>
+          <div style="font-size:18px; font-weight:800; color:#1D4ED8; margin-top:2px;">${stats.points_created_count} ta</div>
+          <div style="font-size:11px; color:#64748B;">Jami: <b>${stats.points_created_sum}</b> ball</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:12px; border-left:4px solid #10B981;">
+          <div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Tasdiqlagan Ballari</div>
+          <div style="font-size:18px; font-weight:800; color:#047857; margin-top:2px;">${stats.points_approved_count} ta</div>
+          <div style="font-size:11px; color:#64748B;">Jami: <b>${stats.points_approved_sum}</b> ball</div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:12px; border-left:4px solid #8B5CF6;">
+          <div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Bot Bildirishnomalari</div>
+          <div style="font-size:18px; font-weight:800; color:#6D28D9; margin-top:2px;">${stats.total_notifications} ta</div>
+          <div style="font-size:11px; color:#64748B;">Yetkazildi: <b>${stats.delivered_notifications}</b> | Blok: <b>${stats.blocked_notifications}</b></div>
+        </div>
+        <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:12px; border-left:4px solid #F59E0B;">
+          <div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Doimiy Arxiv (Audit)</div>
+          <div style="font-size:18px; font-weight:800; color:#B45309; margin-top:2px;">${stats.audit_actions_count} ta</div>
+          <div style="font-size:11px; color:#64748B;">Hech qachon o'chmaydi</div>
+        </div>
+      </div>
+
+      <!-- TABLAR: BILDIRISHNOMALAR VA AUDIT JURNALI -->
+      <div style="display:flex; gap:8px; border-bottom:2px solid #E2E8F0; padding-bottom:6px; margin-bottom:14px;">
+        <button id="sm-tab-btn-notifs" class="btn btn-sm btn-primary" onclick="switchStaffMonitoringSubTab('notifs')" style="font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+          <span>📨</span> <span>Telegram Bildirishnomalari Jurnali (${notifications.length})</span>
+        </button>
+        <button id="sm-tab-btn-audit" class="btn btn-sm btn-outline" onclick="switchStaffMonitoringSubTab('audit')" style="font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+          <span>📋</span> <span>Doimiy Faoliyat & Hatti-harakatlar Tarixi (${audit_logs.length})</span>
+        </button>
+      </div>
+
+      <!-- TAB 1 CONTENT: NOTIFICATIONS -->
+      <div id="sm-tab-content-notifs">
+        ${notifications.length === 0 ? `
+          <div style="text-align:center; padding:30px; background:#F8FAFC; border-radius:8px; color:#64748B;">
+            <div style="font-size:24px; margin-bottom:6px;">📭</div>
+            <p style="font-weight:600;">Hozircha ushbu xodimga Telegram bildirishnomasi yuborilmagan.</p>
+            <p style="font-size:12px;">Tyutor ball kiritganda mas'ul bo'lim sifatida bildirishnoma avtomatik keladi.</p>
+          </div>
+        ` : `
+          <div style="max-height:360px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:8px;">
+            <table class="data-table" style="font-size:12px;">
+              <thead>
+                <tr style="background:#F8FAFC;">
+                  <th style="width:130px;">Vaqti</th>
+                  <th style="width:140px;">Turi</th>
+                  <th>Sarlavha & Mazmuni</th>
+                  <th style="width:110px;">Holati</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${notifications.map(n => {
+                  let statusBadge = '';
+                  if (n.status === 'delivered') {
+                    statusBadge = `<span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-weight:700;">🟢 Yetkazildi</span>`;
+                  } else if (n.status === 'blocked') {
+                    statusBadge = `<span class="badge" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-weight:700;">🔴 Bloklangan</span>`;
+                  } else {
+                    statusBadge = `<span class="badge" style="background:#FFFBEB; color:#D97706; border:1px solid #FDE68A; font-weight:700;">⚠️ ${n.status}</span>`;
+                  }
+
+                  let typeLabel = n.type;
+                  if (n.type === 'new_point_submission') typeLabel = '✍️ Yangi Ariza (Tyutor)';
+                  else if (n.type === 'test_notification') typeLabel = '🔔 Sinov (Test)';
+                  else if (n.type === 'point_approved') typeLabel = '✅ Tasdiqlash';
+                  else if (n.type === 'point_rejected') typeLabel = '❌ Rad etish';
+
+                  return `
+                    <tr>
+                      <td style="white-space:nowrap; font-weight:600; color:#475569;">${formatDateTimeUz(n.sent_at)}</td>
+                      <td><span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-weight:600;">${typeLabel}</span></td>
+                      <td>
+                        <div style="font-weight:700; color:#1E293B;">${n.title || 'Bildirishnoma'}</div>
+                        <div style="font-size:11.5px; color:#475569; margin-top:3px; max-height:48px; overflow:hidden; text-overflow:ellipsis;">
+                          ${(n.message || '').replace(/<[^>]*>/g, ' ').slice(0, 150)}...
+                        </div>
+                        ${n.error_message ? `<div style="font-size:11px; color:#DC2626; margin-top:2px;"><b>Xato sababi:</b> ${n.error_message}</div>` : ''}
+                      </td>
+                      <td>${statusBadge}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+
+      <!-- TAB 2 CONTENT: AUDIT LOGS -->
+      <div id="sm-tab-content-audit" style="display:none;">
+        ${audit_logs.length === 0 ? `
+          <div style="text-align:center; padding:30px; background:#F8FAFC; border-radius:8px; color:#64748B;">
+            <p style="font-weight:600;">Faoliyat tarixi mavjud emas</p>
+          </div>
+        ` : `
+          <div style="max-height:360px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:8px;">
+            <table class="data-table" style="font-size:12px;">
+              <thead>
+                <tr style="background:#F8FAFC;">
+                  <th style="width:130px;">Vaqti</th>
+                  <th style="width:160px;">Amal / Action</th>
+                  <th>Ob'ekt & Tafsilotlar</th>
+                  <th style="width:110px;">IP Manzil</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${audit_logs.map(al => {
+                  let actBadge = '';
+                  const a = al.action || '';
+                  if (a.includes('LOGIN')) actBadge = `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-weight:700;">🔑 Tizimga Kirish</span>`;
+                  else if (a.includes('BOT_START')) actBadge = `<span class="badge" style="background:#ECFDF5; color:#059669; font-weight:700;">🤖 Botga Start</span>`;
+                  else if (a.includes('BOT_LINK')) actBadge = `<span class="badge" style="background:#ECFDF5; color:#059669; font-weight:700;">📱 Bot Ulash</span>`;
+                  else if (a.includes('CREATE_POINT')) actBadge = `<span class="badge" style="background:#FEF3C7; color:#D97706; font-weight:700;">➕ Ball Kiritish</span>`;
+                  else if (a.includes('APPROVE')) actBadge = `<span class="badge" style="background:#ECFDF5; color:#059669; font-weight:700;">✅ Tasdiqlash</span>`;
+                  else if (a.includes('REJECT')) actBadge = `<span class="badge" style="background:#FEF2F2; color:#DC2626; font-weight:700;">❌ Rad Etish</span>`;
+                  else if (a.includes('UPDATE')) actBadge = `<span class="badge" style="background:#F5F3FF; color:#7C3AED; font-weight:700;">✏️ Tahrirlash</span>`;
+                  else actBadge = `<span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700;">${a}</span>`;
+
+                  let details = '';
+                  try {
+                    if (al.details) {
+                      const d = typeof al.details === 'string' ? JSON.parse(al.details) : al.details;
+                      details = JSON.stringify(d);
+                    }
+                  } catch(e) { details = String(al.details || ''); }
+
+                  return `
+                    <tr>
+                      <td style="white-space:nowrap; font-weight:600; color:#475569;">${formatDateTimeUz(al.at)}</td>
+                      <td>${actBadge}</td>
+                      <td>
+                        <div style="font-weight:600; color:#1E293B;">${al.object_type || '-'}: <code>${al.object_id || '-'}</code></div>
+                        ${details ? `<div style="font-size:11px; color:#64748B; font-family:monospace; margin-top:2px; word-break:break-all;">${details.slice(0, 120)}</div>` : ''}
+                      </td>
+                      <td style="color:#64748B; font-family:monospace; font-size:11px;">${al.ip || '127.0.0.1'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+
+    modalFooter.innerHTML = `
+      <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="showEditStaffModal('${user.id}')" style="display:inline-flex; align-items:center; gap:6px;">
+          ${icon('edit', 14)} <span>Tahrirlash / Rollar</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+      </div>
+    `;
+  } catch (err) {
+    modalBody.innerHTML = `
+      <div style="padding:24px; text-align:center; color:#DC2626;">
+        <div style="font-size:28px; margin-bottom:8px;">⚠️</div>
+        <p style="font-weight:700; font-size:15px;">Ma'lumotlarni yuklashda xatolik:</p>
+        <p style="font-size:13px; color:#64748B; margin-top:4px;">${err.message}</p>
+      </div>
+    `;
+  }
+}
+
+function switchStaffMonitoringSubTab(tab) {
+  const btnNotifs = document.getElementById('sm-tab-btn-notifs');
+  const btnAudit = document.getElementById('sm-tab-btn-audit');
+  const contentNotifs = document.getElementById('sm-tab-content-notifs');
+  const contentAudit = document.getElementById('sm-tab-content-audit');
+
+  if (tab === 'notifs') {
+    if (btnNotifs) { btnNotifs.className = 'btn btn-sm btn-primary'; }
+    if (btnAudit) { btnAudit.className = 'btn btn-sm btn-outline'; }
+    if (contentNotifs) contentNotifs.style.display = 'block';
+    if (contentAudit) contentAudit.style.display = 'none';
+  } else {
+    if (btnNotifs) { btnNotifs.className = 'btn btn-sm btn-outline'; }
+    if (btnAudit) { btnAudit.className = 'btn btn-sm btn-primary'; }
+    if (contentNotifs) contentNotifs.style.display = 'none';
+    if (contentAudit) contentAudit.style.display = 'block';
+  }
+}
+
+async function sendStaffTestNotification(userId) {
+  const btn = document.getElementById('btn-send-staff-test-notif');
+  const resultBox = document.getElementById('staff-test-notif-result');
+  if (!btn || !resultBox) return;
+
+  btn.disabled = true;
+  const origText = btn.innerHTML;
+  btn.innerHTML = `<span class="spinner" style="width:14px; height:14px; display:inline-block; border-width:2px; vertical-align:middle;"></span> <span style="margin-left:6px;">Yuborilmoqda...</span>`;
+  resultBox.style.display = 'block';
+  resultBox.innerHTML = `<div style="padding:8px 12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:6px; font-size:12px; color:#1E3A8A;">Bot orqali sinov xabari yuborilmoqda, kuting...</div>`;
+
+  try {
+    const res = await apiFetch(`/api/admin/users/${userId}/test-notification`, {
+      method: 'POST'
+    });
+    if (res.status === 'delivered') {
+      resultBox.innerHTML = `
+        <div style="padding:10px 14px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:6px; font-size:12.5px; color:#065F46; font-weight:700; display:flex; align-items:center; gap:8px;">
+          <span>✅</span> 
+          <span>${res.message || 'Sinov xabari muvaffaqiyatli yetkazildi! Xodim botni faol kuzatmoqda.'}</span>
+        </div>
+      `;
+    } else if (res.status === 'blocked') {
+      resultBox.innerHTML = `
+        <div style="padding:10px 14px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; font-size:12.5px; color:#991B1B; font-weight:700; display:flex; align-items:center; gap:8px;">
+          <span>🔴</span> 
+          <span>DIQQAT: Xodim botni bloklagan yoki ovozini o'chirgan (Mute/Blocked)! Xabar yetib bormadi.</span>
+        </div>
+      `;
+    } else {
+      resultBox.innerHTML = `
+        <div style="padding:10px 14px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; font-size:12.5px; color:#92400E;">
+          Holat: ${res.status || 'Noma\'lum'}. ${res.message || ''}
+        </div>
+      `;
+    }
+
+    // Refresh monitoring details after 1.5 seconds
+    setTimeout(() => {
+      showStaffMonitoringModal(userId);
+    }, 1500);
+  } catch (err) {
+    resultBox.innerHTML = `
+      <div style="padding:10px 14px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; font-size:12.5px; color:#991B1B;">
+        <strong>Xatolik:</strong> ${err.message}
+      </div>
+    `;
+    btn.disabled = false;
+    btn.innerHTML = origText;
+  }
+}
+
 window.showCreateStaffModal = showCreateStaffModal;
 window.handleCreateStaffSubmit = handleCreateStaffSubmit;
 window.showEditStaffModal = showEditStaffModal;
@@ -8315,6 +8865,9 @@ window.handleEditStaffSubmit = handleEditStaffSubmit;
 window.toggleStaffStatus = toggleStaffStatus;
 window.deleteStaffUser = deleteStaffUser;
 window.resetStaffFilters = resetStaffFilters;
+window.showStaffMonitoringModal = showStaffMonitoringModal;
+window.switchStaffMonitoringSubTab = switchStaffMonitoringSubTab;
+window.sendStaffTestNotification = sendStaffTestNotification;
 
 // ====================================================================
 // SUPERADMIN: XODIM SIFATIDA TIZIMNI TEKSHIRISH (IMPERSONATION)

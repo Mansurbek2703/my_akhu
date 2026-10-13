@@ -25,7 +25,7 @@ function initSchema() {
   const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   db.exec(schemaSql);
 
-    // Migration: ensure telegram_user_id exists on staff_user
+    // Migration: ensure telegram columns exist on staff_user
     try {
       const cols = db.pragma('table_info(staff_user)').map(c => c.name);
       if (!cols.includes('telegram_user_id')) {
@@ -37,6 +37,47 @@ function initSchema() {
       if (!cols.includes('photo_url')) {
         db.exec('ALTER TABLE staff_user ADD COLUMN photo_url TEXT;');
       }
+      if (!cols.includes('telegram_username')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN telegram_username TEXT;');
+      }
+      if (!cols.includes('telegram_phone')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN telegram_phone TEXT;');
+      }
+      if (!cols.includes('bot_started_at')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN bot_started_at TEXT;');
+      }
+      if (!cols.includes('bot_status')) {
+        db.exec("ALTER TABLE staff_user ADD COLUMN bot_status TEXT DEFAULT 'not_started';");
+      }
+      if (!cols.includes('last_active_at')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN last_active_at TEXT;');
+      }
+      if (!cols.includes('last_notification_at')) {
+        db.exec('ALTER TABLE staff_user ADD COLUMN last_notification_at TEXT;');
+      }
+
+      // Superadminning bot_statusini faol qilib belgilash
+      db.exec("UPDATE staff_user SET bot_status = 'active', bot_started_at = COALESCE(bot_started_at, datetime('now')) WHERE id = 'superadmin' AND telegram_user_id IS NOT NULL;");
+    } catch (e) {}
+
+    // Migration: ensure staff_notification_log exists
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS staff_notification_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          staff_id TEXT NOT NULL,
+          telegram_user_id TEXT,
+          notification_type TEXT NOT NULL,
+          title TEXT,
+          message TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'sent',
+          error_message TEXT,
+          sent_at TEXT NOT NULL,
+          FOREIGN KEY (staff_id) REFERENCES staff_user(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_staff_notif_staff ON staff_notification_log(staff_id, sent_at);
+        CREATE INDEX IF NOT EXISTS idx_staff_notif_sent ON staff_notification_log(sent_at);
+      `);
     } catch (e) {}
 
     // Migration: ensure photo_url exists on student

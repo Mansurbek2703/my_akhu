@@ -80,7 +80,17 @@ router.post('/login', (req, res) => {
       // Superadminning parolini bazada ham yangilab qo'yish
       try {
         const hash = bcrypt.hashSync('akhu2026!', 8);
-        db.prepare(`UPDATE staff_user SET password_hash = ? WHERE id = 'superadmin'`).run(hash);
+        const now = new Date().toISOString();
+        db.prepare(`UPDATE staff_user SET password_hash = ?, last_active_at = ? WHERE id = 'superadmin'`).run(hash, now);
+        logAudit({
+          actor_id: 'superadmin',
+          actor_role: 'superadmin',
+          action: 'LOGIN',
+          object_type: 'staff_user',
+          object_id: 'superadmin',
+          ip: req.ip || '127.0.0.1',
+          user_agent: req.headers['user-agent'] || 'Web'
+        });
       } catch (e) {}
 
       return res.json({
@@ -128,6 +138,20 @@ router.post('/login', (req, res) => {
         }
 
         const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(dbUser.id).map(g => g.group_code);
+
+        const now = new Date().toISOString();
+        try {
+          db.prepare(`UPDATE staff_user SET last_active_at = ? WHERE id = ?`).run(now, dbUser.id);
+          logAudit({
+            actor_id: dbUser.id,
+            actor_role: userRoles[0] || 'staff',
+            action: 'LOGIN',
+            object_type: 'staff_user',
+            object_id: dbUser.id,
+            ip: req.ip || '127.0.0.1',
+            user_agent: req.headers['user-agent'] || 'Web'
+          });
+        } catch (e) {}
 
         return res.json({
           success: true,
@@ -884,6 +908,8 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
 
     // Agar tyutor bo'lsa guruhlarini olish
     const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(u.id).map(g => g.group_code);
+    const notifsCount = db.prepare(`SELECT COUNT(*) as c FROM staff_notification_log WHERE staff_id = ?`).get(u.id)?.c || 0;
+    const auditCount = db.prepare(`SELECT COUNT(*) as c FROM audit_log WHERE actor_id = ?`).get(u.id)?.c || 0;
 
     return {
       ...u,
@@ -891,11 +917,145 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
       tutor_groups: groups,
       roles,
       groups,
+      notifications_count: notifsCount,
+      audit_count: auditCount,
       password_hash: undefined // maxfiy
     };
   });
 
   res.json({ users: parsed });
+});
+
+/**
+ * GET /api/admin/users/:id/monitoring
+ * Xodimning to'liq faoliyati, Telegram bot holati va o'zgarmas audit tarixi (Superadmin Nazorati)
+ */
+router.get('/users/:id/monitoring', authenticateSuperadmin, (req, res) => {
+  try {
+    const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
+
+    let roles = [];
+    try { roles = JSON.parse(user.roles); } catch(e) { roles = [user.roles]; }
+    const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(user.id).map(g => g.group_code);
+
+    // Telegram bildirishnomalari jurnali
+    const notifications = db.prepare(`
+      SELECT * FROM staff_notification_log 
+      WHERE staff_id = ? 
+      ORDER BY sent_at DESC LIMIT 50
+    `).all(user.id);
+
+    // O'zgarmas audit jurnali (Xodim bajargan barcha hatti-harakatlar)
+    const auditLogs = db.prepare(`
+      SELECT * FROM audit_log 
+      WHERE actor_id = ? OR (object_type = 'staff_user' AND object_id = ?)
+      ORDER BY at DESC LIMIT 100
+    `).all(user.id, user.id);
+
+    // Statistik ko'rsatkichlar
+    const pointsCreated = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(points), 0) as s FROM point_entry WHERE created_by = ?`).get(user.id);
+    const pointsApproved = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(points), 0) as s FROM point_entry WHERE approved_by = ?`).get(user.id);
+    const deliveredNotifs = notifications.filter(n => n.status === 'delivered').length;
+    const blockedNotifs = notifications.filter(n => n.status === 'blocked').length;
+
+    res.json({
+      success: true,
+      user: {
+        ...user,
+        roles,
+        groups,
+        tutor_groups: groups,
+        is_active: user.active === 1,
+        password_hash: undefined
+      },
+      bot_info: {
+        telegram_user_id: user.telegram_user_id || null,
+        telegram_username: user.telegram_username || null,
+        telegram_phone: user.telegram_phone || user.phone || null,
+        bot_started_at: user.bot_started_at || null,
+        bot_status: user.bot_status || (user.telegram_user_id ? 'active' : 'not_started'),
+        last_active_at: user.last_active_at || null,
+        last_notification_at: user.last_notification_at || null
+      },
+      stats: {
+        points_created_count: pointsCreated?.c || 0,
+        points_created_sum: pointsCreated?.s || 0,
+        points_approved_count: pointsApproved?.c || 0,
+        points_approved_sum: pointsApproved?.s || 0,
+        total_notifications: notifications.length,
+        delivered_notifications: deliveredNotifs,
+        blocked_notifications: blockedNotifs,
+        audit_actions_count: auditLogs.length
+      },
+      notifications,
+      audit_logs: auditLogs
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/test-notification
+ * Superadmin tomonidan xodimga Telegram bot orqali sinov xabarnomasi yuborish (Mute / faollikni tekshirish)
+ */
+router.post('/users/:id/test-notification', authenticateSuperadmin, async (req, res) => {
+  try {
+    const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Xodim topilmadi' });
+
+    if (!user.telegram_user_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ushbu xodimning Telegram ID si biriktirilmagan. Xodim avval botga /start bosishi yoki telefon raqamini yuborishi lozim.'
+      });
+    }
+
+    const { sendStaffTelegramNotification } = require('../services/telegramService');
+    const nowStr = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
+
+    const message = `🔔 <b>SUPERADMIN TEST BILDIRISHNOMASI</b>\n\n` +
+      `Hurmatli <b>${user.full_name}</b>!\n` +
+      `Al-Xorazmiy Universiteti Talabalar Reytingi tizimi Superadmini tomonidan bot aloqasini tekshirish sinovi muvaffaqiyatli amalga oshirildi! ✅\n\n` +
+      `📅 Vaqt: <b>${nowStr}</b>\n` +
+      `Sizga arizalar va tizim bildirishnomalari shu bot orqali yetkaziladi.`;
+
+    const result = await sendStaffTelegramNotification({
+      staff_id: user.id,
+      type: 'test_notification',
+      title: 'Superadmin Test Tekshiruvi',
+      message,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '💻 Tizim portalini ochish', url: `${config.baseUrl}/#approvals` }
+          ]
+        ]
+      }
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        delivered: true,
+        message: `Xodimga Telegram bot orqali test xabari muvaffaqiyatli yetkazildi! (ID: ${user.telegram_user_id})`
+      });
+    } else if (result.blocked) {
+      res.json({
+        success: false,
+        blocked: true,
+        error: `Xodim botni bloklagan (mute qilgan yoki chatni o'chirgan)! Xato: ${result.error}`
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: `Xabar yuborishda xatolik yuz berdi: ${result.error || 'Noma\'lum xatolik'}`
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
@@ -999,6 +1159,8 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       tutor_groups = [],
       telegram_user_id,
       telegram_id,
+      telegram_username,
+      telegram_phone,
       is_active,
       active,
       password = 'admin'
@@ -1013,6 +1175,8 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
     const userPhone = phone ? String(phone).trim() : null;
     const userPhoto = photo_url ? String(photo_url).trim() : null;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id || null);
+    const tgUsername = telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null;
+    const tgPhone = telegram_phone ? String(telegram_phone).trim() : (userPhone || null);
     const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : (active !== undefined ? (active ? 1 : 0) : 1);
     const targetGroups = groups.length > 0 ? groups : tutor_groups;
 
@@ -1031,8 +1195,8 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
       // 1. staff_user jadvaliga yozish
       db.prepare(`
         INSERT INTO staff_user (
-          id, full_name, email, phone, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+          id, full_name, email, phone, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, telegram_username, telegram_phone, bot_status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'not_started', ?)
       `).run(
         userId,
         full_name,
@@ -1044,6 +1208,8 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
         activeVal,
         passHash,
         tgId,
+        tgUsername,
+        tgPhone,
         now
       );
 
@@ -1056,7 +1222,7 @@ router.post('/users', authenticateSuperadmin, (req, res) => {
         action: 'CREATE_STAFF_USER',
         object_type: 'staff_user',
         object_id: userId,
-        after: { full_name, email: userEmail, phone: userPhone, roles: cleanRoles, groups: targetGroups },
+        after: { full_name, email: userEmail, phone: userPhone, roles: cleanRoles, groups: targetGroups, telegram_user_id: tgId, telegram_username: tgUsername, telegram_phone: tgPhone },
         ip: req.ip || '127.0.0.1'
       });
     })();
@@ -1183,6 +1349,9 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
       tutor_groups,
       telegram_user_id,
       telegram_id,
+      telegram_username,
+      telegram_phone,
+      bot_status,
       active,
       is_active,
       password
@@ -1207,6 +1376,9 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
     const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
     const newPhotoUrl = photo_url !== undefined ? (photo_url ? String(photo_url).trim() : null) : user.photo_url;
     const tgId = telegram_user_id !== undefined ? telegram_user_id : (telegram_id !== undefined ? telegram_id : user.telegram_user_id);
+    const tgUsername = telegram_username !== undefined ? (telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null) : user.telegram_username;
+    const tgPhone = telegram_phone !== undefined ? (telegram_phone ? String(telegram_phone).trim() : null) : (user.telegram_phone || user.phone);
+    const newBotStatus = bot_status !== undefined ? String(bot_status).trim() : user.bot_status;
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);
 
@@ -1241,6 +1413,9 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
           photo_url = ?,
           roles = ?,
           telegram_user_id = ?,
+          telegram_username = ?,
+          telegram_phone = ?,
+          bot_status = ?,
           active = ?,
           password_hash = ?
         WHERE id = ?
@@ -1251,6 +1426,9 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         newPhotoUrl,
         updatedRoles,
         tgId,
+        tgUsername,
+        tgPhone,
+        newBotStatus || user.bot_status || 'not_started',
         activeVal,
         passHash,
         targetUsername
@@ -1272,7 +1450,7 @@ router.put('/users/:id', authenticateSuperadmin, (req, res) => {
         object_type: 'staff_user',
         object_id: targetUsername,
         before: { id: user.id, full_name: user.full_name, roles: user.roles, active: user.active },
-        after: { id: targetUsername, full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups, password_changed: Boolean(password && String(password).trim().length > 0) },
+        after: { id: targetUsername, full_name: newFullName, email: newEmail, phone: newPhone, photo_url: newPhotoUrl, roles: updatedRoles, active: activeVal, groups: targetGroups, telegram_user_id: tgId, telegram_username: tgUsername, telegram_phone: tgPhone, bot_status: newBotStatus, password_changed: Boolean(password && String(password).trim().length > 0) },
         ip: req.ip || '127.0.0.1'
       });
     })();

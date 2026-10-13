@@ -201,11 +201,25 @@ function createPointEntries({
         ip
       });
 
-      createdEntries.push(entryId);
+    createdEntries.push(entryId);
     }
   });
 
   tx();
+
+  // Tyutor ball kiritganda mas'ul bo'lim xodimlari va superadminga avtomatik Telegram bildirishnoma yuborish
+  try {
+    const { notifyApproversForNewPoints } = require('./telegramService');
+    notifyApproversForNewPoints(createdEntries, creator_user).catch(e => console.error('Telegram approver notify error:', e.message));
+  } catch (e) {
+    console.error('Telegram service load error:', e.message);
+  }
+
+  // Tyutorning oxirgi faolligini yangilash
+  try {
+    db.prepare(`UPDATE staff_user SET last_active_at = ? WHERE id = ?`).run(now, creator_user.id);
+  } catch (e) {}
+
   return createdEntries;
 }
 
@@ -319,6 +333,7 @@ function approveEntry(entryId, approver_user, ip = '127.0.0.1') {
   });
 
   recalculateStudentScores();
+  try { db.prepare("UPDATE staff_user SET last_active_at = ? WHERE id = ?").run(now, approver_user.id); } catch (e) {}
   return { status: 'approved', message: 'Yozuv muvaffaqiyatli tasdiqlandi va reytingga yozildi' };
 }
 
@@ -360,6 +375,7 @@ function rejectEntry(entryId, approver_user, { reason_code, reject_note = '' }, 
     after: { status: 'rejected', reason_code, reject_note },
     ip
   });
+  try { db.prepare("UPDATE staff_user SET last_active_at = ? WHERE id = ?").run(now, approver_user.id); } catch (e) {}
 
   return { status: 'rejected', message: 'Yozuv rad etildi' };
 }
