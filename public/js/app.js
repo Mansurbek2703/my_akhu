@@ -4177,8 +4177,6 @@ window.handleStudentCheckinSubmit = handleStudentCheckinSubmit;
 window.loadEventRecentCheckins = loadEventRecentCheckins;
 window.showEventParticipantsModal = showEventParticipantsModal;
 window.deleteEvent = deleteEvent;
-window.handleStaffProfilePhotoUpload = handleStaffProfilePhotoUpload;
-window.updateProfilePhotoPreview = updateProfilePhotoPreview;
 window.handleStaffProfileSave = handleStaffProfileSave;
 
 // -------------------------------------------------------------
@@ -5878,10 +5876,12 @@ function closeModal() {
     clearInterval(window.eventQrTimer);
     window.eventQrTimer = null;
   }
-  if (typeof currentModalPasteHandler === 'function') {
-    window.removeEventListener('paste', currentModalPasteHandler);
-    currentModalPasteHandler = null;
-  }
+  try {
+    if (typeof window.currentModalPasteHandler === 'function') {
+      window.removeEventListener('paste', window.currentModalPasteHandler);
+      window.currentModalPasteHandler = null;
+    }
+  } catch (e) {}
   const m = document.getElementById('common-modal');
   if (m) {
     m.classList.remove('active');
@@ -7168,7 +7168,7 @@ async function handleClearAllStudents() {
 
 // TALABA BATAFSIL PROFILINI KO'RISH VA RASM BOSHQARUVI
 let currentActiveStudentModalId = null;
-let currentModalPasteHandler = null;
+window.currentModalPasteHandler = null;
 
 async function showStudentDetailsModal(studentId) {
   currentActiveStudentModalId = studentId;
@@ -7177,9 +7177,9 @@ async function showStudentDetailsModal(studentId) {
   const modalFooter = document.getElementById('modal-footer');
 
   // Avvalgi paste hodisasini tozalash
-  if (currentModalPasteHandler) {
-    window.removeEventListener('paste', currentModalPasteHandler);
-    currentModalPasteHandler = null;
+  if (window.currentModalPasteHandler) {
+    window.removeEventListener('paste', window.currentModalPasteHandler);
+    window.currentModalPasteHandler = null;
   }
 
   modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('user', 18)} Talaba Profili & Rasm Boshqaruvi</span>`;
@@ -7316,7 +7316,7 @@ async function showStudentDetailsModal(studentId) {
     }
 
     // Clipboard Paste (Ctrl+V) hodisasi
-    currentModalPasteHandler = (e) => {
+    window.currentModalPasteHandler = (e) => {
       const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
       if (!items) return;
       for (const item of items) {
@@ -7330,7 +7330,7 @@ async function showStudentDetailsModal(studentId) {
         }
       }
     };
-    window.addEventListener('paste', currentModalPasteHandler);
+    window.addEventListener('paste', window.currentModalPasteHandler);
 
   } catch (err) {
     modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
@@ -7338,9 +7338,9 @@ async function showStudentDetailsModal(studentId) {
 }
 
 function closeStudentModalCleanly() {
-  if (currentModalPasteHandler) {
-    window.removeEventListener('paste', currentModalPasteHandler);
-    currentModalPasteHandler = null;
+  if (window.currentModalPasteHandler) {
+    window.removeEventListener('paste', window.currentModalPasteHandler);
+    window.currentModalPasteHandler = null;
   }
   closeModal();
 }
@@ -9008,3 +9008,7 @@ function exitImpersonation() {
 
 window.impersonateStaffUser = impersonateStaffUser;
 window.exitImpersonation = exitImpersonation;
+window.showEditStudentModal = showEditStudentModal;
+window.handleEditStudentSubmit = handleEditStudentSubmit;
+window.showStudentModal = showStudentModal;
+window.showStudentDetailsModal = showStudentDetailsModal;
