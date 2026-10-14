@@ -319,7 +319,7 @@ router.get('/statistics', authenticateStaff, (req, res) => {
     FROM point_entry pe
     LEFT JOIN staff_user su ON pe.created_by = su.id
     WHERE pe.approver_role = ?
-    GROUP BY pe.created_by
+    GROUP BY pe.created_by, su.full_name
   `).all(role);
 
   res.json({

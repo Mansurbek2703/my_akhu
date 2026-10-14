@@ -55,7 +55,7 @@ router.get('/dashboard', (req, res) => {
     SELECT cc.id, cc.name, cc.color, COALESCE(SUM(pe.points), 0) as total_points
     FROM catalog_category cc
     LEFT JOIN point_entry pe ON cc.id = pe.category_id AND pe.status = 'approved'
-    GROUP BY cc.id
+    GROUP BY cc.id, cc.name, cc.color, cc.sort
     ORDER BY cc.sort ASC
   `).all();
 
@@ -73,7 +73,7 @@ router.get('/dashboard', (req, res) => {
     FROM student st
     LEFT JOIN student_score sc ON st.id = sc.student_id
     WHERE st.status = 'active'
-    GROUP BY st.group_code
+    GROUP BY st.group_code, st.program_code
     ORDER BY avg_score DESC, total_score DESC
     LIMIT 10
   `).all();
@@ -222,6 +222,13 @@ router.get('/rating', (req, res) => {
   const { list, total_count, avg_season } = getRatingList({ period, level: filterLevel, limit: 10 });
 
   // Kesim o'rtachalari (guruhlar bo'yicha)
+  const whereClauses = ["st.status = 'active'"];
+  const groupParams = [];
+  if (filterLevel) {
+    whereClauses.push("st.level = ?");
+    groupParams.push(filterLevel);
+  }
+
   const groupAverages = db.prepare(`
     SELECT st.group_code, st.program_code,
            COUNT(st.id) as count,
@@ -229,11 +236,11 @@ router.get('/rating', (req, res) => {
            COALESCE(SUM(sc.season), 0) as total_score
     FROM student st
     LEFT JOIN student_score sc ON st.id = sc.student_id
-    WHERE (? IS NULL OR st.level = ?) AND st.status = 'active'
-    GROUP BY st.group_code
+    WHERE ${whereClauses.join(' AND ')}
+    GROUP BY st.group_code, st.program_code
     ORDER BY avg_score DESC, total_score DESC
     LIMIT 15
-  `).all(filterLevel, filterLevel);
+  `).all(...groupParams);
 
   res.json({
     list: (list || []).slice(0, 10),
