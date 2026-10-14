@@ -14,6 +14,7 @@ const { importStudentsBatch, parseStudentsFromWorkbook } = require('../services/
 const { recalculateStudentScores } = require('../services/ratingService');
 const { normalizePhoneNumber } = require('../utils/phoneUtils');
 const { resolveTelegramChatInfo, sendStaffTelegramNotification } = require('../services/telegramService');
+const { buildStudentSearch } = require('../utils/searchHelper');
 
 // Multer upload sozlamasi (Excel va CSV uchun)
 const uploadDir = config.uploadDir || path.join(__dirname, '../../uploads');
@@ -192,7 +193,7 @@ router.post('/login', (req, res) => {
  * Talabalar ro'yxati (filtrlash, qidiruv)
  */
 router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
-  const { search, status, group, level, course, limit = 100, offset = 0 } = req.query;
+  const { search, status, group, level, course, gender, limit = 100, offset = 0 } = req.query;
 
   let where = [];
   let params = [];
@@ -213,10 +214,16 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
     where.push('st.course = ?');
     params.push(Number(course));
   }
-  if (search) {
-    where.push('(st.first_name LIKE ? OR st.last_name LIKE ? OR st.external_id LIKE ? OR st.group_code LIKE ? OR st.phone LIKE ?)');
-    const q = `%${search}%`;
-    params.push(q, q, q, q, q);
+  if (gender) {
+    where.push('st.gender = ?');
+    params.push(gender);
+  }
+  if (search && search.trim()) {
+    const searchRes = buildStudentSearch(search, 'st');
+    if (searchRes.clauses.length > 0) {
+      where.push(...searchRes.clauses);
+      params.push(...searchRes.params);
+    }
   }
 
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
@@ -2083,7 +2090,7 @@ router.get('/bot-monitoring/users', authenticateSuperadmin, (req, res) => {
 
   if (q && q.trim()) {
     const term = `%${q.trim()}%`;
-    whereClauses.push('(bu.first_name LIKE ? OR bu.last_name LIKE ? OR bu.username LIKE ? OR bu.phone LIKE ? OR st.first_name LIKE ? OR st.last_name LIKE ? OR st.group_code LIKE ? OR bu.telegram_user_id LIKE ?)');
+    whereClauses.push('(bu.first_name ILIKE ? OR bu.last_name ILIKE ? OR bu.username ILIKE ? OR bu.phone ILIKE ? OR st.first_name ILIKE ? OR st.last_name ILIKE ? OR st.group_code ILIKE ? OR bu.telegram_user_id ILIKE ?)');
     params.push(term, term, term, term, term, term, term, term);
   }
 
@@ -2120,7 +2127,7 @@ router.get('/bot-monitoring/logs', authenticateSuperadmin, (req, res) => {
 
   if (q && q.trim()) {
     const term = `%${q.trim()}%`;
-    whereClauses.push('(bl.details LIKE ? OR bl.telegram_user_id LIKE ? OR st.first_name LIKE ? OR st.last_name LIKE ? OR st.group_code LIKE ?)');
+    whereClauses.push('(bl.details ILIKE ? OR bl.telegram_user_id ILIKE ? OR st.first_name ILIKE ? OR st.last_name ILIKE ? OR st.group_code ILIKE ?)');
     params.push(term, term, term, term, term);
   }
 

@@ -40,6 +40,9 @@ function translateSql(rawSql) {
   // Replace datetime('now')
   sql = sql.replace(/datetime\s*\(\s*'now'\s*\)/gi, "TO_CHAR(NOW(), 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')");
 
+  // Translate SQLite LIKE to PostgreSQL ILIKE for case-insensitive compatibility
+  sql = sql.replace(/\bLIKE\b/g, 'ILIKE');
+
   // Handle INSERT OR IGNORE
   if (/INSERT\s+OR\s+IGNORE\s+INTO/i.test(sql)) {
     sql = sql.replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO');

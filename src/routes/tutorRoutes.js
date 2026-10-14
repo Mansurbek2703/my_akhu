@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../db/database');
 const { createPointEntries, resubmitEntry, cancelEntry } = require('../services/pointService');
 const { notifyStudent } = require('../services/telegramService');
+const { buildStudentSearch } = require('../utils/searchHelper');
 
 // Staff auth middleware
 function authenticateStaff(req, res, next) {
@@ -111,9 +112,12 @@ router.get('/students', authenticateStaff, (req, res) => {
     params.push(group);
   }
 
-  if (search) {
-    whereClauses.push('(st.first_name LIKE ? OR st.last_name LIKE ? OR st.external_id LIKE ? OR st.phone LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+  if (search && search.trim()) {
+    const searchRes = buildStudentSearch(search, 'st');
+    if (searchRes.clauses.length > 0) {
+      whereClauses.push(...searchRes.clauses);
+      params.push(...searchRes.params);
+    }
   }
 
   const sql = `

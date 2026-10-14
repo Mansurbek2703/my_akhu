@@ -6871,11 +6871,27 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
   let searchTimer;
   searchInput.addEventListener('input', (e) => {
     clearTimeout(searchTimer);
+    const val = e.target.value.trim();
+    if (!val && adminStudentsState.search) {
+      adminStudentsState.search = '';
+      adminStudentsState.offset = 0;
+      loadAdminStudentsList();
+      return;
+    }
     searchTimer = setTimeout(() => {
+      adminStudentsState.search = val;
+      adminStudentsState.offset = 0;
+      loadAdminStudentsList();
+    }, 250);
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchTimer);
       adminStudentsState.search = e.target.value.trim();
       adminStudentsState.offset = 0;
       loadAdminStudentsList();
-    }, 350);
+    }
   });
 
   document.getElementById('filter-student-level').addEventListener('change', (e) => {
@@ -6969,14 +6985,10 @@ async function loadAdminStudentsList() {
     if (adminStudentsState.level) params.append('level', adminStudentsState.level);
     if (adminStudentsState.course) params.append('course', adminStudentsState.course);
     if (adminStudentsState.status) params.append('status', adminStudentsState.status);
+    if (adminStudentsState.gender) params.append('gender', adminStudentsState.gender);
 
     const res = await apiFetch(`/api/admin/students?${params.toString()}`);
     let students = res.students || [];
-
-    // Jins bo'yicha frontend filtri (agar tanlangan bo'lsa)
-    if (adminStudentsState.gender) {
-      students = students.filter(s => s.gender === adminStudentsState.gender);
-    }
 
     adminStudentsState.items = students;
     adminStudentsState.total = res.total || students.length;

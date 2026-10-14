@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../db/database');
 const { getRatingList, calculateWeeklyStars } = require('../services/ratingService');
 const { calculateRiskFlags, getLateApprovals } = require('../services/cronService');
+const { buildStudentSearch } = require('../utils/searchHelper');
 
 /**
  * GET /api/observe/dashboard
@@ -162,9 +163,12 @@ router.get('/students', (req, res) => {
   if (gender) { whereClauses.push('st.gender = ?'); params.push(gender); }
   if (is_passive !== undefined) { whereClauses.push('sc.is_passive = ?'); params.push(Number(is_passive)); }
 
-  if (search) {
-    whereClauses.push('(st.first_name LIKE ? OR st.last_name LIKE ? OR st.external_id LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  if (search && search.trim()) {
+    const searchRes = buildStudentSearch(search, 'st');
+    if (searchRes.clauses.length > 0) {
+      whereClauses.push(...searchRes.clauses);
+      params.push(...searchRes.params);
+    }
   }
 
   const offset = (Number(page) - 1) * Number(limit);
