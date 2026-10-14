@@ -272,7 +272,8 @@ function calculateWeeklyStars() {
     ORDER BY 
       (CASE WHEN sc.week_cur > 0 THEN sc.week_cur ELSE (CASE WHEN sc.week_prev > 0 THEN sc.week_prev ELSE sc.season END) END) DESC,
       sc.season DESC,
-      sc.total DESC
+      sc.total DESC,
+      (CASE WHEN st.photo_url IS NOT NULL AND st.photo_url != '' THEN 1 ELSE 0 END) DESC
   `).all();
 
   const usedStudentIds = new Set();

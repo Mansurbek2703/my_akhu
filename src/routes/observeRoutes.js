@@ -33,13 +33,30 @@ router.get('/dashboard', (req, res) => {
 
   const formatStar = (s) => {
     if (!s) return null;
-    const name = (s.student_name || `${s.first_name || ''} ${s.last_name || ''}`).trim();
+    let freshPhoto = s.photo_url || null;
+    let freshName = (s.student_name || `${s.first_name || ''} ${s.last_name || ''}`).trim();
+    let freshGroup = s.group_code || '—';
+    let freshGender = s.gender;
+
+    if (s.id) {
+      try {
+        const st = db.prepare('SELECT first_name, last_name, photo_url, group_code, gender FROM student WHERE id = ?').get(s.id);
+        if (st) {
+          if (st.photo_url) freshPhoto = st.photo_url;
+          freshName = `${st.first_name} ${st.last_name}`.trim();
+          if (st.group_code) freshGroup = st.group_code;
+          if (st.gender) freshGender = st.gender;
+        }
+      } catch (e) {}
+    }
+
     return {
       ...s,
-      student_name: name || 'Aniqlanmoqda',
-      photo_url: s.photo_url || null,
+      student_name: freshName || 'Aniqlanmoqda',
+      photo_url: freshPhoto,
       week_points: s.week_points !== undefined ? s.week_points : (s.score !== undefined ? s.score : (s.week_cur || 0)),
-      group_code: s.group_code || '—'
+      group_code: freshGroup,
+      gender: freshGender
     };
   };
 

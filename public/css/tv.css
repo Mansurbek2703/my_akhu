@@ -132,63 +132,122 @@ body {
 /* SLIDE 1: WEEKLY HEROES */
 .stars-hero-grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
-  gap: 24px;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 28px;
   flex: 1;
 }
 
 .tv-hero-card {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 36px;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  padding: 28px 24px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  align-items: center;
+  text-align: center;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .tv-hero-card.main-hero {
-  border-color: #F59E0B;
-  box-shadow: 0 0 40px rgba(245, 158, 11, 0.25);
-  background: linear-gradient(135deg, rgba(30, 58, 138, 0.8), rgba(15, 23, 42, 0.9));
+  border: 2px solid rgba(245, 158, 11, 0.65);
+  box-shadow: 0 0 50px rgba(245, 158, 11, 0.25), 0 20px 40px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(145deg, rgba(40, 30, 10, 0.85), rgba(15, 23, 42, 0.95));
+}
+
+.tv-hero-card.card-girl {
+  border: 2px solid rgba(236, 72, 153, 0.55);
+  box-shadow: 0 0 45px rgba(236, 72, 153, 0.2), 0 20px 40px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(145deg, rgba(45, 15, 30, 0.85), rgba(15, 23, 42, 0.95));
+}
+
+.tv-hero-card.card-boy {
+  border: 2px solid rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 45px rgba(59, 130, 246, 0.2), 0 20px 40px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(145deg, rgba(15, 30, 55, 0.85), rgba(15, 23, 42, 0.95));
+}
+
+.tv-card-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 .tv-hero-rank {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   color: #F59E0B;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 6px 18px;
+  border-radius: 9999px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+.card-girl .tv-hero-rank {
+  color: #F472B6;
+  background: rgba(236, 72, 153, 0.15);
+  border-color: rgba(236, 72, 153, 0.35);
+}
+
+.card-boy .tv-hero-rank {
+  color: #60A5FA;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
 }
 
 .tv-hero-name {
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1.2;
-  margin: 12px 0 6px;
+  margin: 4px 0 2px;
+  color: #FFFFFF;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  max-width: 95%;
+  word-wrap: break-word;
 }
 
 .tv-hero-group {
-  font-size: 18px;
-  color: #94A3B8;
+  font-size: 16px;
+  color: #CBD5E1;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px 12px;
+  border-radius: 999px;
+  margin-top: 4px;
+  display: inline-block;
 }
 
 .tv-hero-score {
-  font-size: 54px;
+  font-size: 46px;
   font-weight: 900;
   color: #38BDF8;
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+  margin-top: 8px;
 }
+.main-hero .tv-hero-score { color: #F59E0B; }
+.card-girl .tv-hero-score { color: #F472B6; }
+.card-boy .tv-hero-score  { color: #60A5FA; }
 
-.tv-hero-score span {
-  font-size: 18px;
+.tv-hero-score span:last-child {
+  font-size: 16px;
   color: #94A3B8;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* TV HERO PHOTO (KATTA VA CHIROYLI RASMLAR) */
@@ -196,48 +255,74 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 18px 0;
+  margin: 12px 0;
   position: relative;
+  width: 100%;
   flex: 1;
 }
 
-.tv-hero-photo-box {
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
+.tv-hero-photo-container {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.7);
-  border: 4px solid #38BDF8;
-  box-shadow: 0 0 35px rgba(56, 189, 248, 0.35);
+}
+
+.tv-hero-ambient-glow {
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: 0.65;
+  z-index: 0;
+  pointer-events: none;
+}
+.tv-hero-ambient-glow.hero { background: radial-gradient(circle, rgba(245, 158, 11, 0.7) 0%, transparent 70%); }
+.tv-hero-ambient-glow.girl { background: radial-gradient(circle, rgba(236, 72, 153, 0.7) 0%, transparent 70%); }
+.tv-hero-ambient-glow.boy  { background: radial-gradient(circle, rgba(59, 130, 246, 0.7) 0%, transparent 70%); }
+
+.tv-hero-photo-box {
+  position: relative;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0B132B;
   overflow: hidden;
+  z-index: 1;
 }
 
-.main-hero .tv-hero-photo-box {
-  width: 210px;
-  height: 210px;
+.tv-hero-photo-box.hero {
+  width: 250px;
+  height: 250px;
   border: 5px solid #F59E0B;
-  box-shadow: 0 0 50px rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 45px rgba(245, 158, 11, 0.6), inset 0 0 20px rgba(245, 158, 11, 0.3);
 }
 
-.card-girl .tv-hero-photo-box {
+.tv-hero-photo-box.girl {
+  width: 220px;
+  height: 220px;
   border: 4px solid #EC4899;
-  box-shadow: 0 0 40px rgba(236, 72, 153, 0.4);
+  box-shadow: 0 0 40px rgba(236, 72, 153, 0.55), inset 0 0 15px rgba(236, 72, 153, 0.3);
 }
 
-.card-boy .tv-hero-photo-box {
+.tv-hero-photo-box.boy {
+  width: 220px;
+  height: 220px;
   border: 4px solid #3B82F6;
-  box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.55), inset 0 0 15px rgba(59, 130, 246, 0.3);
 }
 
 .tv-hero-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 15%;
   display: block;
   border-radius: 50%;
+  image-rendering: -webkit-optimize-contrast;
+  transform: scale(1.02);
+  transition: transform 0.3s ease;
 }
 
 .tv-hero-avatar-fallback {
@@ -246,59 +331,41 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 54px;
+  font-size: 58px;
   font-weight: 900;
   color: #FFFFFF;
-  background: linear-gradient(135deg, #1E3A8A, #0F172A);
   letter-spacing: 2px;
   border-radius: 50%;
 }
-
-.main-hero .tv-hero-avatar-fallback {
-  background: linear-gradient(135deg, #B45309, #78350F);
-  font-size: 64px;
-}
-
-.card-girl .tv-hero-avatar-fallback {
-  background: linear-gradient(135deg, #BE185D, #831843);
-}
-
-.card-boy .tv-hero-avatar-fallback {
-  background: linear-gradient(135deg, #1D4ED8, #1E3A8A);
-}
+.tv-hero-avatar-fallback.hero { background: linear-gradient(135deg, #B45309, #78350F); font-size: 72px; }
+.tv-hero-avatar-fallback.girl { background: linear-gradient(135deg, #BE185D, #831843); }
+.tv-hero-avatar-fallback.boy  { background: linear-gradient(135deg, #1D4ED8, #1E3A8A); }
 
 .tv-hero-badge-medal {
   position: absolute;
   bottom: 0px;
-  right: calc(50% - 90px);
-  width: 48px;
-  height: 48px;
+  right: 12px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: #0F172A;
   border: 3px solid #38BDF8;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.7);
+  font-size: 26px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.85);
   z-index: 2;
 }
-
-.main-hero .tv-hero-badge-medal {
-  right: calc(50% - 105px);
-  width: 54px;
-  height: 54px;
-  border: 3px solid #F59E0B;
-  font-size: 28px;
+.tv-hero-badge-medal.hero {
+  border-color: #F59E0B;
+  width: 62px;
+  height: 62px;
+  font-size: 32px;
+  right: 18px;
 }
-
-.card-girl .tv-hero-badge-medal {
-  border-color: #EC4899;
-}
-
-.card-boy .tv-hero-badge-medal {
-  border-color: #3B82F6;
-}
+.tv-hero-badge-medal.girl { border-color: #EC4899; }
+.tv-hero-badge-medal.boy  { border-color: #3B82F6; }
 
 /* SLIDE 4: TOP 10 LEADERBOARD */
 .leaderboard-tv-grid {
@@ -326,9 +393,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  border-radius: 12px;
-  margin-bottom: 8px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  margin-bottom: 10px;
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -338,24 +405,32 @@ body {
 }
 
 .tv-row-avatar-box {
-  width: 48px;
-  height: 48px;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  border: 2.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #0F172A;
+}
+
+.leaderboard-row.gold .tv-row-avatar-box {
+  border-color: #F59E0B;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.45);
 }
 
 .tv-row-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 15%;
   display: block;
   border-radius: 50%;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .tv-row-fallback {
@@ -364,7 +439,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 800;
   color: #FFFFFF;
   background: linear-gradient(135deg, #2563EB, #1E40AF);
@@ -439,3 +514,54 @@ body {
   width: 0%;
   transition: width 0.1s linear;
 }
+
+/* RESPONSIVE SCALING (LAPTOP & WINDOWED TV MODE) */
+@media (max-height: 850px) {
+  .tv-slides-viewport {
+    padding: 20px 30px;
+  }
+  .tv-slide {
+    inset: 20px 30px;
+  }
+  .slide-header {
+    margin-bottom: 14px;
+  }
+  .slide-title {
+    font-size: 28px;
+  }
+  .tv-hero-card {
+    padding: 18px 16px;
+    border-radius: 20px;
+  }
+  .tv-hero-name {
+    font-size: 22px;
+  }
+  .tv-hero-group {
+    font-size: 13px;
+  }
+  .tv-hero-score {
+    font-size: 34px;
+    padding-top: 8px;
+    margin-top: 6px;
+  }
+  .tv-hero-photo-box.hero {
+    width: 180px;
+    height: 180px;
+  }
+  .tv-hero-photo-box.girl,
+  .tv-hero-photo-box.boy {
+    width: 155px;
+    height: 155px;
+  }
+  .tv-hero-badge-medal {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+  }
+  .tv-hero-badge-medal.hero {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+}
+

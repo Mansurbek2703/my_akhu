@@ -38,41 +38,41 @@
       <div class="stars-hero-grid">
         <!-- 1. Hafta Qahramoni -->
         <div class="tv-hero-card main-hero">
-          <div>
+          <div class="tv-card-top">
             <span class="tv-hero-rank">🏆 HAFTA QAHRAMONI</span>
-            <h3 class="tv-hero-name" id="hero-name">Zafarbek Madrahimov</h3>
-            <div class="tv-hero-group" id="hero-group">MAI01 guruhi</div>
+            <h3 class="tv-hero-name" id="hero-name">—</h3>
+            <div class="tv-hero-group" id="hero-group">—</div>
           </div>
           <div id="hero-photo-wrap" class="tv-hero-photo-wrap"></div>
           <div class="tv-hero-score">
-            <span id="hero-pts">+10</span>
+            <span id="hero-pts">+0</span>
             <span>haftalik ball</span>
           </div>
         </div>
 
         <!-- 2. Eng Faol Qiz -->
-        <div class="tv-hero-card card-girl" style="border-color: rgba(236, 72, 153, 0.4);">
-          <div>
-            <span class="tv-hero-rank" style="color: #EC4899;">🌸 ENG FAOL QIZ</span>
-            <h3 class="tv-hero-name" id="girl-name">IQBOLOY RAJABBOYEVA</h3>
-            <div class="tv-hero-group" id="girl-group">FMC03 guruhi</div>
+        <div class="tv-hero-card card-girl">
+          <div class="tv-card-top">
+            <span class="tv-hero-rank">🌸 ENG FAOL QIZ</span>
+            <h3 class="tv-hero-name" id="girl-name">—</h3>
+            <div class="tv-hero-group" id="girl-group">—</div>
           </div>
           <div id="girl-photo-wrap" class="tv-hero-photo-wrap"></div>
-          <div class="tv-hero-score" style="color: #F472B6;">
-            <span id="girl-pts">+5</span>
+          <div class="tv-hero-score">
+            <span id="girl-pts">+0</span>
             <span>ball</span>
           </div>
         </div>
 
         <!-- 3. Eng Faol Yigit -->
-        <div class="tv-hero-card card-boy" style="border-color: rgba(59, 130, 246, 0.4);">
-          <div>
-            <span class="tv-hero-rank" style="color: #60A5FA;">⚡ ENG FAOL YIGIT</span>
-            <h3 class="tv-hero-name" id="boy-name">BEHRUZBEK RAJABOV</h3>
-            <div class="tv-hero-group" id="boy-group">FMC04 guruhi</div>
+        <div class="tv-hero-card card-boy">
+          <div class="tv-card-top">
+            <span class="tv-hero-rank">⚡ ENG FAOL YIGIT</span>
+            <h3 class="tv-hero-name" id="boy-name">—</h3>
+            <div class="tv-hero-group" id="boy-group">—</div>
           </div>
           <div id="boy-photo-wrap" class="tv-hero-photo-wrap"></div>
-          <div class="tv-hero-score" style="color: #60A5FA;">
+          <div class="tv-hero-score">
             <span id="boy-pts">+0</span>
             <span>ball</span>
           </div>
@@ -206,42 +206,42 @@
     // Rasm va avatarlarni chiroyli render qilish
     function renderHeroPhotoHtml(star, type = 'hero') {
       if (!star) return '';
-      const isFemale = star.gender === 'f' || star.gender === 'female';
-      const initials = `${(star.first_name || 'T')[0] || ''}${(star.last_name || '')[0] || ''}`.toUpperCase() || 'AK';
-      const medal = type === 'hero' ? '🥇' : (type === 'girl' ? '🌸' : '⚡');
-      const size = type === 'hero' ? 210 : 180;
-      const medalOffset = type === 'hero' ? 'calc(50% - 105px)' : 'calc(50% - 90px)';
+      const nameParts = (star.student_name || '').trim().split(/\s+/);
+      const initials = `${(star.first_name || nameParts[0] || 'T')[0] || ''}${(star.last_name || nameParts[1] || '')[0] || ''}`.toUpperCase() || 'AK';
+      const medal = type === 'hero' ? '🏆' : (type === 'girl' ? '🌸' : '⚡');
 
-      let inner = '';
+      let imgHtml = '';
       if (star.photo_url) {
-        inner = `<img src="${star.photo_url}" class="tv-hero-img" alt="${star.student_name || ''}" onerror="this.outerHTML='<div class=\\'tv-hero-avatar-fallback\\'>${initials}</div>'" />`;
-      } else {
-        inner = `<div class="tv-hero-avatar-fallback">${initials}</div>`;
+        imgHtml = `<img src="${star.photo_url}" class="tv-hero-img" alt="${star.student_name || ''}" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />`;
       }
+      const fallbackDisplay = star.photo_url ? 'none' : 'flex';
 
       return `
-        <div class="tv-hero-photo-box" style="width:${size}px; height:${size}px;">
-          ${inner}
-        </div>
-        <div class="tv-hero-badge-medal" style="right:${medalOffset};">
-          ${medal}
+        <div class="tv-hero-photo-container">
+          <div class="tv-hero-ambient-glow ${type}"></div>
+          <div class="tv-hero-photo-box ${type}">
+            ${imgHtml}
+            <div class="tv-hero-avatar-fallback ${type}" style="display: ${fallbackDisplay};">${initials}</div>
+          </div>
+          <div class="tv-hero-badge-medal ${type}">${medal}</div>
         </div>
       `;
     }
 
-    function renderTvAvatar(student, size = 48) {
+    function renderTvAvatar(student, size = 62) {
       if (!student) return '';
       const isFemale = student.gender === 'f' || student.gender === 'female';
       const initials = `${(student.first_name || 'T')[0] || ''}${(student.last_name || '')[0] || ''}`.toUpperCase() || 'AK';
       if (student.photo_url) {
         return `
-          <div class="tv-row-avatar-box" style="width:${size}px; height:${size}px;">
-            <img src="${student.photo_url}" class="tv-row-img" alt="${student.first_name || ''}" onerror="this.parentElement.outerHTML='<div class=\\'tv-row-avatar-box\\'><div class=\\'tv-row-fallback ${isFemale ? 'female' : ''}\\'>${initials}</div></div>'" />
+          <div class="tv-row-avatar-box" style="width:${size}px; height:${size}px; min-width:${size}px;">
+            <img src="${student.photo_url}" class="tv-row-img" alt="${student.first_name || ''}" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+            <div class="tv-row-fallback ${isFemale ? 'female' : ''}" style="display:none; width:100%; height:100%;">${initials}</div>
           </div>
         `;
       }
       return `
-        <div class="tv-row-avatar-box" style="width:${size}px; height:${size}px;">
+        <div class="tv-row-avatar-box" style="width:${size}px; height:${size}px; min-width:${size}px;">
           <div class="tv-row-fallback ${isFemale ? 'female' : ''}">${initials}</div>
         </div>
       `;
@@ -256,23 +256,23 @@
         // 1. Weekly Stars (Haftaning Qahramonlari)
         const ws = data.weekly_stars || {};
         if (ws.hero) {
-          document.getElementById('hero-name').textContent = ws.hero.student_name;
+          document.getElementById('hero-name').textContent = ws.hero.student_name || '—';
           document.getElementById('hero-group').textContent = ws.hero.group_code ? `${ws.hero.group_code} guruhi` : '—';
-          document.getElementById('hero-pts').textContent = `+${ws.hero.week_points}`;
+          document.getElementById('hero-pts').textContent = `+${ws.hero.week_points ?? 0}`;
           const wrap = document.getElementById('hero-photo-wrap');
           if (wrap) wrap.innerHTML = renderHeroPhotoHtml(ws.hero, 'hero');
         }
         if (ws.girl) {
-          document.getElementById('girl-name').textContent = ws.girl.student_name;
+          document.getElementById('girl-name').textContent = ws.girl.student_name || '—';
           document.getElementById('girl-group').textContent = ws.girl.group_code ? `${ws.girl.group_code} guruhi` : '—';
-          document.getElementById('girl-pts').textContent = `+${ws.girl.week_points}`;
+          document.getElementById('girl-pts').textContent = `+${ws.girl.week_points ?? 0}`;
           const wrap = document.getElementById('girl-photo-wrap');
           if (wrap) wrap.innerHTML = renderHeroPhotoHtml(ws.girl, 'girl');
         }
         if (ws.boy) {
-          document.getElementById('boy-name').textContent = ws.boy.student_name;
+          document.getElementById('boy-name').textContent = ws.boy.student_name || '—';
           document.getElementById('boy-group').textContent = ws.boy.group_code ? `${ws.boy.group_code} guruhi` : '—';
-          document.getElementById('boy-pts').textContent = `+${ws.boy.week_points}`;
+          document.getElementById('boy-pts').textContent = `+${ws.boy.week_points ?? 0}`;
           const wrap = document.getElementById('boy-photo-wrap');
           if (wrap) wrap.innerHTML = renderHeroPhotoHtml(ws.boy, 'boy');
         }
@@ -281,34 +281,34 @@
         const bakList = document.getElementById('tv-top-bak-list');
         bakList.innerHTML = (data.top_bak || []).slice(0, 5).map((s, idx) => `
           <div class="leaderboard-row ${idx === 0 ? 'gold' : ''}">
-            <div style="display: flex; align-items: center; gap: 14px;">
-              <span style="font-size: 20px; font-weight: 800; color: ${idx === 0 ? '#F59E0B' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#CD7F32' : '#94A3B8'))}; width: 28px; text-align: center;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <span style="font-size: 22px; font-weight: 800; color: ${idx === 0 ? '#F59E0B' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#CD7F32' : '#94A3B8'))}; width: 32px; text-align: center;">
                 ${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '#' + (idx + 1)))}
               </span>
-              ${renderTvAvatar(s, 48)}
+              ${renderTvAvatar(s, 62)}
               <div>
-                <strong style="font-size: 17px; display: block; line-height: 1.2;">${s.first_name} ${s.last_name}</strong>
-                <div style="font-size: 13px; color: #94A3B8; margin-top: 2px;">${s.group_code} • ${s.course}-kurs</div>
+                <strong style="font-size: 19px; display: block; line-height: 1.25; font-weight: 700;">${s.first_name} ${s.last_name}</strong>
+                <div style="font-size: 14px; color: #94A3B8; margin-top: 4px; font-weight: 500;">${s.group_code} • ${s.course}-kurs</div>
               </div>
             </div>
-            <strong style="font-size: 20px; color: #38BDF8;">${s.season} ball</strong>
+            <strong style="font-size: 22px; color: #38BDF8; font-weight: 800;">${s.season} ball</strong>
           </div>
         `).join('');
 
         const magList = document.getElementById('tv-top-mag-list');
         magList.innerHTML = (data.top_mag || []).slice(0, 5).map((s, idx) => `
           <div class="leaderboard-row ${idx === 0 ? 'gold' : ''}">
-            <div style="display: flex; align-items: center; gap: 14px;">
-              <span style="font-size: 20px; font-weight: 800; color: ${idx === 0 ? '#F59E0B' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#CD7F32' : '#94A3B8'))}; width: 28px; text-align: center;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <span style="font-size: 22px; font-weight: 800; color: ${idx === 0 ? '#F59E0B' : (idx === 1 ? '#E2E8F0' : (idx === 2 ? '#CD7F32' : '#94A3B8'))}; width: 32px; text-align: center;">
                 ${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '#' + (idx + 1)))}
               </span>
-              ${renderTvAvatar(s, 48)}
+              ${renderTvAvatar(s, 62)}
               <div>
-                <strong style="font-size: 17px; display: block; line-height: 1.2;">${s.first_name} ${s.last_name}</strong>
-                <div style="font-size: 13px; color: #94A3B8; margin-top: 2px;">${s.group_code} • ${s.course}-kurs</div>
+                <strong style="font-size: 19px; display: block; line-height: 1.25; font-weight: 700;">${s.first_name} ${s.last_name}</strong>
+                <div style="font-size: 14px; color: #94A3B8; margin-top: 4px; font-weight: 500;">${s.group_code} • ${s.course}-kurs</div>
               </div>
             </div>
-            <strong style="font-size: 20px; color: #38BDF8;">${s.season} ball</strong>
+            <strong style="font-size: 22px; color: #38BDF8; font-weight: 800;">${s.season} ball</strong>
           </div>
         `).join('');
 
