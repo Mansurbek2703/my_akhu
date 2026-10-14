@@ -1285,11 +1285,34 @@ router.post('/users', authenticateSuperadmin, async (req, res) => {
 
     const userId = (id || username) ? String(id || username).trim() : 'staff_' + crypto.randomBytes(5).toString('hex');
     const userEmail = email ? String(email).trim() : `${userId}@akhu.uz`;
-    const userPhone = phone ? String(phone).trim() : null;
+    let userPhone = phone ? String(phone).trim() : null;
+    if (userPhone) {
+      userPhone = userPhone.replace(/[^0-9+]/g, '');
+      if (!userPhone.startsWith('+') && userPhone.startsWith('998')) userPhone = '+' + userPhone;
+    }
     const userPhoto = photo_url ? String(photo_url).trim() : null;
     let tgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : (telegram_id ? String(telegram_id).trim() : null);
     let tgUsername = telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null;
-    const tgPhone = telegram_phone ? String(telegram_phone).trim() : (userPhone || null);
+    let tgPhone = telegram_phone ? String(telegram_phone).trim().replace(/[^0-9+]/g, '') : (userPhone || null);
+    if (tgPhone && !tgPhone.startsWith('+') && tgPhone.startsWith('998')) tgPhone = '+' + tgPhone;
+
+    // Sanitize tgId and tgUsername (agar foydalanuvchi @username ni Telegram ID ga kiritgan bo'lsa)
+    if (tgId) {
+      if (tgId.toLowerCase() === 'null' || tgId.toLowerCase() === 'undefined' || tgId === '') {
+        tgId = null;
+      } else if (tgId.startsWith('@') || /[^0-9]/.test(tgId)) {
+        if (!tgUsername) tgUsername = tgId.replace(/^@/, '');
+        tgId = null;
+      }
+    }
+    if (tgUsername) {
+      if (tgUsername.toLowerCase() === 'null' || tgUsername.toLowerCase() === 'undefined' || tgUsername === '') {
+        tgUsername = null;
+      } else {
+        tgUsername = tgUsername.replace(/^@/, '');
+      }
+    }
+
     const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : (active !== undefined ? (active ? 1 : 0) : 1);
     const targetGroups = groups.length > 0 ? groups : tutor_groups;
 
@@ -1406,10 +1429,21 @@ router.put('/profile/me', (req, res) => {
 
     const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
     const newEmail = email !== undefined ? String(email).trim() : user.email;
-    const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
+    let newPhone = phone !== undefined ? (phone ? String(phone).trim() : null) : user.phone;
+    if (newPhone) {
+      newPhone = newPhone.replace(/[^0-9+]/g, '');
+      if (!newPhone.startsWith('+') && newPhone.startsWith('998')) newPhone = '+' + newPhone;
+    }
     // Xodimlar o'z profilidan rasmni almashtira olmaydi
     const newPhotoUrl = (isSuperadmin && photo_url !== undefined) ? String(photo_url).trim() : user.photo_url;
-    const newTgId = telegram_user_id !== undefined ? String(telegram_user_id).trim() : user.telegram_user_id;
+    let newTgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : user.telegram_user_id;
+    if (newTgId) {
+      if (newTgId.toLowerCase() === 'null' || newTgId.toLowerCase() === 'undefined' || newTgId === '') {
+        newTgId = null;
+      } else if (newTgId.startsWith('@') || /[^0-9]/.test(newTgId)) {
+        newTgId = null;
+      }
+    }
 
     let passHash = user.password_hash;
     if (password && String(password).trim().length > 0) {
@@ -1508,11 +1542,33 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
 
     const newFullName = full_name !== undefined ? String(full_name).trim() : user.full_name;
     const newEmail = email !== undefined ? String(email).trim() : user.email;
-    const newPhone = phone !== undefined ? String(phone).trim() : user.phone;
+    let newPhone = phone !== undefined ? (phone ? String(phone).trim() : null) : user.phone;
+    if (newPhone) {
+      newPhone = newPhone.replace(/[^0-9+]/g, '');
+      if (!newPhone.startsWith('+') && newPhone.startsWith('998')) newPhone = '+' + newPhone;
+    }
     const newPhotoUrl = photo_url !== undefined ? (photo_url ? String(photo_url).trim() : null) : user.photo_url;
     let tgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : (telegram_id !== undefined ? (telegram_id ? String(telegram_id).trim() : null) : user.telegram_user_id);
     let tgUsername = telegram_username !== undefined ? (telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null) : user.telegram_username;
-    const tgPhone = telegram_phone !== undefined ? (telegram_phone ? String(telegram_phone).trim() : null) : (user.telegram_phone || user.phone);
+    let tgPhone = telegram_phone !== undefined ? (telegram_phone ? String(telegram_phone).trim().replace(/[^0-9+]/g, '') : null) : (user.telegram_phone || newPhone);
+    if (tgPhone && !tgPhone.startsWith('+') && tgPhone.startsWith('998')) tgPhone = '+' + tgPhone;
+
+    // Sanitize tgId and tgUsername (agar foydalanuvchi @username ni Telegram ID ga kiritgan bo'lsa)
+    if (tgId) {
+      if (tgId.toLowerCase() === 'null' || tgId.toLowerCase() === 'undefined' || tgId === '') {
+        tgId = null;
+      } else if (tgId.startsWith('@') || /[^0-9]/.test(tgId)) {
+        if (!tgUsername) tgUsername = tgId.replace(/^@/, '');
+        tgId = null;
+      }
+    }
+    if (tgUsername) {
+      if (tgUsername.toLowerCase() === 'null' || tgUsername.toLowerCase() === 'undefined' || tgUsername === '') {
+        tgUsername = null;
+      } else {
+        tgUsername = tgUsername.replace(/^@/, '');
+      }
+    }
     const newBotStatus = bot_status !== undefined ? String(bot_status).trim() : user.bot_status;
     const targetGroups = groups !== undefined ? groups : tutor_groups;
     const activeVal = active !== undefined ? (active ? 1 : 0) : (is_active !== undefined ? (is_active ? 1 : 0) : user.active);

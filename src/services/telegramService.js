@@ -294,15 +294,17 @@ async function broadcastNewEventToStudents(event) {
  * M-01, N-10: Talabaning telefon raqami orqali Telegram akkauntini bog'lash va +5 kirish balli berish
  */
 function linkStudentTelegramAccount(telegramUserId, phoneNumber) {
-  let cleanPhone = String(phoneNumber).replace(/[^0-9]/g, '');
-  if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
-  const phoneWithoutPlus = cleanPhone.replace('+', '');
+  let cleanDigits = String(phoneNumber).replace(/[^0-9]/g, '');
+  const last9 = cleanDigits.slice(-9);
+  const formattedPhone = cleanDigits.startsWith('998') ? '+' + cleanDigits : (cleanDigits.length === 9 ? '+998' + cleanDigits : '+' + cleanDigits);
+  const phoneWithoutPlus = formattedPhone.replace('+', '');
 
   const student = db.prepare(`
     SELECT * FROM student
-    WHERE phone = ? OR phone = ? OR phone LIKE ?
+    WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE ?
+       OR phone = ? OR phone = ?
     LIMIT 1
-  `).get(cleanPhone, phoneWithoutPlus, `%${cleanPhone.slice(-9)}`);
+  `).get('%' + last9, formattedPhone, phoneWithoutPlus);
 
   if (!student) {
     return {
@@ -603,6 +605,91 @@ function getSuperadminKeyboard() {
 }
 
 /**
+ * Xodim uchun tabrik va menyuni yuborish
+ */
+async function sendStaffGreetingAndMenu(chatId, staffUser, rawUsername, formattedPhone = null) {
+  let parsedRoles = [];
+  try { parsedRoles = JSON.parse(staffUser.roles); } catch(e) { parsedRoles = [staffUser.roles]; }
+  const isSuper = parsedRoles.includes('superadmin') || staffUser.id === 'superadmin';
+
+  // 1. Klaviaturadagi "Telefon raqamni yuborish" tugmasini olib tashlash
+  try {
+    await sendTelegramMessage(chatId, `✅ <b>Hisobingiz muvaffaqiyatli tasdiqlandi va sinxronlandi!</b>`, {
+      reply_markup: { remove_keyboard: true }
+    });
+  } catch (e) {}
+
+  if (isSuper) {
+    const totalStudents = db.prepare(`SELECT COUNT(*) as c FROM student WHERE status = 'active'`).get().c;
+    const pendingCount = db.prepare(`SELECT COUNT(*) as c FROM point_entry WHERE status IN ('pending', 'pending_pv')`).get().c;
+    const totalPoints = db.prepare(`SELECT COALESCE(SUM(season), 0) as s FROM student_score`).get().s;
+
+    const adminWelcome = `🏛️ <b>Assalomu alaykum, ${staffUser.full_name}!</b>\n` +
+      `Siz AKHU Talabalar reytingi tizimi <b>Superadmini</b> sifatida tasdiqlangansiz (ID: <code>${chatId}</code>).\n\n` +
+      `📊 <b>Tizimning joriy holati:</b>\n` +
+      `• Faol talabalar: <b>${totalStudents} nafar</b>\n` +
+      `• Kutilayotgan tasdiqlar: <b>${pendingCount} ta</b>\n` +
+      `• Mavsumning jami ballari: <b>${totalPoints.toLocaleString()} ball</b>\n\n` +
+      `Tizimni boshqarish va nazorat qilish uchun pastdagi tugmalardan foydalaning:`;
+
+    await sendTelegramMessage(chatId, adminWelcome, {
+      reply_markup: getSuperadminKeyboard()
+    });
+    return;
+  }
+
+  // Mas'ul xodim (Tyutor, Dekanat yoki Bo'lim)
+  const roleTitles = {
+    'superadmin': 'Superadmin (Tizim boshqaruvchisi)',
+    'tutor': 'Akademik Tyutor',
+    'dep_yb': "Yoshlar bilan ishlash bo'limi",
+    'dep_mb': "Ma'naviyat va ma'rifat bo'limi",
+    'dep_ob': "O'quv-uslubiy boshqarma (Registrator)",
+    'dep_ib': "Ilmiy va innovatsiyalar bo'limi",
+    'dep_sb': "Sanoat bilan hamkorlik bo'limi",
+    'dep_pb': "Matbuot xizmati (PR)",
+    'prorektor': "Yoshlar masalalari bo'yicha prorektor",
+    'observer': "Kuzatuvchi / Rektorat"
+  };
+  const displayRoles = parsedRoles.map(r => roleTitles[r] || r).join(', ') || 'Mas\'ul xodim';
+
+  let pendingForMe = 0;
+  if (parsedRoles.length > 0) {
+    const placeholders = parsedRoles.map(() => '?').join(',');
+    pendingForMe = db.prepare(`
+      SELECT COUNT(*) as c FROM point_entry 
+      WHERE status IN ('pending', 'pending_pv') AND (approver_role IN (${placeholders}))
+    `).get(...parsedRoles)?.c || 0;
+  }
+
+  const usernameText = rawUsername ? `@${rawUsername}` : (staffUser.telegram_username ? `@${staffUser.telegram_username.replace(/^@/, '')}` : 'Mavjud emas');
+  const phoneText = formattedPhone || staffUser.telegram_phone || staffUser.phone || '—';
+
+  const staffWelcome = `🏛️ <b>Assalomu alaykum, ${staffUser.full_name}!</b>\n\n` +
+    `Siz AKHU tizimida mas'ul xodim sifatida muvaffaqiyatli tasdiqlandingiz:\n\n` +
+    `👔 <b>Lavozim/Rol:</b> ${displayRoles}\n` +
+    `🆔 <b>Telegram ID:</b> <code>${chatId}</code>\n` +
+    `👤 <b>Telegram Username:</b> ${usernameText}\n` +
+    `📱 <b>Tasdiqlangan telefon:</b> <code>${phoneText}</code>\n` +
+    `📥 <b>Tasdiqlash kutilayotgan arizalar:</b> <b>${pendingForMe} ta</b>\n\n` +
+    `⚡ <b>Telegram Bot faollashtirildi!</b> Endi talabalarning yangi ball arizalari va muhim tizim xabarnomalari avtomatik shu bot orqali sizga yetkaziladi.\n\n` +
+    `Tizim portaliga o'tish uchun pastdagi tugmani bosing:`;
+
+  await sendTelegramMessage(chatId, staffWelcome, {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '💻 Tasdiqlash va Boshqaruv Portali', url: `${config.baseUrl}/#approvals` }
+        ],
+        [
+          { text: '📥 Kutilayotgan arizalar', callback_data: 'admin_pending' }
+        ]
+      ]
+    }
+  });
+}
+
+/**
  * Telegram Update Handler (Webhook va Polling uchun yagona)
  */
 async function handleTelegramWebhook(update) {
@@ -647,7 +734,7 @@ async function handleTelegramWebhook(update) {
     return;
   }
 
-  // 2. Oddiy xabarlar
+// 2. Oddiy xabarlar
   const msg = update.message;
   if (!msg) return;
 
@@ -660,10 +747,18 @@ async function handleTelegramWebhook(update) {
 
   // Agar bu xodim bo'lsa, uning username va oxirgi faolligini har qanday xabarda darhol yangilash
   try {
-    const existingStaff = db.prepare(`
-      SELECT id, telegram_username FROM staff_user 
-      WHERE telegram_user_id = ? OR (telegram_username IS NOT NULL AND LOWER(telegram_username) = LOWER(?))
-    `).get(tgId, rawUsername || '');
+    let existingStaff = db.prepare(`
+      SELECT * FROM staff_user 
+      WHERE telegram_user_id = ?
+    `).get(tgId);
+
+    if (!existingStaff && rawUsername) {
+      existingStaff = db.prepare(`
+        SELECT * FROM staff_user 
+        WHERE (telegram_username IS NOT NULL AND (LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)))
+           OR (telegram_user_id IS NOT NULL AND (LOWER(telegram_user_id) = LOWER(?) OR LOWER(telegram_user_id) = LOWER(?)))
+      `).get(rawUsername, `@${rawUsername}`, rawUsername, `@${rawUsername}`);
+    }
 
     if (existingStaff) {
       db.prepare(`
@@ -692,7 +787,11 @@ async function handleTelegramWebhook(update) {
     } else {
       staffUser = db.prepare(`SELECT * FROM staff_user WHERE telegram_user_id = ?`).get(tgId);
       if (!staffUser && rawUsername) {
-        staffUser = db.prepare(`SELECT * FROM staff_user WHERE LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)`).get(rawUsername, `@${rawUsername}`);
+        staffUser = db.prepare(`
+          SELECT * FROM staff_user 
+          WHERE (telegram_username IS NOT NULL AND (LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)))
+             OR (telegram_user_id IS NOT NULL AND (LOWER(telegram_user_id) = LOWER(?) OR LOWER(telegram_user_id) = LOWER(?)))
+        `).get(rawUsername, `@${rawUsername}`, rawUsername, `@${rawUsername}`);
       }
     }
 
@@ -707,6 +806,19 @@ async function handleTelegramWebhook(update) {
         WHERE id = ?
       `).run(tgId, rawUsername, nowIso, nowIso, staffUser.id);
 
+      try {
+        db.prepare(`
+          INSERT INTO telegram_bot_user (telegram_user_id, username, first_name, last_name, started_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT (telegram_user_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            last_seen_at = EXCLUDED.last_seen_at,
+            actions_count = telegram_bot_user.actions_count + 1
+        `).run(tgId, rawUsername, msg.from?.first_name || null, msg.from?.last_name || null, nowIso, nowIso);
+      } catch (e) {}
+
       logAudit({
         actor_id: staffUser.id,
         actor_role: 'staff',
@@ -716,71 +828,8 @@ async function handleTelegramWebhook(update) {
         after: { username: rawUsername, telegram_user_id: tgId }
       });
 
-      let parsedRoles = [];
-      try { parsedRoles = JSON.parse(staffUser.roles); } catch(e) { parsedRoles = [staffUser.roles]; }
-      const isSuper = parsedRoles.includes('superadmin') || staffUser.id === 'superadmin';
-
-      if (isSuper) {
-        const totalStudents = db.prepare(`SELECT COUNT(*) as c FROM student WHERE status = 'active'`).get().c;
-        const pendingCount = db.prepare(`SELECT COUNT(*) as c FROM point_entry WHERE status IN ('pending', 'pending_pv')`).get().c;
-        const totalPoints = db.prepare(`SELECT COALESCE(SUM(season), 0) as s FROM student_score`).get().s;
-
-        const adminWelcome = `🏛️ <b>Assalomu alaykum, ${staffUser.full_name}!</b>\n` +
-          `Siz AKHU Talabalar reytingi tizimi <b>Superadmini</b> sifatida tasdiqlangansiz (ID: <code>${chatId}</code>).\n\n` +
-          `📊 <b>Tizimning joriy holati:</b>\n` +
-          `• Faol talabalar: <b>${totalStudents} nafar</b>\n` +
-          `• Kutilayotgan tasdiqlar: <b>${pendingCount} ta</b>\n` +
-          `• Mavsumning jami ballari: <b>${totalPoints.toLocaleString()} ball</b>\n\n` +
-          `Tizimni boshqarish va nazorat qilish uchun pastdagi tugmalardan foydalaning:`;
-
-        await sendTelegramMessage(chatId, adminWelcome, {
-          reply_markup: getSuperadminKeyboard()
-        });
-        return;
-      }
-
-      // Mas'ul xodim (Tyutor yoki Bo'lim)
-      const roleTitles = {
-        'tutor': 'Akademik Tyutor',
-        'dep_yb': "Yoshlar bilan ishlash bo'limi",
-        'dep_mb': "Ma'naviyat va ma'rifat bo'limi",
-        'dep_ob': "O'quv-uslubiy boshqarma (Registrator)",
-        'dep_ib': "Ilmiy va innovatsiyalar bo'limi",
-        'dep_sb': "Sanoat bilan hamkorlik bo'limi",
-        'dep_pb': "Matbuot xizmati (PR)",
-        'prorektor': "Yoshlar masalalari bo'yicha prorektor"
-      };
-      const displayRoles = parsedRoles.map(r => roleTitles[r] || r).join(', ');
-
-      let pendingForMe = 0;
-      if (parsedRoles.length > 0) {
-        const placeholders = parsedRoles.map(() => '?').join(',');
-        pendingForMe = db.prepare(`
-          SELECT COUNT(*) as c FROM point_entry 
-          WHERE status IN ('pending', 'pending_pv') AND (approver_role IN (${placeholders}))
-        `).get(...parsedRoles)?.c || 0;
-      }
-
-      const staffWelcome = `🏛️ <b>Assalomu alaykum, ${staffUser.full_name}!</b>\n\n` +
-        `Siz AKHU tizimida mas'ul xodim sifatida tasdiqlandingiz:\n` +
-        `👔 <b>Lavozim/Rol:</b> ${displayRoles}\n` +
-        `🆔 <b>Telegram ID:</b> <code>${chatId}</code>\n` +
-        `📥 <b>Tasdiqlash kutilayotgan arizalar:</b> <b>${pendingForMe} ta</b>\n\n` +
-        `✅ <b>Telegram Bot faollashtirildi!</b> Endi tyutorlar ball kiritganda va muhim arizalar tushganda sizga avtomatik tezkor xabarnomalar shu yerga yetkaziladi.\n\n` +
-        `Tizim portaliga o'tish uchun pastdagi tugmani bosing:`;
-
-      await sendTelegramMessage(chatId, staffWelcome, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '💻 Tasdiqlash va Boshqaruv Portali', url: `${config.baseUrl}/#approvals` }
-            ],
-            [
-              { text: '📥 Kutilayotgan arizalar', callback_data: 'admin_pending' }
-            ]
-          ]
-        }
-      });
+      const updated = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staffUser.id);
+      await sendStaffGreetingAndMenu(chatId, updated, rawUsername);
       return;
     }
 
@@ -829,35 +878,66 @@ async function handleTelegramWebhook(update) {
     return;
   }
 
-  // 2. Contact yuborilganda (Telefon raqam orqali bog'lash)
-  if (msg.contact) {
-    const phone = msg.contact.phone_number;
-    let cleanPhone = String(phone).replace(/[^0-9]/g, '');
-    if (!cleanPhone.startsWith('+')) cleanPhone = '+' + cleanPhone;
-    const phoneWithoutPlus = cleanPhone.replace('+', '');
-    const last9 = cleanPhone.slice(-9);
+  // 2. Contact yuborilganda yoki telefon raqami yozilganda
+  let incomingPhone = null;
+  if (msg.contact && msg.contact.phone_number) {
+    incomingPhone = msg.contact.phone_number;
+  } else if (text && /^\+?998[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}$|^\d{9,12}$/.test(text.trim())) {
+    incomingPhone = text.trim();
+  }
 
-    // 1. Avval xodimlar orasidan telefon bo'yicha qidirish
+  if (incomingPhone) {
+    const cleanDigits = String(incomingPhone).replace(/[^0-9]/g, '');
+    const last9 = cleanDigits.slice(-9);
+    const formattedPhone = cleanDigits.startsWith('998') ? '+' + cleanDigits : (cleanDigits.length === 9 ? '+998' + cleanDigits : '+' + cleanDigits);
+    const phoneWithoutPlus = formattedPhone.replace('+', '');
+
+    // 1. Avval xodimlar orasidan telefon, username yoki id bo'yicha qidirish
     const staff = db.prepare(`
       SELECT * FROM staff_user
-      WHERE phone = ? OR phone = ? OR phone LIKE ? 
-         OR telegram_phone = ? OR telegram_phone LIKE ?
+      WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE ?
+         OR REGEXP_REPLACE(COALESCE(telegram_phone, ''), '[^0-9]', '', 'g') LIKE ?
+         OR phone = ? OR phone = ?
+         OR telegram_phone = ? OR telegram_phone = ?
+         OR telegram_user_id = ?
+         OR (telegram_username IS NOT NULL AND (LOWER(telegram_username) = LOWER(?) OR LOWER(telegram_username) = LOWER(?)))
+         OR (telegram_user_id IS NOT NULL AND (LOWER(telegram_user_id) = LOWER(?) OR LOWER(telegram_user_id) = LOWER(?)))
       LIMIT 1
-    `).get(cleanPhone, phoneWithoutPlus, `%${last9}`, cleanPhone, `%${last9}`);
+    `).get(
+      '%' + last9, '%' + last9,
+      formattedPhone, phoneWithoutPlus,
+      formattedPhone, phoneWithoutPlus,
+      tgId,
+      rawUsername || '', `@${rawUsername || ''}`,
+      rawUsername || '', `@${rawUsername || ''}`
+    );
 
     if (staff) {
-      const now = new Date().toISOString();
-      const rawUsername = msg.from?.username ? msg.from.username.replace(/^@/, '') : null;
       db.prepare(`
         UPDATE staff_user
         SET telegram_user_id = ?,
             telegram_phone = ?,
             telegram_username = COALESCE(?, telegram_username),
+            phone = CASE WHEN phone IS NULL OR phone = '' OR phone LIKE '% %' THEN ? ELSE phone END,
             bot_started_at = COALESCE(bot_started_at, ?),
             bot_status = 'active',
             last_active_at = ?
         WHERE id = ?
-      `).run(String(chatId), cleanPhone, rawUsername, now, now, staff.id);
+      `).run(tgId, formattedPhone, rawUsername, formattedPhone, nowIso, nowIso, staff.id);
+
+      try {
+        db.prepare(`
+          INSERT INTO telegram_bot_user (telegram_user_id, username, first_name, last_name, phone, started_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (telegram_user_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            phone = EXCLUDED.phone,
+            last_seen_at = EXCLUDED.last_seen_at,
+            actions_count = telegram_bot_user.actions_count + 1
+        `).run(tgId, rawUsername, msg.from?.first_name || null, msg.from?.last_name || null, formattedPhone, nowIso, nowIso);
+      } catch (e) {}
 
       logAudit({
         actor_id: staff.id,
@@ -865,35 +945,30 @@ async function handleTelegramWebhook(update) {
         action: 'BOT_LINK_STAFF',
         object_type: 'staff_user',
         object_id: staff.id,
-        after: { telegram_user_id: String(chatId), phone: cleanPhone, username }
+        after: { telegram_user_id: tgId, phone: formattedPhone, username: rawUsername }
       });
 
-      await sendTelegramMessage(chatId, `🎉 <b>Tabriklaymiz, ${staff.full_name}!</b>\n\n` +
-        `Sizning xodim hisobingiz Telegram botga muvaffaqiyatli bog'landi! ✅\n` +
-        `Endi talabalarning barcha yangi ball arizalari bo'yicha bildirishnomalarni to'g'ridan-to'g'ri shu bot orqali qabul qilasiz.`, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '💻 Boshqaruv / Tasdiqlash Portali', url: `${config.baseUrl}/#approvals` }
-            ]
-          ]
-        }
-      });
+      const updated = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staff.id);
+      await sendStaffGreetingAndMenu(chatId, updated, rawUsername, formattedPhone);
       return;
     }
 
     // 2. Aks holda talaba bog'lanishi (Student logic)
-    const result = linkStudentTelegramAccount(chatId, phone);
+    const result = linkStudentTelegramAccount(chatId, incomingPhone);
 
-    recordBotActivity(chatId, 'share_contact', `Telefon yuborildi: ${phone} (${result.success ? 'Muvaffaqiyatli bog\'landi' : 'Topilmadi'})`, {
-      username: msg.from?.username,
+    recordBotActivity(chatId, 'share_contact', `Telefon yuborildi: ${incomingPhone} (${result.success ? 'Muvaffaqiyatli bog\'landi' : 'Topilmadi'})`, {
+      username: rawUsername,
       firstName: msg.from?.first_name,
       lastName: msg.from?.last_name,
-      phone,
+      phone: incomingPhone,
       studentId: result.student ? result.student.id : null
     });
 
     if (result.success) {
+      await sendTelegramMessage(chatId, `✅ <b>Telefon raqamingiz muvaffaqiyatli tasdiqlandi!</b>`, {
+        reply_markup: { remove_keyboard: true }
+      });
+
       await sendTelegramMessage(chatId, `🎉 <b>${result.message}</b>\n\nIsm-familiya: <b>${result.student.first_name} ${result.student.last_name}</b>\nGuruh: <b>${result.student.group_code}</b>\n\nPastdagi tugma orqali kabinetingizga kiring:`, {
         reply_markup: {
           inline_keyboard: [
@@ -909,6 +984,7 @@ async function handleTelegramWebhook(update) {
     } else {
       await sendTelegramMessage(chatId, `❌ ${result.message}`);
     }
+    return;
   }
 }
 

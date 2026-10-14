@@ -8424,16 +8424,16 @@ async function showCreateStaffModal() {
       <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1.1fr 1fr 1fr; gap:10px;">
         <div class="form-group">
           <label class="form-label" style="font-weight:600;">Telegram User ID</label>
-          <input type="text" id="new-staff-tgid" class="form-control" placeholder="1202082857" onblur="autoFetchTgUsername('new-staff-tgid', 'new-staff-tgusername', 'new-staff-tgid-status')">
-          <div id="new-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">ID kiritilganda username botdan avtomatik olinadi</div>
+          <input type="text" id="new-staff-tgid" class="form-control" placeholder="1202082857 (ixtiyoriy)" onblur="autoFetchTgUsername('new-staff-tgid', 'new-staff-tgusername', 'new-staff-tgid-status')">
+          <div id="new-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">Bo'sh bo'lsa, xodim botga /start bosganda avtomatik to'ldiriladi</div>
         </div>
         <div class="form-group">
           <label class="form-label">Telegram Username (@)</label>
           <div style="position:relative;">
             <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
-            <input type="text" id="new-staff-tgusername" class="form-control" style="padding-left:26px;" placeholder="avtomatik aniqlanadi">
+            <input type="text" id="new-staff-tgusername" class="form-control" style="padding-left:26px;" placeholder="username (ixtiyoriy)">
           </div>
-          <small class="text-muted" style="font-size:11px;">Avtomatik olinadi</small>
+          <small class="text-muted" style="font-size:11px;">Ixtiyoriy (avtomatik olinadi)</small>
         </div>
         <div class="form-group">
           <label class="form-label">Telegram Telefon Raqami</label>
@@ -8514,6 +8514,26 @@ async function handleCreateStaffSubmit() {
     return;
   }
 
+  let cleanTgId = telegram_user_id || null;
+  let cleanTgUsername = telegram_username ? telegram_username.replace(/^@/, '').trim() : null;
+  if (cleanTgId) {
+    if (cleanTgId.toLowerCase() === 'null' || cleanTgId.toLowerCase() === 'undefined' || cleanTgId === '') {
+      cleanTgId = null;
+    } else if (cleanTgId.startsWith('@') || /[^0-9]/.test(cleanTgId)) {
+      if (!cleanTgUsername) cleanTgUsername = cleanTgId.replace(/^@/, '').trim();
+      cleanTgId = null;
+    }
+  }
+  if (cleanTgUsername) {
+    if (cleanTgUsername.toLowerCase() === 'null' || cleanTgUsername.toLowerCase() === 'undefined' || cleanTgUsername === '') {
+      cleanTgUsername = null;
+    }
+  }
+  let cleanPhone = phone ? phone.replace(/[^0-9+]/g, '') : null;
+  if (cleanPhone && !cleanPhone.startsWith('+') && cleanPhone.startsWith('998')) cleanPhone = '+' + cleanPhone;
+  let cleanTgPhone = telegram_phone ? telegram_phone.replace(/[^0-9+]/g, '') : (cleanPhone || null);
+  if (cleanTgPhone && !cleanTgPhone.startsWith('+') && cleanTgPhone.startsWith('998')) cleanTgPhone = '+' + cleanTgPhone;
+
   try {
     await apiFetch('/api/admin/users', {
       method: 'POST',
@@ -8522,10 +8542,10 @@ async function handleCreateStaffSubmit() {
         password,
         full_name,
         email,
-        phone,
-        telegram_user_id: telegram_user_id || null,
-        telegram_username: telegram_username || null,
-        telegram_phone: telegram_phone || phone || null,
+        phone: cleanPhone,
+        telegram_user_id: cleanTgId,
+        telegram_username: cleanTgUsername,
+        telegram_phone: cleanTgPhone,
         photo_url: photo_url || null,
         roles,
         tutor_groups,
@@ -8648,8 +8668,8 @@ async function showEditStaffModal(userId) {
         </div>
         <div class="form-group">
           <label class="form-label" style="font-weight:600;">Telegram User ID</label>
-          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857" onblur="autoFetchTgUsername('edit-staff-tgid', 'edit-staff-tgusername', 'edit-staff-tgid-status')">
-          <div id="edit-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">ID kiritilganda username botdan avtomatik olinadi</div>
+          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857 (ixtiyoriy)" onblur="autoFetchTgUsername('edit-staff-tgid', 'edit-staff-tgusername', 'edit-staff-tgid-status')">
+          <div id="edit-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">Bo'sh bo'lsa, xodim botga /start bosganda avtomatik to'ldiriladi</div>
         </div>
       </div>
 
@@ -8816,16 +8836,36 @@ async function handleEditStaffSubmit(userId) {
     submitBtn.innerHTML = `Saqlanmoqda...`;
   }
 
+  let cleanTgId = telegram_user_id || null;
+  let cleanTgUsername = telegram_username ? telegram_username.replace(/^@/, '').trim() : null;
+  if (cleanTgId) {
+    if (cleanTgId.toLowerCase() === 'null' || cleanTgId.toLowerCase() === 'undefined' || cleanTgId === '') {
+      cleanTgId = null;
+    } else if (cleanTgId.startsWith('@') || /[^0-9]/.test(cleanTgId)) {
+      if (!cleanTgUsername) cleanTgUsername = cleanTgId.replace(/^@/, '').trim();
+      cleanTgId = null;
+    }
+  }
+  if (cleanTgUsername) {
+    if (cleanTgUsername.toLowerCase() === 'null' || cleanTgUsername.toLowerCase() === 'undefined' || cleanTgUsername === '') {
+      cleanTgUsername = null;
+    }
+  }
+  let cleanPhone = phone ? phone.replace(/[^0-9+]/g, '') : null;
+  if (cleanPhone && !cleanPhone.startsWith('+') && cleanPhone.startsWith('998')) cleanPhone = '+' + cleanPhone;
+  let cleanTgPhone = telegram_phone ? telegram_phone.replace(/[^0-9+]/g, '') : (cleanPhone || null);
+  if (cleanTgPhone && !cleanTgPhone.startsWith('+') && cleanTgPhone.startsWith('998')) cleanTgPhone = '+' + cleanTgPhone;
+
   try {
     const payload = {
       username,
       full_name,
       email,
-      phone,
+      phone: cleanPhone,
       photo_url: photo_url || null,
-      telegram_user_id: telegram_user_id || null,
-      telegram_username: telegram_username || null,
-      telegram_phone: telegram_phone || phone || null,
+      telegram_user_id: cleanTgId,
+      telegram_username: cleanTgUsername,
+      telegram_phone: cleanTgPhone,
       bot_status: bot_status || undefined,
       active: is_active,
       is_active: is_active === 1,
@@ -9308,6 +9348,17 @@ async function autoFetchTgUsername(inputId, targetUsernameId, statusId) {
   if (!idInput || !idInput.value.trim()) return;
 
   const val = idInput.value.trim();
+  // Agar foydalanuvchi Telegram ID maydoniga @username yoki matn yozgan bo'lsa
+  if (val.startsWith('@') || /[^0-9]/.test(val)) {
+    const cleanU = val.replace(/^@/, '');
+    if (uInput && (!uInput.value || !uInput.value.trim())) {
+      uInput.value = cleanU;
+    }
+    idInput.value = '';
+    if (statusBox) statusBox.innerHTML = `<span style="color:#2563EB;">💡 @${cleanU} username maydoniga o'tkazildi. Telegram ID botga /start bosganda avtomatik olinadi!</span>`;
+    return;
+  }
+
   if (statusBox) statusBox.innerHTML = '<span style="color:#2563EB;">🔍 Telegram tekshirilmoqda...</span>';
 
   try {
