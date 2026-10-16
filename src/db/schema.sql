@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS event (
     ends_at TEXT NOT NULL,
     place TEXT NOT NULL,
     organizer_unit TEXT NOT NULL,
+    photo_url TEXT,
+    image_url TEXT,
     category_id TEXT NOT NULL,
     level TEXT NOT NULL, -- klub (3), universitet (5), viloyat (8), respublika (15), xalqaro (25)
     points INTEGER NOT NULL,

@@ -69,10 +69,12 @@ function initPostgresSchema() {
     // Migration: ensure photo_url exists on student
     db.exec(`ALTER TABLE student ADD COLUMN IF NOT EXISTS photo_url TEXT;`);
 
-    // Migration: ensure qr_refresh_seconds and attendance_open_minutes_before exist on event
+    // Migration: ensure qr_refresh_seconds, attendance_open_minutes_before, photo_url, image_url exist on event
     db.exec(`
       ALTER TABLE event ADD COLUMN IF NOT EXISTS qr_refresh_seconds INTEGER DEFAULT 5;
       ALTER TABLE event ADD COLUMN IF NOT EXISTS attendance_open_minutes_before INTEGER DEFAULT 5;
+      ALTER TABLE event ADD COLUMN IF NOT EXISTS photo_url TEXT;
+      ALTER TABLE event ADD COLUMN IF NOT EXISTS image_url TEXT;
       UPDATE event SET qr_refresh_seconds = 5;
       UPDATE event SET attendance_open_minutes_before = 5 WHERE attendance_open_minutes_before IS NULL;
     `);
@@ -172,6 +174,12 @@ function initSqliteSchema() {
     }
     if (!cols.includes('attendance_open_minutes_before')) {
       db.exec('ALTER TABLE event ADD COLUMN attendance_open_minutes_before INTEGER DEFAULT 5;');
+    }
+    if (!cols.includes('photo_url')) {
+      db.exec('ALTER TABLE event ADD COLUMN photo_url TEXT;');
+    }
+    if (!cols.includes('image_url')) {
+      db.exec('ALTER TABLE event ADD COLUMN image_url TEXT;');
     }
     db.exec('UPDATE event SET qr_refresh_seconds = 5;');
     db.exec('UPDATE event SET attendance_open_minutes_before = 5 WHERE attendance_open_minutes_before IS NULL;');

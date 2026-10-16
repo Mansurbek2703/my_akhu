@@ -316,19 +316,63 @@
         const evRes = await fetch('/api/events');
         const evData = await evRes.json();
         const evGrid = document.getElementById('tv-events-grid');
-        evGrid.innerHTML = (evData.events || []).slice(0, 3).map(e => `
-          <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+        
+        const nowMs = Date.now();
+        const sortedEvents = (evData.events || []).sort((a, b) => {
+          const aEnd = new Date(a.ends_at).getTime();
+          const bEnd = new Date(b.ends_at).getTime();
+          const aUpcoming = aEnd >= nowMs;
+          const bUpcoming = bEnd >= nowMs;
+          if (aUpcoming && !bUpcoming) return -1;
+          if (!aUpcoming && bUpcoming) return 1;
+          if (aUpcoming && bUpcoming) return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+          return bEnd - aEnd;
+        });
+
+        evGrid.innerHTML = sortedEvents.slice(0, 3).map(e => `
+          <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.12); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 10px 30px rgba(0,0,0,0.35);">
             <div>
-              <span class="badge" style="background: ${e.category_color}20; color: ${e.category_color}; border: 1px solid ${e.category_color}; margin-bottom: 12px; display: inline-block;">
-                ${e.category_name}
-              </span>
-              <h3 style="font-size: 22px; margin-bottom: 12px;">${e.title}</h3>
-              <p style="color: #94A3B8; font-size: 15px; margin-bottom: 6px;">📍 ${e.place}</p>
-              <p style="color: #94A3B8; font-size: 15px;">🕒 ${new Date(e.starts_at).toLocaleString('uz-UZ')}</p>
+              <!-- 16:9 BANNER RASM (TV REJIMI UCHUN MAXSUS) -->
+              <div style="width: 100%; height: 200px; position: relative; overflow: hidden; background: #0F172A;">
+                ${(e.photo_url || e.image_url) ? `
+                  <img src="${e.photo_url || e.image_url}" alt="${e.title}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\\'height:100%; width:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, ${e.category_color}25 0%, rgba(15,23,42,0.95) 100%); font-size:48px;\\'>📅</div>';">
+                  <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(to top, rgba(30,41,59,0.95) 0%, transparent 100%);"></div>
+                ` : `
+                  <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, ${e.category_color}35 0%, #0F172A 100%); color: ${e.category_color};">
+                    <span style="font-size: 54px; margin-bottom: 4px;">📅</span>
+                    <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85;">${e.category_name}</span>
+                  </div>
+                `}
+                <span class="badge" style="position: absolute; top: 12px; left: 12px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); color: ${e.category_color}; border: 1px solid ${e.category_color}; font-weight: 700; font-size: 12.5px; padding: 5px 12px; border-radius: 8px;">
+                  ${e.category_name}
+                </span>
+                <span style="position: absolute; top: 12px; right: 12px; background: #10B981; color: white; font-weight: 800; font-size: 14px; padding: 4px 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                  +${e.points} ball
+                </span>
+              </div>
+
+              <!-- TADBIK TAFSILOTLARI -->
+              <div style="padding: 18px 22px 10px;">
+                <h3 style="font-size: 21px; font-weight: 800; line-height: 1.3; margin-bottom: 12px; color: #F8FAFC; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                  ${e.title}
+                </h3>
+                <p style="color: #94A3B8; font-size: 15px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                  <span>📍</span> <span style="font-weight: 600; color: #E2E8F0;">${e.place}</span>
+                </p>
+                <p style="color: #94A3B8; font-size: 15px; margin-bottom: 0; display: flex; align-items: center; gap: 8px;">
+                  <span>🕒</span> <span style="font-weight: 700; color: #38BDF8;">${new Date(e.starts_at).toLocaleString('uz-UZ', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                </p>
+              </div>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; margin-top: 16px;">
-              <span style="color: #38BDF8; font-size: 20px; font-weight: 800;">+${e.points} ball</span>
-              <span style="color: #94A3B8; font-size: 14px;">👥 ${e.checkins_count || 0} qatnashchi</span>
+
+            <!-- PASTKI QISM (ISHTIROKCHILAR) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding: 12px 22px; background: rgba(15, 23, 42, 0.4);">
+              <span style="color: #38BDF8; font-size: 14.5px; font-weight: 700;">
+                🎯 ${e.level ? e.level.toUpperCase() : 'UNIVERSITET'}
+              </span>
+              <span style="color: #CBD5E1; font-size: 14px; font-weight: 600;">
+                👥 ${e.checkins_count || 0} qatnashchi
+              </span>
             </div>
           </div>
         `).join('');

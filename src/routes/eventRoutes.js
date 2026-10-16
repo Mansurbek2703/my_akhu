@@ -19,7 +19,10 @@ const LEVEL_POINTS = {
  */
 router.get('/', (req, res) => {
   const events = db.prepare(`
-    SELECT ev.*, cc.name as category_name, cc.color as category_color,
+    SELECT ev.*, 
+           COALESCE(ev.photo_url, ev.image_url) as photo_url,
+           COALESCE(ev.image_url, ev.photo_url) as image_url,
+           cc.name as category_name, cc.color as category_color,
            (SELECT COUNT(*) FROM checkin WHERE event_id = ev.id) as checkins_count,
            (SELECT COUNT(*) FROM event_registration WHERE event_id = ev.id) as registered_count
     FROM event ev
@@ -76,6 +79,7 @@ router.post('/', (req, res) => {
     const qrSecret = 'sec_' + crypto.randomBytes(12).toString('hex');
     const nowIso = now.toISOString();
     const createdBy = req.headers['x-user-id'] || organizer_unit || 'dep_yb';
+    const photoUrl = (req.body.photo_url || req.body.image_url) ? String(req.body.photo_url || req.body.image_url).trim() : null;
 
     // Anti-fraud talabi: Tadbir yaratuvchi QR kodi har doim qat'iy 5 sekunddan yangilanishi shart!
     const qrRefresh = 5;
@@ -86,16 +90,18 @@ router.post('/', (req, res) => {
 
     db.prepare(`
       INSERT INTO event (
-        id, title, starts_at, ends_at, place, organizer_unit, category_id,
+        id, title, starts_at, ends_at, place, photo_url, image_url, organizer_unit, category_id,
         level, points, capacity, requires_registration, status, qr_secret,
         qr_refresh_seconds, attendance_open_minutes_before, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, 5, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, 5, ?, ?, ?)
     `).run(
       eventId,
       title,
       starts_at,
       ends_at,
       place,
+      photoUrl,
+      photoUrl,
       organizer_unit || 'dep_yb',
       category_id,
       level,
@@ -127,6 +133,8 @@ router.post('/', (req, res) => {
         starts_at,
         ends_at,
         place,
+        photo_url: photoUrl,
+        image_url: photoUrl,
         points,
         attendance_open_minutes_before: attendanceOpenMinutes
       });
@@ -206,12 +214,21 @@ router.put('/:id', (req, res) => {
       }
     }
 
+    let photoUrl = event.photo_url || event.image_url;
+    if (req.body.photo_url !== undefined) {
+      photoUrl = req.body.photo_url ? String(req.body.photo_url).trim() : null;
+    } else if (req.body.image_url !== undefined) {
+      photoUrl = req.body.image_url ? String(req.body.image_url).trim() : null;
+    }
+
     db.prepare(`
       UPDATE event SET
         title = ?,
         starts_at = ?,
         ends_at = ?,
         place = ?,
+        photo_url = ?,
+        image_url = ?,
         category_id = ?,
         level = ?,
         points = ?,
@@ -225,6 +242,8 @@ router.put('/:id', (req, res) => {
       starts_at,
       ends_at,
       place,
+      photoUrl,
+      photoUrl,
       category_id,
       level,
       points,
@@ -482,6 +501,11 @@ router.post('/:id/checkin-student', (req, res) => {
 
     const { recalculateStudentScores } = require('../services/ratingService');
     recalculateStudentScores();
+
+    try {
+      const { notifyStudentEventCheckin } = require('../services/telegramService');
+      notifyStudentEventCheckin(student.id, event, points);
+    } catch (e) {}
 
     res.json({
       success: true,

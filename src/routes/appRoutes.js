@@ -318,39 +318,87 @@ router.get('/rating', authenticateStudent, (req, res) => {
 
 /**
  * GET /api/app/events
- * Tadbirlar ro'yxati (bugun, yaqin, o'tgan)
+ * Tadbirlar ro'yxati (kelayotgan, ro'yxatdan o'tilgan, qatnashilgan va o'tib ketgan)
  */
 router.get('/events', authenticateStudent, (req, res) => {
-  const status = req.query.status || 'today';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const filter = req.query.filter || req.query.status || 'all';
+  const now = new Date();
+  const nowIso = now.toISOString();
 
-  let query = '';
+  let query = `
+    SELECT ev.*,
+           COALESCE(ev.photo_url, ev.image_url) as photo_url,
+           COALESCE(ev.image_url, ev.photo_url) as image_url,
+           cc.name as category_name, cc.color as category_color,
+           (SELECT COUNT(*) FROM checkin WHERE event_id = ev.id) as checkins_count,
+           (SELECT COUNT(*) FROM event_registration WHERE event_id = ev.id) as registered_count
+    FROM event ev
+    LEFT JOIN catalog_category cc ON ev.category_id = cc.id
+    WHERE ev.status = 'published'
+  `;
   let params = [];
 
-  if (status === 'today') {
-    query = `SELECT * FROM event WHERE starts_at LIKE ? AND status = 'published' ORDER BY starts_at ASC`;
-    params = [`${todayStr}%`];
-  } else if (status === 'upcoming') {
-    query = `SELECT * FROM event WHERE starts_at > ? AND status = 'published' ORDER BY starts_at ASC`;
-    params = [`${todayStr}T23:59:59`];
+  if (filter === 'upcoming') {
+    query += ` AND ev.ends_at >= ? ORDER BY ev.starts_at ASC`;
+    params.push(nowIso);
+  } else if (filter === 'past') {
+    query += ` AND ev.ends_at < ? ORDER BY ev.ends_at DESC LIMIT 50`;
+    params.push(nowIso);
   } else {
-    // past
-    query = `SELECT * FROM event WHERE ends_at < ? ORDER BY ends_at DESC LIMIT 20`;
-    params = [`${todayStr}T00:00:00`];
+    // all: kelayotganlar eng boshida (starts_at ASC), o'tib ketganlar keyin (ends_at DESC)
+    query += ` ORDER BY CASE WHEN ev.ends_at >= ? THEN 0 ELSE 1 END,
+                        CASE WHEN ev.ends_at >= ? THEN ev.starts_at END ASC,
+                        ev.ends_at DESC LIMIT 60`;
+    params.push(nowIso, nowIso);
   }
 
   const events = db.prepare(query).all(...params);
 
-  // Talabaning ishtirok va ro'yxatdan o'tganlik holatini tekshirish
+  // Talabaning ishtirok, ro'yxatdan o'tganlik va vaqt holatini tekshirish
   const enriched = events.map(ev => {
     const reg = db.prepare(`SELECT * FROM event_registration WHERE event_id = ? AND student_id = ?`).get(ev.id, req.studentId);
     const chk = db.prepare(`SELECT * FROM checkin WHERE event_id = ? AND student_id = ?`).get(ev.id, req.studentId);
 
+    const startsAtDate = new Date(ev.starts_at);
+    const endsAtDate = new Date(ev.ends_at);
+    const openMinutes = (ev.attendance_open_minutes_before !== undefined && ev.attendance_open_minutes_before !== null)
+      ? Number(ev.attendance_open_minutes_before)
+      : 5;
+    const attOpenTime = new Date(startsAtDate.getTime() - openMinutes * 60 * 1000);
+
+    const isPast = now > endsAtDate;
+    const isUpcoming = now <= endsAtDate;
+    const isCheckedIn = !!chk;
+    const isRegistered = !!reg;
+    const attendanceIsOpen = now >= attOpenTime && now <= endsAtDate;
+
+    // 4 ta aniq ajralib turuvchi holat (State Type):
+    // 1) attended_past: Qatnashilgan o'tib ketgan tadbir (yashil)
+    // 2) registered_upcoming: Kelayotgan ro'yxatdan o'tilgan tadbir (binafsha / indigo)
+    // 3) open_upcoming: Kelayotgan hali ro'yxatdan o'tilmagan tadbir (moviy / ko'k)
+    // 4) unattended_past: O'tib ketgan qatnashilmagan tadbir (kulrang / neytral)
+    let stateType = 'open_upcoming';
+    if (isCheckedIn) {
+      stateType = 'attended_past';
+    } else if (isPast) {
+      stateType = 'unattended_past';
+    } else if (isRegistered) {
+      stateType = 'registered_upcoming';
+    } else {
+      stateType = 'open_upcoming';
+    }
+
     return {
       ...ev,
-      is_registered: !!reg,
+      is_registered: isRegistered,
       waitlist_pos: reg ? reg.waitlist_pos : null,
-      is_checked_in: !!chk
+      registered_at: reg ? reg.registered_at : null,
+      is_checked_in: isCheckedIn,
+      checked_in_at: chk ? chk.at : null,
+      is_past: isPast,
+      is_upcoming: isUpcoming,
+      attendance_is_open: attendanceIsOpen,
+      state_type: stateType
     };
   });
 
@@ -359,12 +407,76 @@ router.get('/events', authenticateStudent, (req, res) => {
 
 /**
  * POST /api/app/events/:id/register
- * Tadbirga ro'yxatdan o'tish
+ * Tadbirga oldindan ro'yxatdan o'tish (M-05, AT-13)
  */
 router.post('/events/:id/register', authenticateStudent, (req, res) => {
   try {
+    const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(req.params.id);
+    if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
+
+    const now = new Date();
+    if (now > new Date(event.ends_at)) {
+      return res.status(400).json({ error: 'Tadbir vaqti tugagan, ro\'yxatdan o\'tib bo\'lmaydi.' });
+    }
+
     const result = registerForEvent(req.studentId, req.params.id);
+
+    // Telegram bildirishnoma yuborish
+    try {
+      const { notifyStudentEventRegistration } = require('../services/telegramService');
+      notifyStudentEventRegistration(req.studentId, event, result.in_waitlist, result.waitlist_pos);
+    } catch (e) {
+      console.error('Notify reg error:', e.message);
+    }
+
     res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/app/events/:id/unregister
+ * Tadbirdan ro'yxatdan chiqish (bekor qilish)
+ */
+router.post('/events/:id/unregister', authenticateStudent, (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const studentId = req.studentId;
+    const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
+    if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
+
+    const chk = db.prepare(`SELECT * FROM checkin WHERE event_id = ? AND student_id = ?`).get(eventId, studentId);
+    if (chk) {
+      return res.status(400).json({ error: 'Siz allaqachon tadbir davomatidan o\'tgansiz, ro\'yxatdan chiqib bo\'lmaydi.' });
+    }
+
+    const now = new Date();
+    if (now > new Date(event.ends_at)) {
+      return res.status(400).json({ error: 'Tadbir vaqti tugagan, ro\'yxatni bekor qilib bo\'lmaydi.' });
+    }
+
+    db.prepare(`DELETE FROM event_registration WHERE event_id = ? AND student_id = ?`).run(eventId, studentId);
+
+    // Agar navbatda (waitlist) turganlar bo'lsa, birinchisini asosiy ro'yxatga ko'tarish
+    const nextInWaitlist = db.prepare(`
+      SELECT * FROM event_registration WHERE event_id = ? AND waitlist_pos IS NOT NULL ORDER BY waitlist_pos ASC LIMIT 1
+    `).get(eventId);
+    if (nextInWaitlist) {
+      db.prepare(`UPDATE event_registration SET waitlist_pos = NULL WHERE id = ?`).run(nextInWaitlist.id);
+      try {
+        const { notifyStudentEventRegistration } = require('../services/telegramService');
+        notifyStudentEventRegistration(nextInWaitlist.student_id, event, false, null);
+      } catch(e) {}
+    }
+
+    // Telegram bildirishnoma
+    try {
+      const { notifyStudentEventUnregister } = require('../services/telegramService');
+      notifyStudentEventUnregister(studentId, event);
+    } catch(e) {}
+
+    res.json({ success: true, message: 'Tadbirga ro\'yxatdan o\'tish bekor qilindi!' });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
@@ -379,6 +491,25 @@ router.post('/checkin', authenticateStudent, (req, res) => {
     const { qr_payload, device_hint } = req.body;
     const ip = req.ip || '127.0.0.1';
     const result = checkinEventQr(req.studentId, qr_payload, { deviceHint: device_hint, ip });
+
+    // Telegram bildirishnoma
+    try {
+      let eventId = null;
+      if (typeof qr_payload === 'string') {
+        const parts = qr_payload.split(':');
+        if (parts[0] === 'EVT') eventId = parts[1];
+      }
+      if (eventId) {
+        const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
+        if (event) {
+          const { notifyStudentEventCheckin } = require('../services/telegramService');
+          notifyStudentEventCheckin(req.studentId, event, result.points);
+        }
+      }
+    } catch (e) {
+      console.error('Notify checkin error:', e.message);
+    }
+
     res.json(result);
   } catch (e) {
     res.status(400).json({ error: e.message });

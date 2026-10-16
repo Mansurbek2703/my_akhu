@@ -2945,8 +2945,14 @@ async function renderDeptEvents(container) {
             const attOpenMin = ev.attendance_open_minutes_before ?? 5;
 
             return `
-              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
+              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
                 <div>
+                  ${(ev.photo_url || ev.image_url) ? `
+                    <div style="height: 140px; width: 100%; overflow: hidden; background: #0F172A; position: relative;">
+                      <img src="${ev.photo_url || ev.image_url}" alt="${ev.title}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.parentElement.style.display='none';">
+                      <span style="position: absolute; bottom: 8px; right: 10px; background: rgba(0,0,0,0.7); color: white; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600;">16:9 Banner</span>
+                    </div>
+                  ` : ''}
                   <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
                     <div>
                       <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
@@ -3543,6 +3549,34 @@ async function openCreateEventModal() {
         <input type="text" id="ev-place" class="form-control" placeholder="Masalan: Bosh bino, Aktlar zali" required>
       </div>
 
+      <!-- TADBIK RASMI (BANNER) VA TAVSIYA ETILGAN O'LCHAM -->
+      <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="font-weight: 700; color: #1E293B; margin: 0; display: flex; align-items: center; gap: 6px;">
+            🖼️ Tadbir Rasmi / Banneri (TV va Ilova uchun)
+          </label>
+          <span style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
+            Recommended: 16:9
+          </span>
+        </div>
+        <p style="font-size: 11.5px; color: #64748B; margin-bottom: 10px; line-height: 1.4;">
+          📐 <strong>Tavsiya etilgan o'lcham:</strong> <strong>16:9 nisbatda</strong> (masalan, <strong>1200×675 px</strong> yoki <strong>800×450 px</strong>). TV ekranida va Talaba ilovasida to'liq mos va chiroyli chiqishi uchun sifatli gorizontal rasm yuklang.
+        </p>
+
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+          <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili yoki fayl tanlang..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 13px;">
+          <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; font-size: 12.5px;">
+            📁 Fayl tanlash
+            <input type="file" accept="image/*" style="display: none;" onchange="handleEventPhotoUpload(this, 'ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')">
+          </label>
+        </div>
+
+        <div id="ev-photo-preview-wrap" style="display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; max-height: 200px; background: #0F172A; text-align: center; position: relative;">
+          <img id="ev-photo-preview" src="" alt="Banner ko'rinishi" style="width: 100%; max-height: 200px; object-fit: cover; display: block;">
+          <button type="button" onclick="clearEventPhoto('ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
+        </div>
+      </div>
+
       <div class="grid grid-2 mb-3">
         <div class="form-group">
           <label class="form-label">Soha / Kategoriya *</label>
@@ -3645,11 +3679,15 @@ async function submitCreateEvent() {
   const attOpenMinutes = Math.max(0, Number(att_open_val) || 5);
 
   try {
+    const photo_url = document.getElementById('ev-photo-url')?.value.trim() || null;
+
     const payload = {
       title,
       starts_at: dtResult.starts_at,
       ends_at: dtResult.ends_at,
       place,
+      photo_url,
+      image_url: photo_url,
       organizer_unit: AppState.user.id || 'dep_yb',
       category_id,
       level,
@@ -3769,6 +3807,34 @@ async function openEditEventModal(eventId) {
           <input type="text" id="edit-ev-place" class="form-control" value="${safePlace}" required>
         </div>
 
+        <!-- TADBIK RASMI (BANNER) VA TAVSIYA ETILGAN O'LCHAM -->
+        <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="form-label" style="font-weight: 700; color: #1E293B; margin: 0; display: flex; align-items: center; gap: 6px;">
+              🖼️ Tadbir Rasmi / Banneri (TV va Ilova uchun)
+            </label>
+            <span style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
+              Recommended: 16:9
+            </span>
+          </div>
+          <p style="font-size: 11.5px; color: #64748B; margin-bottom: 10px; line-height: 1.4;">
+            📐 <strong>Tavsiya etilgan o'lcham:</strong> <strong>16:9 nisbatda</strong> (masalan, <strong>1200×675 px</strong> yoki <strong>800×450 px</strong>). TV ekranida va Talaba ilovasida to'liq mos va chiroyli chiqishi uchun sifatli gorizontal rasm yuklang.
+          </p>
+
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+            <input type="text" id="edit-ev-photo-url" class="form-control" value="${event.photo_url || event.image_url || ''}" placeholder="Rasm URL manzili yoki fayl tanlang..." oninput="handleEventPhotoUrlChange(this.value, 'edit-ev-photo-preview', 'edit-ev-photo-preview-wrap')" style="font-size: 13px;">
+            <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; font-size: 12.5px;">
+              📁 Fayl tanlash
+              <input type="file" accept="image/*" style="display: none;" onchange="handleEventPhotoUpload(this, 'edit-ev-photo-url', 'edit-ev-photo-preview', 'edit-ev-photo-preview-wrap')">
+            </label>
+          </div>
+
+          <div id="edit-ev-photo-preview-wrap" style="display: ${event.photo_url || event.image_url ? 'block' : 'none'}; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; max-height: 200px; background: #0F172A; text-align: center; position: relative;">
+            <img id="edit-ev-photo-preview" src="${event.photo_url || event.image_url || ''}" alt="Banner ko'rinishi" style="width: 100%; max-height: 200px; object-fit: cover; display: block;">
+            <button type="button" onclick="clearEventPhoto('edit-ev-photo-url', 'edit-ev-photo-preview', 'edit-ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
+          </div>
+        </div>
+
         <div class="grid grid-2 mb-3">
           <div class="form-group">
             <label class="form-label">Soha / Kategoriya *</label>
@@ -3850,11 +3916,15 @@ async function submitEditEvent(eventId) {
   const attOpenMinutes = Math.max(0, Number(att_open_val) || 5);
 
   try {
+    const photo_url = document.getElementById('edit-ev-photo-url')?.value.trim() || null;
+
     const payload = {
       title,
       starts_at: dtResult.starts_at,
       ends_at: dtResult.ends_at,
       place,
+      photo_url,
+      image_url: photo_url,
       category_id,
       level,
       capacity: capacity ? Number(capacity) : null,
@@ -3874,6 +3944,50 @@ async function submitEditEvent(eventId) {
     showToast("Xatolik: " + err.message, 'error');
   }
 }
+
+async function handleEventPhotoUpload(fileInput, urlInputId, previewImgId, wrapId) {
+  if (!fileInput.files || !fileInput.files[0]) return;
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Faylni yuklashda xatolik');
+    const urlInput = document.getElementById(urlInputId);
+    if (urlInput) urlInput.value = data.url;
+    handleEventPhotoUrlChange(data.url, previewImgId, wrapId);
+    showToast("Tadbir rasmi muvaffaqiyatli yuklandi!", "success");
+  } catch (err) {
+    alert("Rasm yuklashda xatolik: " + err.message);
+  }
+}
+
+function handleEventPhotoUrlChange(url, previewImgId, wrapId) {
+  const wrap = document.getElementById(wrapId);
+  const preview = document.getElementById(previewImgId);
+  if (!wrap || !preview) return;
+  if (url && url.trim()) {
+    preview.src = url.trim();
+    wrap.style.display = 'block';
+  } else {
+    preview.src = '';
+    wrap.style.display = 'none';
+  }
+}
+
+function clearEventPhoto(urlInputId, previewImgId, wrapId) {
+  const urlInput = document.getElementById(urlInputId);
+  if (urlInput) urlInput.value = '';
+  handleEventPhotoUrlChange('', previewImgId, wrapId);
+}
+
+window.handleEventPhotoUpload = handleEventPhotoUpload;
+window.handleEventPhotoUrlChange = handleEventPhotoUrlChange;
+window.clearEventPhoto = clearEventPhoto;
 
 // 2-USUL: Xodim Talabaning QR Kodini yoki ID sini skanerlab qabul qilishi
 // ====================================================================

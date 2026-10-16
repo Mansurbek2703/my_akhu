@@ -39,6 +39,34 @@ async function sendTelegramMessage(chatId, text, options = {}) {
 }
 
 /**
+ * Telegram API ga rasm (photo) bilan xabar yuborish
+ */
+async function sendTelegramPhoto(chatId, photo, caption = '', options = {}) {
+  try {
+    const url = `${TELEGRAM_API}/sendPhoto`;
+    const body = {
+      chat_id: chatId,
+      photo,
+      caption,
+      parse_mode: 'HTML',
+      ...options
+    };
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await resp.json();
+    return data;
+  } catch (err) {
+    console.error('Telegram sendPhoto error:', err.message);
+    return null;
+  }
+}
+
+/**
  * Telegram Callback Query ga javob qaytarish
  */
 async function answerCallbackQuery(callbackQueryId, text = '', showAlert = false) {
@@ -271,9 +299,22 @@ async function broadcastNewEventToStudents(event) {
     // Orqa fonda xavfsiz asinxron yuborish
     (async () => {
       let sentCount = 0;
+      let rawPhoto = event.photo_url || event.image_url;
+      let fullPhotoUrl = null;
+      if (rawPhoto) {
+        fullPhotoUrl = rawPhoto.startsWith('http') ? rawPhoto : `${config.baseUrl}${rawPhoto.startsWith('/') ? '' : '/'}${rawPhoto}`;
+      }
+
       for (const st of students) {
         try {
-          await sendTelegramMessage(st.telegram_user_id, text, { reply_markup: replyMarkup });
+          let photoSent = false;
+          if (fullPhotoUrl) {
+            const photoRes = await sendTelegramPhoto(st.telegram_user_id, fullPhotoUrl, text, { reply_markup: replyMarkup });
+            if (photoRes && photoRes.ok) photoSent = true;
+          }
+          if (!photoSent) {
+            await sendTelegramMessage(st.telegram_user_id, text, { reply_markup: replyMarkup });
+          }
           sentCount++;
           await new Promise(r => setTimeout(r, 45)); // Rate-limiting tolerans
         } catch (e) {
@@ -287,6 +328,110 @@ async function broadcastNewEventToStudents(event) {
 
   } catch (err) {
     console.error('broadcastNewEventToStudents error:', err.message);
+  }
+}
+
+/**
+ * Talabaning tadbirga ro'yxatdan o'tganligini bildirish
+ */
+async function notifyStudentEventRegistration(studentId, event, inWaitlist = false, waitlistPos = null) {
+  try {
+    const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(studentId);
+    if (!student || !student.telegram_user_id) return;
+
+    const startsDate = new Date(event.starts_at);
+    const dateFormatted = startsDate.toLocaleDateString('uz-UZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeFormatted = startsDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const attOpenMin = event.attendance_open_minutes_before ?? 5;
+
+    let text = '';
+    if (inWaitlist) {
+      text = `⏳ <b>TADBIR KUTISH NAVBATIGA QO'SHILDINGIZ</b>\n\n` +
+        `📌 <b>Tadbir:</b> ${event.title}\n` +
+        `🔢 <b>Navbatingiz:</b> #${waitlistPos}\n` +
+        `📍 <b>O'tkazilish joyi:</b> ${event.place}\n` +
+        `🕒 <b>Vaqt:</b> ${dateFormatted}, soat ${timeFormatted}\n` +
+        `⭐ <b>Ball:</b> +${event.points} ball\n\n` +
+        `<i>Joy bo'shashi bilan avtomatik asosiy ro'yxatga o'tasiz va sizga xabar beriladi.</i>`;
+    } else {
+      text = `🎫 <b>TADBIRGA RO'YXATDAN O'TDINGIZ!</b> ✅\n\n` +
+        `📌 <b>Tadbir:</b> ${event.title}\n` +
+        `⭐ <b>Ball:</b> +${event.points} ball\n` +
+        `📍 <b>O'tkazilish joyi:</b> ${event.place}\n` +
+        `📅 <b>Sana:</b> ${dateFormatted}\n` +
+        `🕒 <b>Boshlanish vaqti:</b> ${timeFormatted}\n` +
+        `⏱️ <b>Davomat ochiladi:</b> Tadbirdan ${attOpenMin} daqiqa oldin\n\n` +
+        `💡 <b>Eslatma:</b> Davomat vaqtida tadbir zalidagi QR kodni Mini App orqali skanerlab ballni qo'lga kiriting!`;
+    }
+
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          { text: '📱 Tadbirlar bo\'limiga o\'tish', web_app: { url: `${config.baseUrl}/miniapp` } }
+        ]
+      ]
+    };
+
+    let rawPhoto = event.photo_url || event.image_url;
+    if (rawPhoto) {
+      let fullPhotoUrl = rawPhoto.startsWith('http') ? rawPhoto : `${config.baseUrl}${rawPhoto.startsWith('/') ? '' : '/'}${rawPhoto}`;
+      const res = await sendTelegramPhoto(student.telegram_user_id, fullPhotoUrl, text, { reply_markup: replyMarkup });
+      if (res && res.ok) return;
+    }
+
+    await sendTelegramMessage(student.telegram_user_id, text, { reply_markup: replyMarkup });
+  } catch (e) {
+    console.error('notifyStudentEventRegistration error:', e.message);
+  }
+}
+
+/**
+ * Talabaning tadbirdan ro'yxatdan chiqqanligini bildirish
+ */
+async function notifyStudentEventUnregister(studentId, event) {
+  try {
+    const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(studentId);
+    if (!student || !student.telegram_user_id) return;
+
+    const text = `ℹ️ <b>Tadbirdan ro'yxatdan chiqildi</b>\n\n` +
+      `Siz <b>"${event.title}"</b> tadbiriga ro'yxatdan o'tishingizni bekor qildingiz.\n` +
+      `Bo'shatilgan o'rin boshqa talabalar uchun ochildi.`;
+
+    await sendTelegramMessage(student.telegram_user_id, text);
+  } catch (e) {
+    console.error('notifyStudentEventUnregister error:', e.message);
+  }
+}
+
+/**
+ * Talabaning tadbir davomatidan o'tganligini (check-in) bildirish
+ */
+async function notifyStudentEventCheckin(studentId, event, points) {
+  try {
+    const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(studentId);
+    if (!student || !student.telegram_user_id) return;
+
+    const score = db.prepare(`SELECT total FROM student_score WHERE student_id = ?`).get(studentId);
+    const total = score ? score.total : points;
+
+    const text = `🎉 <b>TABRIKLAYMIZ! DAVOMAT TASDIQLANDI!</b> ✅\n\n` +
+      `📌 <b>Tadbir:</b> ${event.title}\n` +
+      `⭐ <b>Qo'shilgan ball:</b> +${points} ball\n` +
+      `📍 <b>O'tkazilish joyi:</b> ${event.place}\n` +
+      `🏆 <b>Mavsumiy jami ballingiz:</b> <b>${total} ball</b>\n\n` +
+      `Universitet hayotida faol ishtirokingiz uchun tashakkur! 🚀`;
+
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          { text: '📊 Reyting & Natijalarim', web_app: { url: `${config.baseUrl}/miniapp` } }
+        ]
+      ]
+    };
+
+    await sendTelegramMessage(student.telegram_user_id, text, { reply_markup: replyMarkup });
+  } catch (e) {
+    console.error('notifyStudentEventCheckin error:', e.message);
   }
 }
 
@@ -1037,6 +1182,7 @@ function stopTelegramPolling() {
 
 module.exports = {
   sendTelegramMessage,
+  sendTelegramPhoto,
   answerCallbackQuery,
   editTelegramMessage,
   verifyTelegramInitData,
@@ -1050,5 +1196,8 @@ module.exports = {
   stopTelegramPolling,
   recordBotActivity,
   broadcastNewEventToStudents,
+  notifyStudentEventRegistration,
+  notifyStudentEventUnregister,
+  notifyStudentEventCheckin,
   resolveTelegramChatInfo
 };

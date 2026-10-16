@@ -102,10 +102,41 @@
 
   <!-- 3. TADBIRLAR TAB -->
   <div class="tab-content" id="tab-events">
-    <div class="section-title">
+    <div class="section-title" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
       <span>Universitet Tadbirlari</span>
+      <span id="events-count-badge" style="font-size: 11.5px; font-weight: 700; color: #2563EB; background: #EFF6FF; padding: 4px 10px; border-radius: 12px; border: 1px solid #BFDBFE;">0 ta</span>
     </div>
-    <div id="events-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+
+    <!-- FILTER TUGMALARI -->
+    <div style="display: flex; gap: 8px; margin-bottom: 12px; background: #F1F5F9; padding: 4px; border-radius: 12px;">
+      <button class="event-filter-pill active" onclick="setEventFilter('all', this)" style="flex: 1; padding: 8px 10px; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; background: white; color: #0F172A; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        Barchasi
+      </button>
+      <button class="event-filter-pill" onclick="setEventFilter('upcoming', this)" style="flex: 1; padding: 8px 10px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: transparent; color: #64748B;">
+        Kelayotgan
+      </button>
+      <button class="event-filter-pill" onclick="setEventFilter('past', this)" style="flex: 1; padding: 8px 10px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: transparent; color: #64748B;">
+        O'tib ketgan
+      </button>
+    </div>
+
+    <!-- RANGLAR BO'YICHA HOLATLAR -->
+    <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 12px; font-size: 11px;">
+      <span style="display: inline-flex; align-items: center; gap: 4px; background: #EFF6FF; color: #1D4ED8; padding: 3px 8px; border-radius: 6px; white-space: nowrap; font-weight: 600; border: 1px solid #DBEAFE;">
+        🔵 Kelayotgan
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 4px; background: #FAF5FF; color: #7E22CE; padding: 3px 8px; border-radius: 6px; white-space: nowrap; font-weight: 600; border: 1px solid #F3E8FF;">
+        🟣 Ro'yxatdan o'tilgan
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 4px; background: #ECFDF5; color: #047857; padding: 3px 8px; border-radius: 6px; white-space: nowrap; font-weight: 600; border: 1px solid #A7F3D0;">
+        🟢 Qatnashilgan (+ball)
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #475569; padding: 3px 8px; border-radius: 6px; white-space: nowrap; font-weight: 600; border: 1px solid #CBD5E1;">
+        ⚪ O'tib ketgan
+      </span>
+    </div>
+
+    <div id="events-list-container" style="display: flex; flex-direction: column; gap: 14px;">
       <!-- Dinamik tadbirlar -->
     </div>
   </div>
@@ -462,44 +493,207 @@
       }
     }
 
+    let currentEventFilter = 'all';
+    let allLoadedEvents = [];
+
+    function setEventFilter(filter, btn) {
+      currentEventFilter = filter;
+      document.querySelectorAll('.event-filter-pill').forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = '#64748B';
+        b.style.fontWeight = '600';
+        b.style.boxShadow = 'none';
+      });
+      if (btn) {
+        btn.style.background = 'white';
+        btn.style.color = '#0F172A';
+        btn.style.fontWeight = '700';
+        btn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+      }
+      renderEventsList();
+    }
+
     async function loadEventsTab() {
+      const cont = document.getElementById('events-list-container');
+      if (cont && allLoadedEvents.length === 0) {
+        cont.innerHTML = '<div style="text-align:center; padding:30px 20px; color:#64748B; font-size:13px;">⏳ Tadbirlar yuklanmoqda...</div>';
+      }
       try {
         const res = await fetch('/api/app/events', {
           headers: { 'Authorization': `Bearer ${currentAuthToken}` }
         });
         const data = await res.json();
-        const cont = document.getElementById('events-list-container');
-        const events = data.events || [];
+        allLoadedEvents = data.events || [];
+        renderEventsList();
+      } catch (e) {
+        console.error('Events tab error:', e);
+        if (cont) cont.innerHTML = `<div style="text-align:center; padding:20px; color:#EF4444; font-size:13px;">Yuklashda xatolik: ${e.message}</div>`;
+      }
+    }
 
-        if (events.length === 0) {
-          cont.innerHTML = '<div style="text-align:center; padding:20px; color:#94A3B8;">Hozircha rejalashtirilgan tadbirlar yo\'q</div>';
-          return;
+    function renderEventsList() {
+      const cont = document.getElementById('events-list-container');
+      const badgeCount = document.getElementById('events-count-badge');
+      if (!cont) return;
+
+      let filtered = allLoadedEvents;
+      if (currentEventFilter === 'upcoming') {
+        filtered = allLoadedEvents.filter(e => e.is_upcoming);
+      } else if (currentEventFilter === 'past') {
+        filtered = allLoadedEvents.filter(e => e.is_past);
+      }
+
+      if (badgeCount) {
+        badgeCount.textContent = `${filtered.length} ta`;
+      }
+
+      if (filtered.length === 0) {
+        let emptyMsg = "Hozircha rejalashtirilgan tadbirlar yo'q";
+        if (currentEventFilter === 'upcoming') emptyMsg = "Hozircha kelayotgan rejalashtirilgan tadbirlar yo'q";
+        if (currentEventFilter === 'past') emptyMsg = "O'tib ketgan tadbirlar mavjud emas";
+        cont.innerHTML = `<div style="text-align:center; padding:35px 20px; color:#94A3B8; background:white; border-radius:16px; border:1px solid #E2E8F0;">
+          <div style="font-size:36px; margin-bottom:8px;">📅</div>
+          <div style="font-size:13px; font-weight:600;">${emptyMsg}</div>
+        </div>`;
+        return;
+      }
+
+      cont.innerHTML = filtered.map(ev => {
+        // 4 xil holat bo'yicha vizual uslublar
+        let cardBorder = '#E2E8F0';
+        let cardBg = '#FFFFFF';
+        let statusBadgeHtml = '';
+
+        if (ev.state_type === 'attended_past') {
+          // 1. Qatnashilgan o'tib ketgan tadbir (Yashil)
+          cardBorder = '#10B981';
+          cardBg = '#F0FDF4';
+          statusBadgeHtml = `
+            <span style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              🟢 Qatnashdingiz (+${ev.points} ball ✅)
+            </span>
+          `;
+        } else if (ev.state_type === 'registered_upcoming') {
+          // 2. Kelayotgan ro'yxatdan o'tilgan tadbir (Binafsha / Indigo)
+          cardBorder = '#8B5CF6';
+          cardBg = '#FAF5FF';
+          const waitlistText = ev.waitlist_pos ? `🟡 Kutish navbatida (#${ev.waitlist_pos})` : '🟣 Siz ro\'yxatdan o\'tgansiz ✅';
+          statusBadgeHtml = `
+            <span style="background: #F3E8FF; color: #7E22CE; border: 1px solid #DDD6FE; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              ${waitlistText}
+            </span>
+          `;
+        } else if (ev.state_type === 'open_upcoming') {
+          // 3. Kelayotgan hali ro'yxatdan o'tilmagan tadbir (Moviy / Ko'k)
+          cardBorder = '#3B82F6';
+          cardBg = '#FFFFFF';
+          statusBadgeHtml = `
+            <span style="background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              🔵 Kelayotgan tadbir
+            </span>
+          `;
+        } else {
+          // 4. O'tib ketgan qatnashilmagan tadbir (Kulrang / Neytral)
+          cardBorder = '#E2E8F0';
+          cardBg = '#F8FAFC';
+          statusBadgeHtml = `
+            <span style="background: #F1F5F9; color: #64748B; border: 1px solid #CBD5E1; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              ⚪ Yakunlangan (Qatnashilmagan)
+            </span>
+          `;
         }
 
-        cont.innerHTML = events.map(ev => `
-          <div class="entry-item-card">
-            <div class="entry-header">
-              <span class="entry-title">${ev.title}</span>
-              <span class="badge" style="background:#EFF6FF; color:#2563EB; font-weight:700;">+${ev.points} ball</span>
-            </div>
-            <p style="font-size:12px; color:#64748B; margin: 4px 0;">
-              📍 ${ev.place} • 🕒 ${new Date(ev.starts_at).toLocaleString('uz-UZ')}
-            </p>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-              <span style="font-size:11px; color:#94A3B8;">
-                ${ev.is_checked_in ? '✅ Davomatdan o\'tdingiz (+ball berildi)' : '📷 Davomat faqat QR skanerlash orqali'}
-              </span>
-              ${!ev.is_checked_in ? `
-                <button onclick="openQrScannerModal('${ev.id}')" style="background:#2563EB; color:white; border:none; padding:8px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
-                  📷 Davomat / Ro'yxatdan o'tish
+        const rawPhoto = ev.photo_url || ev.image_url;
+        const bannerHtml = rawPhoto ? `
+          <div style="width: 100%; height: 160px; position: relative; overflow: hidden; background: #0F172A; border-radius: 14px 14px 0 0;">
+            <img src="${rawPhoto}" alt="${ev.title}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.parentElement.style.display='none';">
+            <span class="badge" style="position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); color: ${ev.category_color || '#3B82F6'}; border: 1px solid ${ev.category_color || '#3B82F6'}; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px;">
+              ${ev.category_name || 'Tadbir'}
+            </span>
+            <span style="position: absolute; top: 10px; right: 10px; background: #10B981; color: white; font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+              +${ev.points} ball
+            </span>
+          </div>
+        ` : `
+          <div style="padding: 12px 14px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span class="badge" style="background: ${(ev.category_color || '#3B82F6')}18; color: ${ev.category_color || '#3B82F6'}; border: 1px solid ${ev.category_color || '#3B82F6'}; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px;">
+              ${ev.category_name || 'Tadbir'}
+            </span>
+            <span style="background: #EFF6FF; color: #2563EB; font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
+              +${ev.points} ball
+            </span>
+          </div>
+        `;
+
+        // Tugmalar va harakatlar
+        let actionButtonsHtml = '';
+        if (ev.state_type === 'open_upcoming') {
+          // Ro'yxatdan o'tish tugmasi
+          actionButtonsHtml = `
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+              <button onclick="registerEvent('${ev.id}')" style="flex: 1; background: #2563EB; color: white; border: none; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+                📝 Ro'yxatdan o'tish
+              </button>
+              ${ev.attendance_is_open ? `
+                <button onclick="openQrScannerModal('${ev.id}')" style="background: #10B981; color: white; border: none; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                  📷 Davomat (QR Skaner)
                 </button>
               ` : ''}
             </div>
+          `;
+        } else if (ev.state_type === 'registered_upcoming') {
+          // Ro'yxatdan o'tilgan: Bekor qilish va (agar ochiq bo'lsa) Davomat
+          actionButtonsHtml = `
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+              <button onclick="unregisterEvent('${ev.id}')" style="background: #FFFFFF; color: #DC2626; border: 1px solid #FCA5A5; padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                ✕ Ro'yxatdan chiqish
+              </button>
+              ${ev.attendance_is_open ? `
+                <button onclick="openQrScannerModal('${ev.id}')" style="flex: 1; background: #10B981; color: white; border: none; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(16,185,129,0.25);">
+                  📷 Davomat qilish (QR Skaner)
+                </button>
+              ` : `
+                <span style="font-size: 11px; color: #7C3AED; font-weight: 600; display: flex; align-items: center; padding-left: 4px;">
+                  Davomat tadbir boshlanishidan oldin ochiladi
+                </span>
+              `}
+            </div>
+          `;
+        } else if (ev.state_type === 'attended_past') {
+          actionButtonsHtml = `
+            <div style="margin-top: 10px; font-size: 12px; color: #047857; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              ✅ Ishtirokingiz tasdiqlangan. Ball reytingingizga qo'shilgan!
+            </div>
+          `;
+        } else {
+          // unattended_past
+          actionButtonsHtml = `
+            <div style="margin-top: 8px; font-size: 11.5px; color: #94A3B8;">
+              Tadbir yakunlangan. Ishtirok etilmagan.
+            </div>
+          `;
+        }
+
+        return `
+          <div style="background: ${cardBg}; border: 1.5px solid ${cardBorder}; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.04); transition: transform 0.2s;">
+            ${bannerHtml}
+            <div style="padding: 12px 14px 14px;">
+              <div style="margin-bottom: 6px;">
+                ${statusBadgeHtml}
+              </div>
+              <h4 style="font-size: 15.5px; font-weight: 700; color: #0F172A; line-height: 1.35; margin-bottom: 6px;">
+                ${ev.title}
+              </h4>
+              <div style="font-size: 12px; color: #64748B; display: flex; flex-direction: column; gap: 3px;">
+                <span>📍 <b>Joy:</b> ${ev.place}</span>
+                <span>🕒 <b>Vaqt:</b> ${new Date(ev.starts_at).toLocaleString('uz-UZ', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                ${ev.capacity ? `<span>👥 <b>O'rinlar:</b> ${ev.registered_count || 0} / ${ev.capacity}</span>` : ''}
+              </div>
+              ${actionButtonsHtml}
+            </div>
           </div>
-        `).join('');
-      } catch (e) {
-        console.error('Events tab error:', e);
-      }
+        `;
+      }).join('');
     }
 
     async function registerEvent(eventId) {
@@ -509,8 +703,25 @@
           headers: { 'Authorization': `Bearer ${currentAuthToken}` }
         });
         const data = await res.json();
-        alert(data.message || 'Ro\'yxatdan o\'tildi!');
-        loadEventsTab();
+        if (!res.ok) throw new Error(data.error || 'Ro\'yxatdan o\'tishda xatolik');
+        alert(data.message || 'Muvaffaqiyatli ro\'yxatdan o\'tildi!');
+        await loadEventsTab();
+      } catch (e) {
+        alert('Xatolik: ' + e.message);
+      }
+    }
+
+    async function unregisterEvent(eventId) {
+      if (!confirm("Haqiqatan ham ushbu tadbirdan ro'yxatdan chiqmoqchimisiz?")) return;
+      try {
+        const res = await fetch(`/api/app/events/${eventId}/unregister`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Bekor qilishda xatolik');
+        alert(data.message || 'Ro\'yxatdan chiqildi');
+        await loadEventsTab();
       } catch (e) {
         alert('Xatolik: ' + e.message);
       }
