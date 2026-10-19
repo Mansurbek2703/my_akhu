@@ -12,6 +12,7 @@ remote_script = '''
 set -e
 cd /home/boss/my_akhu
 git pull origin main
+npm install --omit=dev
 
 node -e '
 const { initSchema, db } = require("./src/db/database");

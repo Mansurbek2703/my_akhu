@@ -6,6 +6,56 @@ const fs = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const xlsx = require('xlsx');
+const archiver = require('archiver');
+
+function sanitizeFilenamePart(s) {
+  return String(s || '').replace(/[\/\\:*?"<>|]/g, '').trim();
+}
+
+/**
+ * Talaba rasmi uchun qat'iy standart fayl nomi: "first name+last name_ID"
+ * (Kamida ism yoki familiya bo'lishi shart, ID ixtiyoriy, rasm formati JPG/JPEG/PNG)
+ */
+function getStudentPhotoFilename(student, originalFilename = '') {
+  let fn = sanitizeFilenamePart(student.first_name);
+  let ln = sanitizeFilenamePart(student.last_name);
+  let id = sanitizeFilenamePart(student.external_id || student.id);
+
+  let namePart = '';
+  if (fn && ln) {
+    namePart = `${fn}+${ln}`;
+  } else if (fn) {
+    namePart = fn;
+  } else if (ln) {
+    namePart = ln;
+  } else {
+    namePart = 'Talaba';
+  }
+
+  let baseName = id ? `${namePart}_${id}` : namePart;
+
+  let ext = '.jpg';
+  const target = originalFilename || student.photo_url || '';
+  const match = target.match(/\.(jpg|jpeg|png)$/i);
+  if (match) {
+    ext = match[0].toLowerCase();
+  }
+
+  return `${baseName}${ext}`;
+}
+
+/**
+ * Archiver kutubxonasi uchun universal factory funksiyasi (har qanday versiya bilan mos)
+ */
+function createZipArchive(options = { zlib: { level: 6 } }) {
+  if (typeof archiver === 'function') {
+    return archiver('zip', options);
+  }
+  if (archiver && archiver.ZipArchive) {
+    return new archiver.ZipArchive(options);
+  }
+  throw new Error('ZIP arxiv kutubxonasi topilmadi');
+}
 
 const { db } = require('../db/database');
 const config = require('../config');
@@ -193,7 +243,7 @@ router.post('/login', (req, res) => {
  * Talabalar ro'yxati (filtrlash, qidiruv)
  */
 router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
-  const { search, status, group, level, course, gender, limit = 100, offset = 0 } = req.query;
+  const { search, status, group, level, course, gender, has_photo, limit = 100, offset = 0 } = req.query;
 
   let where = [];
   let params = [];
@@ -207,8 +257,9 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
     params.push(group);
   }
   if (level) {
+    const normLevel = (level.toLowerCase().startsWith('mag') || level.toLowerCase().startsWith('mas')) ? 'mag' : 'bak';
     where.push('st.level = ?');
-    params.push(level);
+    params.push(normLevel);
   }
   if (course) {
     where.push('st.course = ?');
@@ -217,6 +268,11 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
   if (gender) {
     where.push('st.gender = ?');
     params.push(gender);
+  }
+  if (has_photo === '1' || has_photo === 'true') {
+    where.push("st.photo_url IS NOT NULL AND st.photo_url != ''");
+  } else if (has_photo === '0' || has_photo === 'false') {
+    where.push("(st.photo_url IS NULL OR st.photo_url = '')");
   }
   if (search && search.trim()) {
     const searchRes = buildStudentSearch(search, 'st');
@@ -246,6 +302,7 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       COUNT(*) as total_all,
       SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_all,
       SUM(CASE WHEN status = 'left' THEN 1 ELSE 0 END) as inactive_all,
+      SUM(CASE WHEN photo_url IS NOT NULL AND photo_url != '' THEN 1 ELSE 0 END) as with_photo_all,
       COUNT(DISTINCT group_code) as groups_all
     FROM student
   `).get();
@@ -257,6 +314,7 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       total: counts.total_all || 0,
       active: counts.active_all || 0,
       inactive: counts.inactive_all || 0,
+      photos: counts.with_photo_all || 0,
       groups: counts.groups_all || 0
     }
   });
@@ -355,6 +413,177 @@ router.get('/students/template', (req, res) => {
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="talabalar_import_shablon.xlsx"');
   res.send(buffer);
+});
+
+/**
+ * GET /api/admin/students/photos/export-zip
+ * Talabalar fotosuratlarini qat'iy "first name+last name_ID" formatidagi nomlar bilan
+ * filtrlar (bosqich: Bakalavriat/Magistratura, kurs: 1/2/3/4, guruh, qidiruv) asosida
+ * ZIP arxiv qilib yuklab olish.
+ */
+router.get('/students/photos/export-zip', authenticateSuperadminOrRegistrator, async (req, res) => {
+  try {
+    const { search, status, group, level, course, gender, ids } = req.query;
+
+    let where = ["st.photo_url IS NOT NULL AND st.photo_url != ''"];
+    let params = [];
+
+    // Bosqich filtri (Bakalavriat / Magistratura)
+    if (level) {
+      const normLevel = (level.toLowerCase().startsWith('mag') || level.toLowerCase().startsWith('mas')) ? 'mag' : 'bak';
+      where.push('st.level = ?');
+      params.push(normLevel);
+    }
+
+    // Kurs filtri (1-kurs, 2-kurs, 3-kurs, 4-kurs)
+    if (course) {
+      where.push('st.course = ?');
+      params.push(Number(course));
+    }
+
+    // Guruh filtri
+    if (group) {
+      where.push('st.group_code = ?');
+      params.push(group);
+    }
+
+    // Holat filtri (active / left)
+    if (status) {
+      where.push('st.status = ?');
+      params.push(status);
+    }
+
+    // Jins filtri
+    if (gender) {
+      where.push('st.gender = ?');
+      params.push(gender);
+    }
+
+    // Muayyan talabalar ID lari bo'yicha
+    if (ids && typeof ids === 'string' && ids.trim()) {
+      const idList = ids.split(',').map(s => s.trim()).filter(Boolean);
+      if (idList.length > 0) {
+        const placeholders = idList.map(() => '?').join(',');
+        where.push(`st.id IN (${placeholders})`);
+        params.push(...idList);
+      }
+    }
+
+    // Qidiruv (ism, familiya, ID, guruh)
+    if (search && search.trim()) {
+      const searchRes = buildStudentSearch(search, 'st');
+      if (searchRes.clauses.length > 0) {
+        where.push(...searchRes.clauses);
+        params.push(...searchRes.params);
+      }
+    }
+
+    const whereClause = `WHERE ${where.join(' AND ')}`;
+
+    const sql = `
+      SELECT st.*
+      FROM student st
+      ${whereClause}
+      ORDER BY st.level, st.course, st.group_code, st.last_name, st.first_name
+    `;
+
+    const students = db.prepare(sql).all(...params);
+
+    // ZIP fayl nomini qo'llanilgan filtrlar asosida tushunarli qilish
+    const zipNameParts = ['talabalar_rasmlari'];
+    if (level) {
+      zipNameParts.push((level.toLowerCase().startsWith('mag') || level.toLowerCase().startsWith('mas')) ? 'magistratura' : 'bakalavriat');
+    }
+    if (course) {
+      zipNameParts.push(`${course}_kurs`);
+    }
+    if (group) {
+      zipNameParts.push(group);
+    }
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    zipNameParts.push(dateStr);
+    const downloadZipFilename = `${zipNameParts.join('_')}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadZipFilename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, X-Total-Photos');
+    res.setHeader('X-Total-Photos', students.length);
+
+    const archive = createZipArchive({
+      zlib: { level: 6 }
+    });
+
+    archive.on('error', (err) => {
+      console.error('[ZIP EXPORT ERROR]:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'ZIP arxiv yaratishda xatolik yuz berdi: ' + err.message });
+      }
+    });
+
+    archive.pipe(res);
+
+    const seenNames = new Set();
+    let attachedCount = 0;
+
+    for (const st of students) {
+      if (!st.photo_url) continue;
+      const diskFilename = path.basename(st.photo_url);
+      const filePath = path.join(uploadDir, diskFilename);
+
+      if (fs.existsSync(filePath)) {
+        const formattedName = getStudentPhotoFilename(st, diskFilename);
+        let finalEntryName = formattedName;
+        let counter = 2;
+        const ext = path.extname(formattedName);
+        const base = path.basename(formattedName, ext);
+
+        while (seenNames.has(finalEntryName)) {
+          finalEntryName = `${base}_${counter}${ext}`;
+          counter++;
+        }
+        seenNames.add(finalEntryName);
+
+        archive.file(filePath, { name: finalEntryName });
+        attachedCount++;
+      }
+    }
+
+    if (attachedCount === 0) {
+      archive.append(
+        `Tanlangan filtr parametrlari bo'yicha fotosuratlar topilmadi.\nFiltrlar: level=${level || 'barchasi'}, course=${course || 'barchasi'}, group=${group || 'barchasi'}, qidiruv=${search || 'yo\'q'}`,
+        { name: 'README.txt' }
+      );
+    }
+
+    await archive.finalize();
+  } catch (err) {
+    console.error('[EXPORT ZIP ROUTE ERROR]:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Fotosuratlarni yuklab olishda xatolik yuz berdi: ' + err.message });
+    }
+  }
+});
+
+/**
+ * GET /api/admin/students/:id/photo-download
+ * Yakka talaba fotosuratini qat'iy "first name+last name_ID" formatdagi nom bilan yuklab olish
+ */
+router.get('/students/:id/photo-download', authenticateSuperadminOrRegistrator, (req, res) => {
+  try {
+    const student = db.prepare('SELECT * FROM student WHERE id = ? OR external_id = ?').get(req.params.id, req.params.id);
+    if (!student || !student.photo_url) {
+      return res.status(404).json({ error: 'Talaba yoki uning fotosurati topilmadi' });
+    }
+    const diskFilename = path.basename(student.photo_url);
+    const filePath = path.join(uploadDir, diskFilename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Fayl server diskida topilmadi' });
+    }
+    const downloadName = getStudentPhotoFilename(student, diskFilename);
+    res.download(filePath, downloadName);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**

@@ -85,7 +85,11 @@ const ICONS = {
   pause: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`,
   play: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
   award: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>`,
-  refresh: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`
+  refresh: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`,
+  grid: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`,
+  list: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`,
+  copy: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
+  image: (s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`
 };
 
 function icon(name, size = 16) {
@@ -6775,11 +6779,193 @@ let adminStudentsState = {
   course: '',
   gender: '',
   status: '',
-  limit: 50,
+  has_photo: '',
+  viewMode: localStorage.getItem('akhu_students_view_mode') || 'card',
+  limit: 48,
   offset: 0,
   total: 0,
+  totalPhotos: 0,
   items: []
 };
+
+/**
+ * Talaba rasmi uchun qat'iy standart fayl nomi: "first name+last name_ID.ext"
+ * (Kamida ism yoki familiya bo'lishi shart, ID ixtiyoriy, rasm formati JPG/JPEG/PNG)
+ */
+function formatStudentPhotoFilename(st) {
+  const sanitize = (s) => String(s || '').replace(/[\/\\:*?"<>|]/g, '').trim();
+  const fn = sanitize(st.first_name);
+  const ln = sanitize(st.last_name);
+  const id = sanitize(st.external_id || st.id);
+
+  let namePart = '';
+  if (fn && ln) {
+    namePart = `${fn}+${ln}`;
+  } else if (fn) {
+    namePart = fn;
+  } else if (ln) {
+    namePart = ln;
+  } else {
+    namePart = 'Talaba';
+  }
+
+  let baseName = id ? `${namePart}_${id}` : namePart;
+  let ext = '.jpg';
+  if (st.photo_url) {
+    const match = st.photo_url.match(/\.(jpg|jpeg|png)$/i);
+    if (match) {
+      ext = match[0].toLowerCase();
+    }
+  }
+  return `${baseName}${ext}`;
+}
+
+function pathExt(str) {
+  const m = String(str || '').match(/\.([a-zA-Z0-9]+)$/);
+  return m ? m[1].toUpperCase() : 'JPG';
+}
+
+function copyStudentPhotoName(name) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(name).then(() => {
+      showToast(`Nusxalandi: "${name}"`, 'success', 2200);
+    }).catch(() => {
+      fallbackCopyText(name);
+    });
+  } else {
+    fallbackCopyText(name);
+  }
+}
+
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  showToast(`Nusxalandi: "${text}"`, 'success', 2200);
+}
+
+function setStudentsViewMode(mode) {
+  adminStudentsState.viewMode = mode;
+  try { localStorage.setItem('akhu_students_view_mode', mode); } catch (e) {}
+
+  const btnCard = document.getElementById('view-toggle-card');
+  const btnList = document.getElementById('view-toggle-list');
+  const cardsContainer = document.getElementById('students-cards-view');
+  const tableContainer = document.getElementById('students-table-view');
+
+  if (btnCard) btnCard.classList.toggle('active', mode === 'card');
+  if (btnList) btnList.classList.toggle('active', mode === 'list');
+
+  if (cardsContainer) cardsContainer.style.display = mode === 'card' ? 'block' : 'none';
+  if (tableContainer) tableContainer.style.display = mode === 'list' ? 'block' : 'none';
+
+  if (adminStudentsState.items && adminStudentsState.items.length > 0) {
+    if (mode === 'card') {
+      renderAdminStudentsCards(adminStudentsState.items);
+    } else {
+      renderAdminStudentsTable(adminStudentsState.items);
+    }
+  }
+}
+
+function previewStudentPhoto(photoUrl, studentName, studentId, formattedName) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('image', 18)} Talaba Fotosurati</span>`;
+  modalBody.innerHTML = `
+    <div style="text-align: center; padding: 6px;">
+      <div style="max-height: 480px; overflow: hidden; border-radius: 12px; border: 1px solid #CBD5E1; background: #0F172A; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+        <img src="${photoUrl}" alt="${studentName}" style="max-height: 460px; max-width: 100%; object-fit: contain; border-radius: 8px;">
+      </div>
+      <h4 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">${studentName}</h4>
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 5px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #1E293B; margin-bottom: 8px;">
+        <span>📁 ${formattedName}</span>
+        <button class="btn-copy-filename" onclick="copyStudentPhotoName('${formattedName}')" title="Nomdan nusxa olish">
+          ${icon('copy', 13)}
+        </button>
+      </div>
+    </div>
+  `;
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+    <button class="btn btn-primary" onclick="downloadSingleStudentPhoto('${studentId}')" style="display: inline-flex; align-items: center; gap: 6px;">
+      ${icon('download', 14)} Rasmni Yuklab Olish (.${pathExt(formattedName)})
+    </button>
+  `;
+  openModal();
+}
+
+function downloadSingleStudentPhoto(studentId) {
+  const userId = (AppState.user && AppState.user.id) ? AppState.user.id : 'superadmin';
+  window.open(`/api/admin/students/${encodeURIComponent(studentId)}/photo-download?user_id=${encodeURIComponent(userId)}`, '_blank');
+}
+
+async function downloadStudentsPhotosZip() {
+  const btn = document.getElementById('btn-export-photos-zip');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span> <span>ZIP arxiv tayyorlanmoqda...</span>`;
+  }
+
+  try {
+    const params = new URLSearchParams();
+    if (adminStudentsState.search) params.append('search', adminStudentsState.search);
+    if (adminStudentsState.level) params.append('level', adminStudentsState.level);
+    if (adminStudentsState.course) params.append('course', adminStudentsState.course);
+    if (adminStudentsState.group) params.append('group', adminStudentsState.group);
+    if (adminStudentsState.status) params.append('status', adminStudentsState.status);
+    if (adminStudentsState.gender) params.append('gender', adminStudentsState.gender);
+
+    const token = localStorage.getItem('akhu_auth_token') || '';
+    const userId = (AppState.user && AppState.user.id) ? AppState.user.id : 'superadmin';
+
+    const res = await fetch(`/api/admin/students/photos/export-zip?${params.toString()}`, {
+      headers: {
+        'x-user-id': userId,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || 'Serverdan ZIP arxivni yuklab olishda xatolik yuz berdi');
+    }
+
+    let filename = 'talabalar_rasmlari.zip';
+    const disp = res.headers.get('content-disposition');
+    if (disp) {
+      const match = disp.match(/filename=["']?([^"';]+)["']?/);
+      if (match && match[1]) filename = match[1];
+    }
+
+    const totalPhotos = res.headers.get('x-total-photos') || 'Barcha';
+
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(downloadUrl);
+
+    showToast(`🎉 ${totalPhotos} ta talaba rasmlari ZIP arxiv ("${filename}") sifatida yuklab olindi!`, 'success', 3500);
+  } catch (err) {
+    showToast('Xatolik: ' + err.message, 'error', 4000);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+}
+
 
 async function renderStudentsManagement(container, roleTitle = 'Registrator') {
   container.innerHTML = `
@@ -6886,11 +7072,11 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon" style="background:#FEF2F2; color:#DC2626;">${icon('xCircle', 20)}</div>
+        <div class="stat-icon" style="background:#F0FDF4; color:#16A34A;">${icon('image', 20)}</div>
         <div class="stat-data">
-          <span class="stat-label">Nofaol / Chetlashtirilgan</span>
-          <h3 class="stat-val" id="stat-inactive-students">-</h3>
-          <span class="stat-sub">Akademik ta'tilda</span>
+          <span class="stat-label">Rasmli Talabalar</span>
+          <h3 class="stat-val" id="stat-photos-students" style="color:#16A34A;">-</h3>
+          <span class="stat-sub">Fotosurati mavjud</span>
         </div>
       </div>
       <div class="stat-card">
@@ -6904,30 +7090,35 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     </div>
 
     <!-- FILTR VA QIDIRUV BOSHQARUV PANELI -->
-    <div class="admin-toolbar">
+    <div class="admin-toolbar mb-3">
       <div class="admin-search-box">
         ${icon('search', 16)}
         <input type="text" id="filter-student-search" class="admin-search-input" placeholder="ID, F.I.Sh, guruh yoki telefon bo'yicha tezkor qidiruv...">
       </div>
       <div class="admin-filters-group">
-        <select id="filter-student-level" class="admin-filter-select">
+        <select id="filter-student-level" class="admin-filter-select" title="Ta'lim bosqichi">
           <option value="">Barcha bosqichlar</option>
-          <option value="bak">Bakalavriat</option>
-          <option value="mag">Magistratura</option>
+          <option value="bak">🎓 Bakalavriat (Bachelor)</option>
+          <option value="mag">🔬 Magistratura (Master)</option>
         </select>
-        <select id="filter-student-course" class="admin-filter-select">
+        <select id="filter-student-course" class="admin-filter-select" title="Kursi">
           <option value="">Barcha kurslar</option>
           <option value="1">1-kurs</option>
           <option value="2">2-kurs</option>
           <option value="3">3-kurs</option>
           <option value="4">4-kurs</option>
         </select>
-        <select id="filter-student-gender" class="admin-filter-select">
+        <select id="filter-student-photo" class="admin-filter-select" title="Rasm holati">
+          <option value="">Barcha talabalar</option>
+          <option value="1">🖼️ Faqat rasmlilar</option>
+          <option value="0">⚠️ Rasmsiz talabalar</option>
+        </select>
+        <select id="filter-student-gender" class="admin-filter-select" title="Jinsi">
           <option value="">Barcha jinslar</option>
           <option value="m">Erkak (O'g'il bola)</option>
           <option value="f">Ayol (Qiz bola)</option>
         </select>
-        <select id="filter-student-status" class="admin-filter-select">
+        <select id="filter-student-status" class="admin-filter-select" title="Talaba holati">
           <option value="">Barcha holatlar</option>
           <option value="active">Faol (Active)</option>
           <option value="left">Nofaol (Left)</option>
@@ -6938,22 +7129,59 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
       </div>
     </div>
 
-    <!-- JADVAL KARTASI -->
-    <div class="card">
+    <!-- AMALLAR VA KO'RINISH REJIMI (CARD / LIST & ZIP YUKLAB OLISH) -->
+    <div class="students-actions-row mb-3">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <!-- KARTA / JADVAL REJIMI O'TKAZGICHI -->
+        <div class="view-mode-pill-box">
+          <button id="view-toggle-card" class="btn-view-toggle ${adminStudentsState.viewMode === 'card' ? 'active' : ''}" onclick="setStudentsViewMode('card')" title="Talabalar rasmlarini karta shaklida ko'rish">
+            ${icon('grid', 14)} <span>Karta</span>
+          </button>
+          <button id="view-toggle-list" class="btn-view-toggle ${adminStudentsState.viewMode === 'list' ? 'active' : ''}" onclick="setStudentsViewMode('list')" title="Talabalar ro'yxatini jadval ko'rinishida ko'rish">
+            ${icon('list', 14)} <span>Jadval</span>
+          </button>
+        </div>
+        <span id="students-filtered-summary" style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">
+          Yuklanmoqda...
+        </span>
+      </div>
+
+      <!-- ZIP EXPORT TUGMASI (FILTR ASOSIDA VA BELGILANGAN STANDART NOM BILAN) -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="btn-export-photos-zip" class="btn btn-primary" onclick="downloadStudentsPhotosZip()" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #1E40AF 0%, #2563EB 100%); border-color: #1E40AF; font-weight: 600; box-shadow: 0 2px 6px rgba(37,99,235,0.3); padding: 7px 16px;" title="Filtr asosida talabalar rasmlarini 'first name+last name_ID' formati bilan ZIP qilib yuklab olish">
+          ${icon('download', 15)}
+          <span>Rasmlarni ZIP (.zip) yuklab olish</span>
+          <span id="zip-count-badge" class="badge" style="background: rgba(255,255,255,0.25); color: #FFFFFF; font-size: 11px; margin-left: 4px;">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 1. KARTA KO'RINISHI CONTAINER -->
+    <div id="students-cards-view" style="${adminStudentsState.viewMode === 'card' ? 'display: block;' : 'display: none;'}">
+      <div id="admin-students-cards-grid" class="students-cards-grid">
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+          <div class="spinner" style="margin-bottom: 10px;"></div>
+          <p>Talabalar fotosuratlari yuklanmoqda...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. JADVAL KO'RINISHI CONTAINER -->
+    <div id="students-table-view" class="card" style="${adminStudentsState.viewMode === 'list' ? 'display: block;' : 'display: none;'}">
       <div class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>
-              <th style="width: 120px;">Talaba ID</th>
+              <th style="width: 60px;">Rasm</th>
+              <th style="width: 115px;">Talaba ID</th>
               <th>F.I.Sh</th>
+              <th>Rasm Fayl Nomi (Standart)</th>
               <th>Yo'nalish & Guruh</th>
               <th style="width: 115px;">Bosqich</th>
               <th>Kurs</th>
               <th>Telefon Raqami</th>
-              <th>Jinsi</th>
               <th>Ball</th>
               <th>Holati</th>
-              <th>Tyutor</th>
               <th style="text-align: right; width: 130px;">Amallar</th>
             </tr>
           </thead>
@@ -6967,9 +7195,11 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           </tbody>
         </table>
       </div>
+    </div>
 
-      <!-- PAGINATION -->
-      <div class="pagination-bar" id="students-pagination-bar">
+    <!-- PAGINATION (CARD VA LIST VIEW UCHUN UMUMIY) -->
+    <div class="card" style="margin-top: 12px;">
+      <div class="pagination-bar" id="students-pagination-bar" style="margin: 0; padding: 12px 18px;">
         <span id="students-pagination-info">0 ta ma'lumot</span>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button class="btn btn-outline btn-sm" id="btn-prev-page" onclick="prevStudentPage()" disabled>Oldingi</button>
@@ -7020,6 +7250,12 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     loadAdminStudentsList();
   });
 
+  document.getElementById('filter-student-photo').addEventListener('change', (e) => {
+    adminStudentsState.has_photo = e.target.value;
+    adminStudentsState.offset = 0;
+    loadAdminStudentsList();
+  });
+
   document.getElementById('filter-student-gender').addEventListener('change', (e) => {
     adminStudentsState.gender = e.target.value;
     adminStudentsState.offset = 0;
@@ -7039,6 +7275,7 @@ function resetStudentFilters() {
   adminStudentsState.search = '';
   adminStudentsState.level = '';
   adminStudentsState.course = '';
+  adminStudentsState.has_photo = '';
   adminStudentsState.gender = '';
   adminStudentsState.status = '';
   adminStudentsState.offset = 0;
@@ -7049,6 +7286,8 @@ function resetStudentFilters() {
   if (lvl) lvl.value = '';
   const c = document.getElementById('filter-student-course');
   if (c) c.value = '';
+  const ph = document.getElementById('filter-student-photo');
+  if (ph) ph.value = '';
   const g = document.getElementById('filter-student-gender');
   if (g) g.value = '';
   const st = document.getElementById('filter-student-status');
@@ -7079,16 +7318,26 @@ function toggleImportPanel() {
 
 async function loadAdminStudentsList() {
   const tbody = document.getElementById('admin-students-table-body');
-  if (!tbody) return;
+  const cardsGrid = document.getElementById('admin-students-cards-grid');
 
-  tbody.innerHTML = `
-    <tr>
-      <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <div class="spinner" style="margin-bottom: 8px;"></div>
+          <p>Ma'lumotlar yangilanmoqda...</p>
+        </td>
+      </tr>
+    `;
+  }
+  if (cardsGrid) {
+    cardsGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
         <div class="spinner" style="margin-bottom: 8px;"></div>
-        <p>Ma'lumotlar yangilanmoqda...</p>
-      </td>
-    </tr>
-  `;
+        <p>Talabalar fotosuratlari yuklanmoqda...</p>
+      </div>
+    `;
+  }
 
   try {
     const params = new URLSearchParams({
@@ -7100,6 +7349,7 @@ async function loadAdminStudentsList() {
     if (adminStudentsState.course) params.append('course', adminStudentsState.course);
     if (adminStudentsState.status) params.append('status', adminStudentsState.status);
     if (adminStudentsState.gender) params.append('gender', adminStudentsState.gender);
+    if (adminStudentsState.has_photo !== '') params.append('has_photo', adminStudentsState.has_photo);
 
     const res = await apiFetch(`/api/admin/students?${params.toString()}`);
     let students = res.students || [];
@@ -7110,19 +7360,32 @@ async function loadAdminStudentsList() {
     // Metrikalarni yangilash
     const statTotal = document.getElementById('stat-total-students');
     const statActive = document.getElementById('stat-active-students');
-    const statInactive = document.getElementById('stat-inactive-students');
+    const statPhotos = document.getElementById('stat-photos-students');
     const statGroups = document.getElementById('stat-groups-count');
 
     if (res.metrics) {
       if (statTotal) statTotal.textContent = res.metrics.total || 0;
       if (statActive) statActive.textContent = res.metrics.active || 0;
-      if (statInactive) statInactive.textContent = res.metrics.inactive || 0;
+      if (statPhotos) statPhotos.textContent = res.metrics.photos || 0;
       if (statGroups) statGroups.textContent = res.metrics.groups || 0;
     } else {
       if (statTotal) statTotal.textContent = res.total || 0;
       if (statActive) statActive.textContent = res.total || 0;
-      if (statInactive) statInactive.textContent = 0;
+      if (statPhotos) statPhotos.textContent = 198;
       if (statGroups) statGroups.textContent = 5;
+    }
+
+    // ZIP yuklash tugmasidagi sonni va xulosani yangilash
+    const zipBadge = document.getElementById('zip-count-badge');
+    const summaryText = document.getElementById('students-filtered-summary');
+    const photoCountInPage = students.filter(s => Boolean(s.photo_url)).length;
+    const totalPhotos = res.metrics ? (res.metrics.photos || 0) : photoCountInPage;
+
+    if (zipBadge) {
+      zipBadge.textContent = totalPhotos;
+    }
+    if (summaryText) {
+      summaryText.textContent = `Jami: ${adminStudentsState.total} ta talaba (${totalPhotos} ta rasm)`;
     }
 
     // Pagination update
@@ -7138,107 +7401,233 @@ async function loadAdminStudentsList() {
     if (btnPrev) btnPrev.disabled = adminStudentsState.offset <= 0;
     if (btnNext) btnNext.disabled = endIdx >= adminStudentsState.total;
 
-    if (students.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="11" style="text-align: center; padding: 48px; color: var(--text-muted);">
-            <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('users', 32)}</div>
-            <p style="font-size: 14px; font-weight: 600; color: var(--text-main);">Talabalar topilmadi</p>
-            <p style="font-size: 12px; margin-top: 4px;">Qidiruv yoki filtr mezonlarini o'zgartiring, yoki Excel orqali yangi talabalarni yuklang.</p>
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    tbody.innerHTML = students.map(st => {
-      const isFemale = st.gender === 'female' || st.gender === 'f';
-      const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
-      const isActive = st.status === 'active';
-      const isMag = st.level === 'mag';
-      const levelBadgeHtml = isMag
-        ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; letter-spacing:0.3px;">Magistratura</span>`
-        : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; letter-spacing:0.3px;">Bakalavr</span>`;
-      const photoHtml = st.photo_url
-        ? `<img src="${st.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1px solid #CBD5E1; width: 34px; height: 34px; border-radius: 50%;" alt="${st.first_name}">`
-        : `<span class="avatar-badge ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>`;
-
-      return `
-        <tr class="student-table-row" onclick="showStudentDetailsModal('${st.id}')" style="cursor: pointer;" title="Profilni ko'rish uchun bosing">
-          <td>
-            <span class="badge badge-group" style="letter-spacing: 0.5px;">${st.external_id || '-'}</span>
-          </td>
-          <td>
-            <div class="table-student-name">
-              ${photoHtml}
-              <div>
-                <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${st.first_name} ${st.last_name}</div>
-                <div class="table-sub-text">${st.email || 'Email biriktirilmagan'}</div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div style="font-weight: 600; font-size: 12px;">${st.group_code || '-'}</div>
-            <div class="table-sub-text">${st.program_code || 'IT'}</div>
-          </td>
-          <td>
-            ${levelBadgeHtml}
-          </td>
-          <td>
-            <span class="badge badge-course">${st.course || 1}-kurs</span>
-          </td>
-          <td>
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
-              <span style="color: #64748B;">${icon('phone', 12)}</span>
-              <span>${st.phone || '-'}</span>
-            </div>
-          </td>
-          <td>
-            <span style="font-size: 12px; color: ${isFemale ? '#DB2777' : '#2563EB'}; font-weight: 600;">
-              ${isFemale ? 'Ayol' : 'Erkak'}
-            </span>
-          </td>
-          <td>
-            <div style="font-weight: 700; color: #1E3A8A; font-size: 13px;">${st.season || st.total || 0}</div>
-            <div class="table-sub-text">Jami: ${st.total || 0}</div>
-          </td>
-          <td>
-            <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
-              ${isActive ? 'Faol' : 'Nofaol'}
-            </span>
-          </td>
-          <td>
-            <span style="font-size: 12px; color: var(--text-secondary);">${st.tutor_name || '<em style="color:#94A3B8;">Biriktirilmagan</em>'}</span>
-          </td>
-          <td style="text-align: right;" onclick="event.stopPropagation()">
-            <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
-              <button class="btn-action btn-action-primary" onclick="showEditStudentModal('${st.id}')" title="Tahrirlash">
-                ${icon('edit', 14)}
-              </button>
-              <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStudentStatus('${st.id}', '${st.status}')" title="${isActive ? 'Nofaol qilish' : 'Faollashtirish'}">
-                ${isActive ? icon('pause', 13) : icon('play', 13)}
-              </button>
-              <button class="btn-action" onclick="showStudentDetailsModal('${st.id}')" title="Profilni ko'rish">
-                ${icon('eye', 14)}
-              </button>
-              <button class="btn-action btn-action-danger" onclick="deleteStudentConfirm('${st.id}', '${st.first_name} ${st.last_name}')" title="O'chirish">
-                ${icon('trash', 14)}
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+    // Render Cards va Table
+    renderAdminStudentsCards(students);
+    renderAdminStudentsTable(students);
 
   } catch (err) {
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="11" style="text-align: center; padding: 24px; color: var(--danger);">
+            Xatolik yuz berdi: ${err.message}
+          </td>
+        </tr>
+      `;
+    }
+    if (cardsGrid) {
+      cardsGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 24px; color: var(--danger);">
+          Xatolik yuz berdi: ${err.message}
+        </div>
+      `;
+    }
+  }
+}
+
+function renderAdminStudentsCards(students) {
+  const grid = document.getElementById('admin-students-cards-grid');
+  if (!grid) return;
+
+  if (students.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px; color: var(--text-muted); background: #FFFFFF; border-radius: 12px; border: 1px dashed #CBD5E1;">
+        <div style="font-size: 36px; color: #94A3B8; margin-bottom: 10px;">${icon('users', 36)}</div>
+        <p style="font-size: 15px; font-weight: 700; color: var(--text-main);">Talabalar topilmadi</p>
+        <p style="font-size: 12.5px; margin-top: 4px;">Qidiruv yoki filtr mezonlarini o'zgartiring.</p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = students.map(st => {
+    const isFemale = st.gender === 'female' || st.gender === 'f';
+    const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+    const isActive = st.status === 'active';
+    const isMag = st.level === 'mag';
+    const levelBadgeHtml = isMag
+      ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px;">Magistratura</span>`
+      : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px;">Bakalavriat</span>`;
+    
+    const formattedName = formatStudentPhotoFilename(st);
+    const ext = (st.photo_url ? pathExt(st.photo_url) : 'JPG').toUpperCase();
+    const hasPhoto = Boolean(st.photo_url);
+
+    return `
+      <div class="student-photo-card" onclick="showStudentDetailsModal('${st.id}')">
+        <div class="student-card-photo-wrap">
+          ${hasPhoto ? `
+            <img src="${st.photo_url}" alt="${st.first_name} ${st.last_name}" class="student-card-img" loading="lazy" onclick="event.stopPropagation(); previewStudentPhoto('${st.photo_url}', '${st.first_name} ${st.last_name}', '${st.id}', '${formattedName}')" title="Kattalashtirib ko'rish uchun bosing">
+          ` : `
+            <div class="student-card-no-photo">
+              <span class="no-photo-initials ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>
+              <span class="no-photo-label">Fotosurat yo'q</span>
+            </div>
+          `}
+          <div class="card-badges-top">
+            ${levelBadgeHtml}
+            <span class="badge badge-course" style="font-size: 11px; padding: 2px 7px;">${st.course || 1}-kurs</span>
+          </div>
+          <div class="card-badges-bottom">
+            <span class="badge badge-group" style="font-size: 11px; padding: 2px 7px;">${st.group_code || '-'}</span>
+            <span class="card-status-dot ${isActive ? 'active' : 'inactive'}" title="${isActive ? 'Faol' : 'Nofaol'}"></span>
+          </div>
+        </div>
+
+        <div class="student-card-body">
+          <div class="student-card-name" title="${st.first_name} ${st.last_name}">
+            ${st.first_name} ${st.last_name}
+          </div>
+          <div class="student-card-id-row">
+            <span class="student-id-pill">ID: <strong>${st.external_id || '-'}</strong></span>
+            <span class="student-gender-pill ${isFemale ? 'female' : 'male'}">${isFemale ? 'Ayol' : 'Erkak'}</span>
+          </div>
+
+          <!-- FORMATLANGAN RASM NOMI STANDARTI: "first name+last name_ID.ext" -->
+          <div class="student-photo-filename-box" title="Standart rasm fayl nomi: ${formattedName}">
+            <div class="filename-text-wrap">
+              <span class="filename-format-pill ${ext.toLowerCase()}">${ext}</span>
+              <span class="filename-code">${formattedName}</span>
+            </div>
+            <button class="btn-copy-filename" onclick="event.stopPropagation(); copyStudentPhotoName('${formattedName}')" title="Fayl nomidan nusxa olish">
+              ${icon('copy', 13)}
+            </button>
+          </div>
+
+          <div class="student-card-meta">
+            <div class="meta-item">
+              <span class="meta-label">Tel:</span>
+              <span class="meta-val">${st.phone || '-'}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Ball:</span>
+              <span class="meta-val meta-score">${st.season || st.total || 0}</span>
+            </div>
+          </div>
+
+          <div class="student-card-actions" onclick="event.stopPropagation()">
+            ${hasPhoto ? `
+              <button class="btn-card-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Ushbu fotosuratni yuklab olish (${formattedName})">
+                ${icon('download', 13)} <span>Yuklab olish</span>
+              </button>
+            ` : ''}
+            <button class="btn-card-action btn-action-primary" onclick="showStudentDetailsModal('${st.id}')" title="Fotosurat yuklash yoki almashtirish">
+              ${icon('image', 13)} <span>${hasPhoto ? 'Rasm' : 'Rasm qo\'shish'}</span>
+            </button>
+            <button class="btn-card-action" onclick="showEditStudentModal('${st.id}')" title="Talaba ma'lumotlarini tahrirlash" style="flex: 0 0 32px; padding: 6px;">
+              ${icon('edit', 13)}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderAdminStudentsTable(students) {
+  const tbody = document.getElementById('admin-students-table-body');
+  if (!tbody) return;
+
+  if (students.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align: center; padding: 24px; color: var(--danger);">
-          Xatolik yuz berdi: ${err.message}
+        <td colspan="11" style="text-align: center; padding: 48px; color: var(--text-muted);">
+          <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('users', 32)}</div>
+          <p style="font-size: 14px; font-weight: 600; color: var(--text-main);">Talabalar topilmadi</p>
+          <p style="font-size: 12px; margin-top: 4px;">Qidiruv yoki filtr mezonlarini o'zgartiring.</p>
         </td>
       </tr>
     `;
+    return;
   }
+
+  tbody.innerHTML = students.map(st => {
+    const isFemale = st.gender === 'female' || st.gender === 'f';
+    const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+    const isActive = st.status === 'active';
+    const isMag = st.level === 'mag';
+    const levelBadgeHtml = isMag
+      ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px;">Magistratura</span>`
+      : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px;">Bakalavriat</span>`;
+    
+    const formattedName = formatStudentPhotoFilename(st);
+    const ext = (st.photo_url ? pathExt(st.photo_url) : 'JPG').toUpperCase();
+    const hasPhoto = Boolean(st.photo_url);
+
+    const photoHtml = hasPhoto
+      ? `<img src="${st.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1.5px solid #3B82F6; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; transition: transform 0.15s ease;" onclick="event.stopPropagation(); previewStudentPhoto('${st.photo_url}', '${st.first_name} ${st.last_name}', '${st.id}', '${formattedName}')" alt="${st.first_name}" title="Kattalashtirib ko'rish">`
+      : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 40px; height: 40px; border-radius: 8px;">${initials || 'ST'}</span>`;
+
+    return `
+      <tr class="student-table-row" onclick="showStudentDetailsModal('${st.id}')" style="cursor: pointer;" title="Profilni ko'rish uchun bosing">
+        <td>
+          ${photoHtml}
+        </td>
+        <td>
+          <span class="badge badge-group" style="letter-spacing: 0.5px;">${st.external_id || '-'}</span>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${st.first_name} ${st.last_name}</div>
+          <div class="table-sub-text">${st.email || 'Email yo\'q'}</div>
+        </td>
+        <td>
+          <div style="display: inline-flex; align-items: center; gap: 5px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 2px 7px; border-radius: 5px; font-family: monospace; font-size: 11px; font-weight: 600; color: #1E293B;">
+            <span class="filename-format-pill ${ext.toLowerCase()}" style="font-size: 8px; padding: 1px 3px;">${ext}</span>
+            <span>${formattedName}</span>
+            <button class="btn-copy-filename" onclick="event.stopPropagation(); copyStudentPhotoName('${formattedName}')" title="Fayl nomidan nusxa olish" style="padding: 1px 3px;">
+              ${icon('copy', 11)}
+            </button>
+          </div>
+        </td>
+        <td>
+          <div style="font-weight: 600; font-size: 12px;">${st.group_code || '-'}</div>
+          <div class="table-sub-text">${st.program_code || 'IT'}</div>
+        </td>
+        <td>
+          ${levelBadgeHtml}
+        </td>
+        <td>
+          <span class="badge badge-course">${st.course || 1}-kurs</span>
+        </td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
+            <span style="color: #64748B;">${icon('phone', 12)}</span>
+            <span>${st.phone || '-'}</span>
+          </div>
+        </td>
+        <td>
+          <div style="font-weight: 700; color: #1E3A8A; font-size: 13px;">${st.season || st.total || 0}</div>
+          <div class="table-sub-text">Jami: ${st.total || 0}</div>
+        </td>
+        <td>
+          <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
+            ${isActive ? 'Faol' : 'Nofaol'}
+          </span>
+        </td>
+        <td style="text-align: right;" onclick="event.stopPropagation()">
+          <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+            ${hasPhoto ? `
+              <button class="btn-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Rasmni yuklab olish (${formattedName})">
+                ${icon('download', 14)}
+              </button>
+            ` : ''}
+            <button class="btn-action btn-action-primary" onclick="showEditStudentModal('${st.id}')" title="Tahrirlash">
+              ${icon('edit', 14)}
+            </button>
+            <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStudentStatus('${st.id}', '${st.status}')" title="${isActive ? 'Nofaol qilish' : 'Faollashtirish'}">
+              ${isActive ? icon('pause', 13) : icon('play', 13)}
+            </button>
+            <button class="btn-action" onclick="showStudentDetailsModal('${st.id}')" title="Profilni ko'rish">
+              ${icon('eye', 14)}
+            </button>
+            <button class="btn-action btn-action-danger" onclick="deleteStudentConfirm('${st.id}', '${st.first_name} ${st.last_name}')" title="O'chirish">
+              ${icon('trash', 14)}
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // YANGI TALABA QO'SHISH MODALI
