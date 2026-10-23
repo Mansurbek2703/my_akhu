@@ -11,6 +11,7 @@ ssh.connect('192.168.1.2', port=22, username='boss', password='Sshtelnet27032004
 remote_script = '''
 set -e
 cd /home/boss/my_akhu
+git checkout -- . 2>/dev/null || true
 git pull origin main
 npm install --omit=dev
 
