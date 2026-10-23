@@ -247,14 +247,57 @@
       `;
     }
 
-    // Ma'lumotlarni yuklash
+    // Ma'lumotlarni yuklash (Har bir login qilgan xodim yoki TV token uchun ruxsat)
     const urlParams = new URLSearchParams(window.location.search);
     const tvToken = urlParams.get('token') || '';
+    let userId = urlParams.get('user_id') || '';
+
+    if (!userId) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('akhu_auth_user') || '{}');
+        if (saved && saved.id) {
+          userId = saved.id;
+        }
+      } catch (e) {}
+    }
+
+    function showTvAuthError() {
+      let errBox = document.getElementById('tv-auth-error-box');
+      if (!errBox) {
+        errBox = document.createElement('div');
+        errBox.id = 'tv-auth-error-box';
+        errBox.style.cssText = 'position:fixed; inset:0; background:rgba(3,7,18,0.95); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
+        errBox.innerHTML = `
+          <div style="background:#0F172A; border:1px solid rgba(255,255,255,0.15); border-radius:24px; padding:44px 36px; max-width:480px; text-align:center; color:#FFFFFF; box-shadow:0 25px 60px rgba(0,0,0,0.85);">
+            <div style="font-size:52px; margin-bottom:16px;">🔒</div>
+            <h2 style="font-size:22px; font-weight:800; margin-bottom:12px; color:#F8FAFC;">Kirish Cheklangan</h2>
+            <p style="font-size:14.5px; color:#94A3B8; line-height:1.5; margin-bottom:26px;">Katta Ekran (TV) rejimini ko'rish uchun universitet xodimi sifatida tizimga kirish yoki maxsus ruxsat tokeni talab qilinadi.</p>
+            <a href="/" style="display:inline-block; background:linear-gradient(135deg, #1E3A8A, #2563EB); color:#FFFFFF; text-decoration:none; font-weight:700; font-size:15px; padding:13px 32px; border-radius:10px; box-shadow:0 4px 16px rgba(37,99,235,0.4);">Tizimga Kirish</a>
+          </div>
+        `;
+        document.body.appendChild(errBox);
+      }
+    }
 
     async function loadTvData() {
       try {
-        const res = await fetch(`/api/observe/dashboard?token=${encodeURIComponent(tvToken)}`);
+        const queryParams = new URLSearchParams();
+        if (tvToken) queryParams.set('token', tvToken);
+        if (userId) queryParams.set('user_id', userId);
+
+        const headers = {};
+        if (userId) headers['x-user-id'] = userId;
+        if (tvToken) headers['x-tv-token'] = tvToken;
+
+        const res = await fetch(`/api/observe/dashboard?${queryParams.toString()}`, { headers });
+        if (res.status === 401 || res.status === 403) {
+          showTvAuthError();
+          return;
+        }
+
         const data = await res.json();
+        const existingErr = document.getElementById('tv-auth-error-box');
+        if (existingErr) existingErr.remove();
 
         // 1. Weekly Stars (Haftaning Qahramonlari)
         const ws = data.weekly_stars || {};
