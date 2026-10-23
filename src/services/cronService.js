@@ -213,7 +213,7 @@ function initBackgroundJobs() {
     }
   }, 10 * 60 * 1000);
 
-  // Har 10 daqiqada HikCentral turniket/Face ID davomatini avtomatik sinxronlash
+  // Har 1 daqiqada HikCentral turniket/Face ID davomatini avtomatik sinxronlash
   setInterval(async () => {
     try {
       if (config.hikcentral && config.hikcentral.enabled) {
@@ -223,7 +223,7 @@ function initBackgroundJobs() {
     } catch (e) {
       // Tarmoq ulanishi kutilyotgan paytda ortiqcha xatolik logini bostirish
     }
-  }, 10 * 60 * 1000);
+  }, 1 * 60 * 1000);
 }
 
 module.exports = {

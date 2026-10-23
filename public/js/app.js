@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateAuthUI();
   updateSidebarPermissions();
   await loadCatalogData();
+  initSuperadminNotifications();
 
   // Boshlang'ich sahifani aniqlash (Hash yoki roliga mos standart sahifa)
   const hashPage = (window.location.hash || '').replace(/^#/, '').trim();
@@ -404,6 +405,7 @@ function initLoginForm() {
       updateAuthUI();
       updateSidebarPermissions();
       await loadCatalogData();
+      initSuperadminNotifications();
 
       // Foydalanuvchi roliga mos bosh sahifaga yo'naltirish
       const target = getDefaultPageForRoles(AppState.user.roles);
@@ -6482,8 +6484,8 @@ function showToast(message, type = 'success', duration = 3000) {
   }
 
   const toast = document.createElement('div');
-  const bg = type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : '#10B981';
-  const iconSym = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅';
+  const bg = type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : type === 'info' ? '#2563EB' : '#10B981';
+  const iconSym = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : type === 'info' ? '🔔' : '✅';
   toast.style.cssText = `background:${bg}; color:white; padding:12px 18px; border-radius:10px; font-size:13.5px; font-weight:500; box-shadow:0 10px 25px rgba(0,0,0,0.18); display:flex; align-items:center; gap:10px; pointer-events:auto; opacity:0; transform:translateY(12px); transition:all 0.25s cubic-bezier(0.16, 1, 0.3, 1);`;
   
   const iconSpan = document.createElement('span');
@@ -6512,6 +6514,109 @@ function showToast(message, type = 'success', duration = 3000) {
   }, duration);
 }
 window.showToast = showToast;
+
+// -------------------------------------------------------------
+// SUPERADMIN UCHUN JONLI TURNIKET BILDIRISHNOMALARI (LIVE ALERTS)
+// -------------------------------------------------------------
+let turnstileAlertsInterval = null;
+let lastSeenTurnstileEventId = null;
+
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.exponentialRampToValueAtTime(880.00, ctx.currentTime + 0.12); // A5
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch(e) {}
+}
+
+function initSuperadminNotifications() {
+  if (turnstileAlertsInterval) {
+    clearInterval(turnstileAlertsInterval);
+    turnstileAlertsInterval = null;
+  }
+
+  // Faqat tizimga kirilgan va ruxsati bor xodimlar uchun
+  if (!AppState.isLoggedIn || !AppState.user) return;
+  const roles = AppState.user.roles || [];
+  if (!roles.includes('superadmin') && AppState.user.id !== 'superadmin') return;
+
+  // Dastlabki so'rov - eng so'nggi ID ni olib eskilari uchun darhol toast chiqarmaslik
+  apiFetch('/api/attendance/live-alerts?limit=5')
+    .then(data => {
+      const alerts = data.alerts || [];
+      if (alerts.length > 0) {
+        lastSeenTurnstileEventId = alerts[0].id;
+      }
+    })
+    .catch(() => {});
+
+  // Har 30 soniyada yangi turniket voqealarini tekshirish
+  turnstileAlertsInterval = setInterval(async () => {
+    if (!AppState.isLoggedIn || !AppState.user) {
+      clearInterval(turnstileAlertsInterval);
+      return;
+    }
+
+    try {
+      const data = await apiFetch('/api/attendance/live-alerts?limit=10');
+      const alerts = data.alerts || [];
+      if (!alerts.length) return;
+
+      if (!lastSeenTurnstileEventId) {
+        lastSeenTurnstileEventId = alerts[0].id;
+        return;
+      }
+
+      // Faqat oxirgi tekshiruvdan keyin qo'shilgan yangi voqealar
+      const newAlerts = [];
+      for (const al of alerts) {
+        if (al.id > lastSeenTurnstileEventId) {
+          newAlerts.push(al);
+        } else {
+          break;
+        }
+      }
+
+      if (newAlerts.length > 0) {
+        lastSeenTurnstileEventId = alerts[0].id;
+
+        // Bildirishnoma chiqarish (bir vaqtda ko'p bo'lsa maksimal 3 tasini)
+        newAlerts.slice(0, 3).reverse().forEach(al => {
+          const isKirish = al.direction === 'in';
+          const dirText = isKirish ? '🟢 KIRDI' : '🔴 CHIQDI';
+          const timeStr = al.event_time ? new Date(al.event_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+          const person = al.person_name || al.passport_id || 'Talaba';
+          const group = al.group_code ? `(${al.group_code})` : '';
+          const door = al.door_name || (isKirish ? 'Turniket Kirish' : 'Turniket Chiqish');
+
+          showToast(`🔔 ${person} ${group} ${dirText} — ${door} [${timeStr}]`, 'info', 5500);
+          playNotificationChime();
+        });
+
+        // Agar hozir Davomat sahifasida bo'lsa, jadvalni ham jimjit (silent) yangilab qo'yish
+        if (AppState.currentPage === 'campus-attendance-manage' && document.getElementById('att-table-body')) {
+          if (typeof loadAttendanceData === 'function') {
+            loadAttendanceData(true);
+          }
+        }
+      }
+    } catch(e) {}
+  }, 30000);
+}
+
+window.initSuperadminNotifications = initSuperadminNotifications;
+
 
 // Talaba profil modalini ochish
 async function showStudentModal(studentId) {
@@ -10123,45 +10228,78 @@ let attendanceState = {
 async function renderCampusAttendance(targetContainer) {
   targetContainer.innerHTML = `
     <div class="attendance-container" style="display:flex; flex-direction:column; gap:20px;">
-      <!-- KPI STATISTIKA KARTALARI -->
+      <!-- KPI STATISTIKA KARTALARI (BOSILADIGAN FILTRLAR) -->
       <div id="att-summary-cards" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
-        <div class="stat-card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-          <div style="font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">Jami Talabalar</div>
+        <!-- 1. Jami Talabalar -->
+        <div id="kpi-card-all" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('')" style="background:#FFFFFF; border:2px solid #E2E8F0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.03); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Barcha talabalar ro'yxatini ko'rish uchun bosing">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">Jami Talabalar</div>
+            <span class="kpi-active-pill" style="font-size:10px; font-weight:700; background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:8px;">Barchasi</span>
+          </div>
           <div id="kpi-total-students" style="font-size:28px; font-weight:800; color:#0F172A; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#94A3B8; margin-top:4px;">Faol talabalar kontingenti</div>
+          <div style="font-size:11.5px; color:#94A3B8; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Faol talabalar</span>
+            <span style="color:#2563EB; font-weight:700;">Ro'yxat 👆</span>
+          </div>
         </div>
 
-        <div class="stat-card" style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(16,185,129,0.05);">
+        <!-- 2. Kelganlar -->
+        <div id="kpi-card-present" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('present')" style="background:#F0FDF4; border:2px solid #BBF7D0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(16,185,129,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Faqat universitetga kelgan talabalar ro'yxatini ko'rish">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div style="font-size:12px; font-weight:700; color:#15803D; text-transform:uppercase; letter-spacing:0.5px;">Kelganlar</div>
             <span id="kpi-att-rate" class="badge" style="background:#22C55E; color:white; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">0%</span>
           </div>
           <div id="kpi-present-students" style="font-size:28px; font-weight:800; color:#166534; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#15803D; margin-top:4px;">Universitetga tashrif buyurgan</div>
+          <div style="font-size:11.5px; color:#15803D; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Tashrif buyurgan</span>
+            <span style="color:#166534; font-weight:700;">Ro'yxat 👆</span>
+          </div>
         </div>
 
-        <div class="stat-card" style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(245,158,11,0.05);">
-          <div style="font-size:12px; font-weight:700; color:#B45309; text-transform:uppercase; letter-spacing:0.5px;">Kechikkanlar</div>
+        <!-- 3. Kechikkanlar -->
+        <div id="kpi-card-late" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('late')" style="background:#FFFBEB; border:2px solid #FDE68A; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(245,158,11,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="09:15 dan so'ng kelgan kechikkan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:12px; font-weight:700; color:#B45309; text-transform:uppercase; letter-spacing:0.5px;">Kechikkanlar</div>
+            <span style="font-size:10px; font-weight:700; background:#FEF3C7; color:#92400E; padding:2px 6px; border-radius:6px;">> 09:15</span>
+          </div>
           <div id="kpi-late-students" style="font-size:28px; font-weight:800; color:#92400E; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#B45309; margin-top:4px;">09:15 dan so'ng kelganlar</div>
+          <div style="font-size:11.5px; color:#B45309; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>09:15 dan keyin</span>
+            <span style="color:#92400E; font-weight:700;">Ro'yxat 👆</span>
+          </div>
         </div>
 
-        <div class="stat-card" style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(59,130,246,0.05);">
-          <div style="font-size:12px; font-weight:700; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px;">Hozir Binoda</div>
+        <!-- 4. Hozir Binoda -->
+        <div id="kpi-card-in_campus" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('in_campus')" style="background:#EFF6FF; border:2px solid #BFDBFE; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(59,130,246,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Hozir universitet binosida bo'lib turgan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:12px; font-weight:700; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px;">Hozir Binoda</div>
+            <span style="font-size:10px; font-weight:700; background:#DBEAFE; color:#1E40AF; padding:2px 6px; border-radius:6px;">Hududda</span>
+          </div>
           <div id="kpi-in-campus" style="font-size:28px; font-weight:800; color:#1E40AF; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#2563EB; margin-top:4px;">Chiqish qayd etilmagan</div>
+          <div style="font-size:11.5px; color:#2563EB; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Chiqish qayd etilmagan</span>
+            <span style="color:#1E40AF; font-weight:700;">Ro'yxat 👆</span>
+          </div>
         </div>
 
-        <div class="stat-card" style="background:#FEF2F2; border:1px solid #FECACA; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(239,68,68,0.05);">
-          <div style="font-size:12px; font-weight:700; color:#B91C1C; text-transform:uppercase; letter-spacing:0.5px;">Kelmaganlar</div>
+        <!-- 5. Kelmaganlar -->
+        <div id="kpi-card-absent" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('absent')" style="background:#FEF2F2; border:2px solid #FECACA; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(239,68,68,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Turniketdan umuman o'tmagan kelmagan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:12px; font-weight:700; color:#B91C1C; text-transform:uppercase; letter-spacing:0.5px;">Kelmaganlar</div>
+            <span style="font-size:10px; font-weight:700; background:#FEE2E2; color:#991B1B; padding:2px 6px; border-radius:6px;">0 marta</span>
+          </div>
           <div id="kpi-absent-students" style="font-size:28px; font-weight:800; color:#991B1B; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#DC2626; margin-top:4px;">Turniketdan o'tmagan</div>
+          <div style="font-size:11.5px; color:#DC2626; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Turniketdan o'tmagan</span>
+            <span style="color:#991B1B; font-weight:700;">Ro'yxat 👆</span>
+          </div>
         </div>
       </div>
 
-      <!-- BOSHQARUV VA FILTRLAR -->
+      <!-- BOSHQARUV, FILTRLAR VA EXCEL EXPORT -->
       <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
         <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:14px; margin-bottom:16px;">
+          <!-- Filtrlash mezonlari -->
           <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
             <div>
               <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">📅 Sana:</label>
@@ -10176,9 +10314,9 @@ async function renderCampusAttendance(targetContainer) {
             </div>
 
             <div>
-              <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">🏷️ Holati:</label>
-              <select id="att-status-select" class="form-control" style="font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid #CBD5E1;">
-                <option value="">Barchasi</option>
+              <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">🏷️ Holati bo'yicha:</label>
+              <select id="att-status-select" class="form-control" style="font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid #CBD5E1; min-width:150px;">
+                <option value="">Barchasi (Jami)</option>
                 <option value="present">Kelganlar</option>
                 <option value="late">Kechikkanlar</option>
                 <option value="in_campus">Hozir binoda</option>
@@ -10192,19 +10330,34 @@ async function renderCampusAttendance(targetContainer) {
             </div>
           </div>
 
-          <!-- AMALLAR VA HIKCENTRAL SINXRONLASH -->
-          <div style="display:flex; align-items:flex-end; gap:10px;">
+          <!-- AMALLAR: EXCEL YUKLAB OLISH VA SINXRONIZATSIYA -->
+          <div style="display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px;">
+            <!-- EXCEL YUKLAB OLISH TUGMASI -->
+            <button id="btn-export-excel" class="btn" onclick="downloadAttendanceExcel()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; font-weight:700; font-size:13px; color:#15803D; border:1px solid #86EFAC; background:#F0FDF4; box-shadow:0 1px 3px rgba(0,0,0,0.05); cursor:pointer;" title="Filtrlangan ro'yxatni Excel (.xlsx) formatida yuklab olish">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span id="btn-export-excel-label">Excel Yuklab Olish (.xlsx)</span>
+            </button>
+
+            <!-- HIKCENTRAL SINXRONLASH -->
             <button id="btn-sync-hik" class="btn btn-primary" onclick="triggerHikCentralSync()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; box-shadow:0 2px 6px rgba(37,99,235,0.25);">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               <span>HikCentral Sinxronlash</span>
             </button>
+
+            <!-- ALOQANI TEKSHIRISH -->
             <button class="btn btn-outline" onclick="checkHikConnectionStatus()" title="HikCentral aloqasini tekshirish" style="font-size:13px; padding:8px 12px; border-radius:8px;">
               📡 Tekshirish
             </button>
+
+            <!-- JONLI MONITORING STATUSI (HAR 1 DAQIQADA YANGILANADI) -->
+            <span id="att-live-status-badge" style="font-size:11.5px; font-weight:600; color:#15803D; background:#DCFCE7; border:1px solid #BBF7D0; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22C55E;"></span>
+              <span id="att-last-refreshed-time">Har 1 minutda yangilanadi</span>
+            </span>
           </div>
         </div>
 
-        <!-- JADVAL QISMI -->
+        <!-- JADVAL QISMI (TAFSILLOT USTUNI OLIB TASHLANDI, SATRLAR BOSILADIGAN) -->
         <div class="table-responsive" style="margin-top:12px; border-radius:10px; border:1px solid #E2E8F0; overflow:hidden;">
           <table class="table" style="margin-bottom:0; width:100%; border-collapse:collapse;">
             <thead style="background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
@@ -10216,12 +10369,11 @@ async function renderCampusAttendance(targetContainer) {
                 <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">CHIQDI (VAQT)</th>
                 <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">O'TISHLAR</th>
                 <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">HOLATI</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">TAFSILLOT</th>
               </tr>
             </thead>
             <tbody id="att-table-body">
               <tr>
-                <td colspan="8" style="text-align:center; padding:30px; color:#94A3B8;">
+                <td colspan="7" style="text-align:center; padding:30px; color:#94A3B8;">
                   <div class="spinner" style="margin:0 auto 10px;"></div>
                   Davomat ma'lumotlari yuklanmoqda...
                 </td>
@@ -10257,6 +10409,7 @@ async function renderCampusAttendance(targetContainer) {
   document.getElementById('att-status-select').addEventListener('change', (e) => {
     attendanceState.status = e.target.value;
     attendanceState.page = 1;
+    updateActiveKpiCard(e.target.value);
     loadAttendanceData();
   });
 
@@ -10270,8 +10423,125 @@ async function renderCampusAttendance(targetContainer) {
     }, 300);
   });
 
-  // Ma'lumotlarni yuklash
+  // Har 1 minutda (60000 ms) avtomatik ravishda yangilanish
+  if (window.attendanceAutoRefreshTimer) {
+    clearInterval(window.attendanceAutoRefreshTimer);
+  }
+  window.attendanceAutoRefreshTimer = setInterval(() => {
+    const tableBody = document.getElementById('att-table-body');
+    if (!tableBody) {
+      clearInterval(window.attendanceAutoRefreshTimer);
+      return;
+    }
+    loadAttendanceData(true); // jimjit yangilash
+  }, 60000);
+
+  // Faol KPI kartani belgilash va ma'lumotlarni yuklash
+  updateActiveKpiCard(attendanceState.status);
   await loadAttendanceData();
+}
+
+// KPI kartani bosganda filtrlash funksiyasi
+function filterAttendanceByCard(status) {
+  attendanceState.status = status;
+  attendanceState.page = 1;
+  const select = document.getElementById('att-status-select');
+  if (select) select.value = status;
+  updateActiveKpiCard(status);
+  loadAttendanceData();
+}
+
+// KPI kartalarning aktiv ko'rinishini boshqarish
+function updateActiveKpiCard(status) {
+  const cards = {
+    '': document.getElementById('kpi-card-all'),
+    'present': document.getElementById('kpi-card-present'),
+    'late': document.getElementById('kpi-card-late'),
+    'in_campus': document.getElementById('kpi-card-in_campus'),
+    'absent': document.getElementById('kpi-card-absent')
+  };
+
+  Object.entries(cards).forEach(([key, card]) => {
+    if (!card) return;
+    if (key === (status || '')) {
+      card.style.transform = 'translateY(-3px)';
+      card.style.boxShadow = '0 10px 22px rgba(0,0,0,0.12)';
+      card.style.outline = '3px solid #3B82F6';
+      card.style.outlineOffset = '2px';
+    } else {
+      card.style.transform = 'translateY(0)';
+      card.style.boxShadow = '0 2px 6px rgba(0,0,0,0.03)';
+      card.style.outline = 'none';
+    }
+  });
+
+  // Excel tugmasi matnini yangilash
+  const btnExp = document.getElementById('btn-export-excel-label');
+  if (btnExp) {
+    const labels = {
+      '': 'Excel Yuklab Olish (.xlsx)',
+      'present': 'Kelganlar (Excel)',
+      'late': 'Kechikkanlar (Excel)',
+      'in_campus': 'Hozir Binodagilar (Excel)',
+      'absent': 'Kelmaganlar (Excel)'
+    };
+    btnExp.textContent = labels[status || ''] || 'Excel Yuklab Olish (.xlsx)';
+  }
+}
+
+// Excel faylini yuklab olish
+async function downloadAttendanceExcel() {
+  const btn = document.getElementById('btn-export-excel');
+  const btnLabel = document.getElementById('btn-export-excel-label');
+  const origText = btnLabel ? btnLabel.textContent : 'Excel Yuklab Olish';
+
+  try {
+    if (btn) btn.style.opacity = '0.6';
+    if (btnLabel) btnLabel.textContent = "Tayyorlanmoqda...";
+
+    const params = new URLSearchParams({
+      date: attendanceState.date,
+      group_code: attendanceState.group || '',
+      status: attendanceState.status || '',
+      search: attendanceState.search || ''
+    });
+
+    const res = await fetch(`/api/attendance/export-excel?${params.toString()}`, {
+      headers: {
+        'x-user-id': (AppState.user && AppState.user.id) ? AppState.user.id : 'superadmin'
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server xatoligi: ${res.statusText}`);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const statusLabels = {
+      '': 'Barcha_Talabalar',
+      'present': 'Kelganlar',
+      'late': 'Kechikkanlar',
+      'in_campus': 'Hozir_Binoda',
+      'absent': 'Kelmaganlar'
+    };
+    const curLabel = statusLabels[attendanceState.status || ''] || 'Davomat';
+    a.download = `davomat_${curLabel}_${attendanceState.date}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    showToast(`✅ Excel ro'yxat (${curLabel}) muvaffaqiyatli yuklab olindi!`, 'success');
+  } catch (err) {
+    showToast(`Excel yuklab olishda xatolik: ${err.message}`, 'error');
+  } finally {
+    if (btn) btn.style.opacity = '1';
+    if (btnLabel) btnLabel.textContent = origText;
+  }
 }
 
 async function populateAttendanceGroups() {
@@ -10286,23 +10556,49 @@ async function populateAttendanceGroups() {
       select.appendChild(opt);
     });
   } catch (e) {
-    // Guruhlar ro'yxati chiqmasa ham ishlayveradi
+    // Guruhlar ro'yxati chiqmasa ham davom etadi
   }
 }
 
-async function loadAttendanceData() {
+async function loadAttendanceData(isSilent = false) {
   const tableBody = document.getElementById('att-table-body');
   if (!tableBody) return;
+
+  if (!isSilent) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:35px; color:#94A3B8;">
+          <div class="spinner" style="margin:0 auto 10px;"></div>
+          Davomat ma'lumotlari yuklanmoqda...
+        </td>
+      </tr>
+    `;
+  }
 
   try {
     // 1. KPI statistikani yuklash
     const sumRes = await apiFetch(`/api/attendance/summary?date=${encodeURIComponent(attendanceState.date)}`);
-    document.getElementById('kpi-total-students').textContent = (sumRes.totalStudents || 0).toLocaleString();
-    document.getElementById('kpi-present-students').textContent = (sumRes.presentCount || 0).toLocaleString();
-    document.getElementById('kpi-att-rate').textContent = `${sumRes.attendanceRate || 0}%`;
-    document.getElementById('kpi-late-students').textContent = (sumRes.lateCount || 0).toLocaleString();
-    document.getElementById('kpi-in-campus').textContent = (sumRes.inCampusCount || 0).toLocaleString();
-    document.getElementById('kpi-absent-students').textContent = (sumRes.absentCount || 0).toLocaleString();
+    const totalEl = document.getElementById('kpi-total-students');
+    const presEl = document.getElementById('kpi-present-students');
+    const rateEl = document.getElementById('kpi-att-rate');
+    const lateEl = document.getElementById('kpi-late-students');
+    const campusEl = document.getElementById('kpi-in-campus');
+    const absentEl = document.getElementById('kpi-absent-students');
+
+    if (totalEl) totalEl.textContent = (sumRes.totalStudents || 0).toLocaleString();
+    if (presEl) presEl.textContent = (sumRes.presentCount || 0).toLocaleString();
+    if (rateEl) rateEl.textContent = `${sumRes.attendanceRate || 0}%`;
+    if (lateEl) lateEl.textContent = (sumRes.lateCount || 0).toLocaleString();
+    if (campusEl) campusEl.textContent = (sumRes.inCampusCount || 0).toLocaleString();
+    if (absentEl) absentEl.textContent = (sumRes.absentCount || 0).toLocaleString();
+
+    // Oxirgi yangilangan vaqtni yozib qo'yish
+    const lastRefEl = document.getElementById('att-last-refreshed-time');
+    if (lastRefEl) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      lastRefEl.textContent = `Jonli (Oxirgi: ${timeStr})`;
+    }
 
     // 2. Talabalar ro'yxatini yuklash
     const query = new URLSearchParams({
@@ -10320,14 +10616,15 @@ async function loadAttendanceData() {
     if (list.length === 0) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="8" style="text-align:center; padding:40px; color:#94A3B8;">
+          <td colspan="7" style="text-align:center; padding:40px; color:#94A3B8;">
             <div style="font-size:28px; margin-bottom:8px;">🔍</div>
-            <div style="font-size:14px; font-weight:600; color:#64748B;">Ushbu mezonlar bo'yicha talabalar topilmadi</div>
-            <div style="font-size:12px; color:#94A3B8; margin-top:4px;">Boshqa sana yoki guruhni tanlab ko'ring</div>
+            <div style="font-size:14px; font-weight:700; color:#64748B;">Ushbu mezonlar bo'yicha talabalar topilmadi</div>
+            <div style="font-size:12px; color:#94A3B8; margin-top:4px;">Boshqa guruh yoki holat filtrini tanlab ko'ring</div>
           </td>
         </tr>
       `;
-      document.getElementById('att-pagination-container').innerHTML = '';
+      const pag = document.getElementById('att-pagination-container');
+      if (pag) pag.innerHTML = '';
       return;
     }
 
@@ -10345,7 +10642,9 @@ async function loadAttendanceData() {
       };
 
       const inTimeStr = formatTime(st.first_in_at);
-      const outTimeStr = st.is_in_campus ? '<span style="color:#2563EB; font-weight:600;">Binoda</span>' : formatTime(st.last_out_at);
+      const outTimeStr = st.is_in_campus 
+        ? '<span style="color:#2563EB; font-weight:700; background:#EFF6FF; padding:2px 8px; border-radius:6px; border:1px solid #BFDBFE;">🏢 Binoda</span>' 
+        : formatTime(st.last_out_at);
 
       // Holat nishoni
       let badgeHtml = '';
@@ -10358,11 +10657,12 @@ async function loadAttendanceData() {
       }
 
       const avatarHtml = st.photo_url 
-        ? `<img src="${st.photo_url}" style="width:32px; height:32px; border-radius:50%; object-fit:cover; border:1px solid #E2E8F0;">`
-        : `<div style="width:32px; height:32px; border-radius:50%; background:#E0F2FE; color:#0369A1; font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center;">${(st.first_name || 'T')[0]}</div>`;
+        ? `<img src="${st.photo_url}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #E2E8F0;">`
+        : `<div style="width:34px; height:34px; border-radius:50%; background:#E0F2FE; color:#0369A1; font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center;">${(st.first_name || 'T')[0]}</div>`;
 
+      // BUTUN SATR BOSILADIGAN QILINDI (TAFSILLOT USTUNI YO'Q)
       rowsHtml += `
-        <tr style="border-bottom:1px solid #F1F5F9; transition:background 0.15s ease;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='white'">
+        <tr onclick="showStudentAttendanceModal('${st.student_id}')" style="border-bottom:1px solid #F1F5F9; cursor:pointer; transition:background 0.15s ease;" onmouseenter="this.style.background='#F1F5F9'" onmouseleave="this.style.background='white'" title="Davomat tarixi va statistikasini ko'rish uchun bosing 👆">
           <td style="padding:12px 14px;">
             <div style="display:flex; align-items:center; gap:10px;">
               ${avatarHtml}
@@ -10391,11 +10691,6 @@ async function loadAttendanceData() {
           <td style="padding:12px 14px; text-align:center;">
             ${badgeHtml}
           </td>
-          <td style="padding:12px 14px; text-align:center;">
-            <button class="btn btn-outline btn-sm" onclick="showStudentAttendanceModal('${st.student_id}')" style="font-size:11.5px; padding:4px 10px; border-radius:6px;">
-              Tarix 📋
-            </button>
-          </td>
         </tr>
       `;
     });
@@ -10407,7 +10702,7 @@ async function loadAttendanceData() {
   } catch (err) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center; padding:30px; color:#EF4444;">
+        <td colspan="7" style="text-align:center; padding:30px; color:#EF4444;">
           <div style="font-weight:700; margin-bottom:4px;">Yuklashda xatolik yuz berdi:</div>
           <div style="font-size:12px;">${err.message}</div>
         </td>
@@ -10486,14 +10781,15 @@ async function checkHikConnectionStatus() {
   }
 }
 
+// TALABANING TURNIKET DAVOMAT TARIXI VA MUHIM STATISTIKALARI MODALI
 async function showStudentAttendanceModal(studentId) {
   const modal = document.getElementById('common-modal');
   const title = document.getElementById('modal-title');
   const body = document.getElementById('modal-body');
   if (!modal || !body) return;
 
-  title.textContent = "Talabaning Kirish-Chiqish Tarixi";
-  body.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Tarix yuklanmoqda...</p></div>`;
+  title.textContent = "Talabaning Turniket Davomat Tarixi va Statistikasi";
+  body.innerHTML = `<div class="loading-state" style="padding:40px; text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div><p style="color:#64748B;">Davomat tarixi va statistikasi yuklanmoqda...</p></div>`;
   modal.classList.add('active');
 
   try {
@@ -10502,70 +10798,163 @@ async function showStudentAttendanceModal(studentId) {
     const history = data.history || [];
     const logs = data.logs || [];
 
+    // Muhim statistikalarni hisoblash
+    const todayStr = attendanceState.date || new Date().toISOString().slice(0, 10);
+    const todayRecord = history.find(h => h.date === todayStr) || history[0] || null;
+
+    const totalDaysRecorded = history.length;
+    const daysPresent = history.filter(h => h.status === 'present' || h.status === 'late').length;
+    const daysLate = history.filter(h => h.status === 'late').length;
+    const daysAbsent = history.filter(h => h.status === 'absent').length;
+    const attRate30 = totalDaysRecorded > 0 ? Math.round((daysPresent / totalDaysRecorded) * 100) : 0;
+    const totalTurnstilePasses = history.reduce((sum, h) => sum + (h.in_count || 0) + (h.out_count || 0), 0);
+
+    // Hozirgi bino holati
+    let presenceHtml = '';
+    if (todayRecord && todayRecord.is_in_campus) {
+      presenceHtml = `<span style="color:#1D4ED8; background:#EFF6FF; border:1px solid #BFDBFE; padding:4px 10px; border-radius:8px; font-weight:700;">🏢 Hozir universitet hududida</span>`;
+    } else if (todayRecord && todayRecord.first_in_at) {
+      presenceHtml = `<span style="color:#475569; background:#F1F5F9; border:1px solid #E2E8F0; padding:4px 10px; border-radius:8px; font-weight:700;">🚶 Universitetdan chiqib ketgan</span>`;
+    } else {
+      presenceHtml = `<span style="color:#B91C1C; background:#FEF2F2; border:1px solid #FECACA; padding:4px 10px; border-radius:8px; font-weight:700;">❌ Bugun kelmagan</span>`;
+    }
+
+    const formatTimeOnly = (iso) => {
+      if (!iso) return '-';
+      try {
+        return new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch(e) {
+        return iso.slice(11, 19);
+      }
+    };
+
+    const inTodayTime = todayRecord ? formatTimeOnly(todayRecord.first_in_at) : '-';
+    const outTodayTime = todayRecord ? (todayRecord.is_in_campus ? 'Hozir binoda' : formatTimeOnly(todayRecord.last_out_at)) : '-';
+
     let historyRows = '';
     if (history.length === 0) {
       historyRows = `<tr><td colspan="5" style="text-align:center; color:#94A3B8; padding:20px;">Oxirgi 30 kunda davomat qayd etilmagan</td></tr>`;
     } else {
       history.forEach(h => {
-        const inStr = h.first_in_at ? new Date(h.first_in_at).toLocaleTimeString('uz-UZ') : '-';
-        const outStr = h.last_out_at ? new Date(h.last_out_at).toLocaleTimeString('uz-UZ') : '-';
+        const inStr = formatTimeOnly(h.first_in_at);
+        const outStr = h.is_in_campus ? '<b style="color:#2563EB;">Binoda</b>' : formatTimeOnly(h.last_out_at);
         const statusBadge = h.status === 'present' 
-          ? '<span style="color:#16A34A; font-weight:700;">Kelgan</span>'
-          : (h.status === 'late' ? '<span style="color:#D97706; font-weight:700;">Kechikkan</span>' : '<span style="color:#DC2626; font-weight:700;">Kelmagan</span>');
+          ? '<span style="color:#16A34A; font-weight:700; background:#DCFCE7; padding:2px 8px; border-radius:6px;">Kelgan</span>'
+          : (h.status === 'late' 
+            ? '<span style="color:#D97706; font-weight:700; background:#FEF3C7; padding:2px 8px; border-radius:6px;">Kechikkan</span>' 
+            : '<span style="color:#DC2626; font-weight:700; background:#FEE2E2; padding:2px 8px; border-radius:6px;">Kelmagan</span>');
 
         historyRows += `
           <tr style="border-bottom:1px solid #F1F5F9;">
-            <td style="padding:8px 10px; font-weight:600;">${h.date}</td>
-            <td style="padding:8px 10px; color:#15803D; font-weight:700;">${inStr}</td>
-            <td style="padding:8px 10px; color:#475569;">${outStr}</td>
-            <td style="padding:8px 10px; text-align:center;">+${h.in_count} / -${h.out_count}</td>
-            <td style="padding:8px 10px; text-align:center;">${statusBadge}</td>
+            <td style="padding:10px 12px; font-weight:700; color:#334155;">${h.date}</td>
+            <td style="padding:10px 12px; color:#15803D; font-weight:700;">${inStr !== '-' ? '🟢 ' + inStr : '-'}</td>
+            <td style="padding:10px 12px; color:#475569; font-weight:600;">${outStr}</td>
+            <td style="padding:10px 12px; text-align:center; font-weight:700;">
+              <span style="color:#16A34A;">+${h.in_count}</span> / <span style="color:#EA580C;">-${h.out_count}</span>
+            </td>
+            <td style="padding:10px 12px; text-align:center;">${statusBadge}</td>
           </tr>
         `;
       });
     }
 
+    const studentAvatarHtml = st.photo_url 
+      ? `<img src="${st.photo_url}" style="width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid #3B82F6; box-shadow:0 2px 8px rgba(0,0,0,0.1);">`
+      : `<div style="width:56px; height:56px; border-radius:50%; background:#EFF6FF; color:#1D4ED8; font-weight:800; font-size:20px; display:flex; align-items:center; justify-content:center; border:2px solid #BFDBFE;">${(st.first_name || 'T')[0]}</div>`;
+
     body.innerHTML = `
-      <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #E2E8F0;">
-        <div style="font-size:26px;">🎓</div>
-        <div>
-          <h4 style="margin:0; font-size:16px; font-weight:800; color:#0F172A;">${st.last_name || ''} ${st.first_name || ''}</h4>
-          <div style="font-size:12px; color:#64748B; margin-top:2px;">
-            Guruh: <b>${st.group_code || '-'}</b> | Pasport ID: <b>${st.external_id || '-'}</b>
+      <!-- TALABA ASOSIY PROFIL KARTASI -->
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid #E2E8F0;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          ${studentAvatarHtml}
+          <div>
+            <h3 style="margin:0; font-size:17px; font-weight:800; color:#0F172A;">${st.last_name || ''} ${st.first_name || ''}</h3>
+            <div style="font-size:12.5px; color:#64748B; margin-top:4px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+              <span style="background:#EFF6FF; color:#1E40AF; padding:2px 8px; border-radius:6px; font-weight:700;">${st.group_code || '-'}</span>
+              <span>${st.course ? st.course + '-kurs' : ''}</span>
+              <span>•</span>
+              <span>Pasport: <code style="font-weight:700; color:#0F172A;">${st.external_id || '-'}</code></span>
+              ${st.phone ? `<span>•</span> <span>📞 ${st.phone}</span>` : ''}
+            </div>
           </div>
+        </div>
+        <div>
+          ${presenceHtml}
         </div>
       </div>
 
-      <h5 style="font-size:13px; font-weight:700; color:#334155; margin-bottom:8px;">Kunlik Davomat Tarixi (Oxirgi 30 kun)</h5>
-      <div class="table-responsive" style="max-height:220px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:8px; margin-bottom:16px;">
-        <table class="table" style="width:100%; font-size:12px; margin:0;">
-          <thead style="background:#F8FAFC; position:sticky; top:0;">
-            <tr>
-              <th style="padding:8px 10px;">Sana</th>
-              <th style="padding:8px 10px;">Kirdi</th>
-              <th style="padding:8px 10px;">Chiqdi</th>
-              <th style="padding:8px 10px; text-align:center;">O'tishlar</th>
-              <th style="padding:8px 10px; text-align:center;">Holati</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${historyRows}
-          </tbody>
-        </table>
+      <!-- MUHIM STATISTIKALAR BLOKI (4 TA METRIKA KARTALARI) -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:20px;">
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Bugungi Kirish</div>
+          <div style="font-size:17px; font-weight:800; color:#15803D; margin-top:4px;">${inTodayTime}</div>
+          <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">Birinchi qayd</div>
+        </div>
+
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Bugungi Chiqish</div>
+          <div style="font-size:17px; font-weight:800; color:#475569; margin-top:4px;">${outTodayTime}</div>
+          <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">Oxirgi qayd</div>
+        </div>
+
+        <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:12px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#15803D; text-transform:uppercase;">30 Kunlik Davomat</div>
+          <div style="font-size:17px; font-weight:800; color:#166534; margin-top:4px;">${attRate30}%</div>
+          <div style="font-size:10.5px; color:#15803D; margin-top:2px;">${daysPresent} / ${totalDaysRecorded} kun kelgan</div>
+        </div>
+
+        <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:10px; padding:12px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#991B1B; text-transform:uppercase;">Kechikishlar</div>
+          <div style="font-size:17px; font-weight:800; color:#B91C1C; margin-top:4px;">${daysLate} marta</div>
+          <div style="font-size:10.5px; color:#DC2626; margin-top:2px;">Kelmagan: ${daysAbsent} kun</div>
+        </div>
       </div>
 
-      <h5 style="font-size:13px; font-weight:700; color:#334155; margin-bottom:8px;">Face ID / Turniket O'tish Loglari</h5>
-      <div style="max-height:160px; overflow-y:auto; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; font-size:11.5px; font-family:monospace;">
-        ${logs.length === 0 ? '<div style="color:#94A3B8;">Turniket loglari mavjud emas</div>' : logs.map(l => `
-          <div style="padding:3px 0; border-bottom:1px dashed #E2E8F0; display:flex; justify-content:space-between;">
-            <span>${l.direction === 'in' ? '🟢 KIRISH' : '🔴 CHIQISH'} — ${l.door_name || 'Bosh turniket'}</span>
-            <span style="color:#64748B;">${l.event_time.replace('T', ' ').slice(0, 19)}</span>
-          </div>
-        `).join('')}
+      <!-- KUNLIK DAVOMAT TARIXI JADVALI -->
+      <div style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h4 style="font-size:13.5px; font-weight:800; color:#1E293B; margin:0;">📋 Kunlik Davomat Tarixi (Oxirgi 30 kun)</h4>
+          <span style="font-size:11.5px; color:#64748B;">Jami o'tishlar: <b>${totalTurnstilePasses}</b> marta</span>
+        </div>
+        <div class="table-responsive" style="max-height:220px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:10px;">
+          <table class="table" style="width:100%; font-size:12px; margin:0; border-collapse:collapse;">
+            <thead style="background:#F8FAFC; position:sticky; top:0; z-index:2; border-bottom:1px solid #E2E8F0;">
+              <tr>
+                <th style="padding:10px 12px; text-align:left;">Sana</th>
+                <th style="padding:10px 12px; text-align:left;">Birinchi Kirish</th>
+                <th style="padding:10px 12px; text-align:left;">Oxirgi Chiqish</th>
+                <th style="padding:10px 12px; text-align:center;">Harakatlar (+/-)</th>
+                <th style="padding:10px 12px; text-align:center;">Holati</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${historyRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FACE ID VA TURNIKET O'TISH LOGLARI -->
+      <div>
+        <h4 style="font-size:13.5px; font-weight:800; color:#1E293B; margin:0 0 8px;">🚪 Face ID / Turniket O'tish Tafsilotlari (Jonli Loglar)</h4>
+        <div style="max-height:160px; overflow-y:auto; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px; font-size:11.5px; font-family:monospace;">
+          ${logs.length === 0 ? '<div style="color:#94A3B8; text-align:center; padding:14px;">Ushbu talaba bo\'yicha turniket loglari mavjud emas</div>' : logs.map(l => {
+            const isKirish = l.direction === 'in';
+            const timeFormatted = l.event_time ? l.event_time.replace('T', ' ').slice(0, 19) : '';
+            return `
+              <div style="padding:5px 8px; border-bottom:1px dashed #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; color:${isKirish ? '#15803D' : '#C2410C'};">
+                  ${isKirish ? '🟢 KIRISH' : '🔴 CHIQISH'} — ${l.door_name || (isKirish ? 'Turniket Kirish' : 'Turniket Chiqish')}
+                </span>
+                <span style="color:#64748B; font-weight:600;">${timeFormatted}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
       </div>
     `;
   } catch (err) {
-    body.innerHTML = `<div style="color:#EF4444; padding:20px; text-align:center;">Xatolik: ${err.message}</div>`;
+    body.innerHTML = `<div style="color:#EF4444; padding:30px; text-align:center; font-weight:700;">Xatolik yuz berdi: ${err.message}</div>`;
   }
 }
 
@@ -10579,4 +10968,8 @@ window.triggerHikCentralSync = triggerHikCentralSync;
 window.checkHikConnectionStatus = checkHikConnectionStatus;
 window.showStudentAttendanceModal = showStudentAttendanceModal;
 window.changeAttendancePage = changeAttendancePage;
+window.filterAttendanceByCard = filterAttendanceByCard;
+window.updateActiveKpiCard = updateActiveKpiCard;
+window.downloadAttendanceExcel = downloadAttendanceExcel;
+
 
