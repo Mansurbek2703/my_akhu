@@ -1503,6 +1503,7 @@ router.post('/users', authenticateSuperadmin, async (req, res) => {
       full_name,
       email,
       phone,
+      passport_id,
       photo_url,
       roles = [],
       groups = [],
@@ -1527,6 +1528,7 @@ router.post('/users', authenticateSuperadmin, async (req, res) => {
       userPhone = userPhone.replace(/[^0-9+]/g, '');
       if (!userPhone.startsWith('+') && userPhone.startsWith('998')) userPhone = '+' + userPhone;
     }
+    const staffPassportId = passport_id ? String(passport_id).trim().toUpperCase() : null;
     const userPhoto = photo_url ? String(photo_url).trim() : null;
     let tgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : (telegram_id ? String(telegram_id).trim() : null);
     let tgUsername = telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null;
@@ -1581,13 +1583,14 @@ router.post('/users', authenticateSuperadmin, async (req, res) => {
         // 1. staff_user jadvaliga yozish
         db.prepare(`
           INSERT INTO staff_user (
-            id, full_name, email, phone, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, telegram_username, telegram_phone, bot_status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'not_started', ?)
+            id, full_name, email, phone, passport_id, photo_url, sso_subject, roles, twofa_enabled, active, password_hash, telegram_user_id, telegram_username, telegram_phone, bot_status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'not_started', ?)
         `).run(
           userId,
           full_name,
           userEmail,
           userPhone,
+          staffPassportId,
           userPhoto,
           `sso_${userId}`,
           JSON.stringify(cleanRoles),
@@ -1750,6 +1753,7 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
       full_name,
       email,
       phone,
+      passport_id,
       photo_url,
       roles,
       groups,
@@ -1785,6 +1789,7 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
       newPhone = newPhone.replace(/[^0-9+]/g, '');
       if (!newPhone.startsWith('+') && newPhone.startsWith('998')) newPhone = '+' + newPhone;
     }
+    const newPassportId = passport_id !== undefined ? (passport_id ? String(passport_id).trim().toUpperCase() : null) : user.passport_id;
     const newPhotoUrl = photo_url !== undefined ? (photo_url ? String(photo_url).trim() : null) : user.photo_url;
     let tgId = telegram_user_id !== undefined ? (telegram_user_id ? String(telegram_user_id).trim() : null) : (telegram_id !== undefined ? (telegram_id ? String(telegram_id).trim() : null) : user.telegram_user_id);
     let tgUsername = telegram_username !== undefined ? (telegram_username ? String(telegram_username).trim().replace(/^@/, '') : null) : user.telegram_username;
@@ -1861,6 +1866,7 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
           SET full_name = ?,
             email = ?,
             phone = ?,
+            passport_id = ?,
             photo_url = ?,
             roles = ?,
             telegram_user_id = ?,
@@ -1874,6 +1880,7 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
           newFullName,
           newEmail,
           newPhone,
+          newPassportId,
           newPhotoUrl,
           updatedRoles,
           tgId,

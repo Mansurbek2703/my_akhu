@@ -224,6 +224,36 @@ function initBackgroundJobs() {
       // Tarmoq ulanishi kutilyotgan paytda ortiqcha xatolik logini bostirish
     }
   }, 1 * 60 * 1000);
+
+  // Har 30 soniyada soat 18:00 kunlik davomat hisobotini tekshirish (Toshkent vaqti UTC+5)
+  let lastDailyReportSentDate = null;
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const tashkentTimeStr = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Tashkent',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(now);
+      const [datePart, timePart] = tashkentTimeStr.split(', ');
+      const [day, month, year] = datePart.split('/');
+      const todayIso = `${year}-${month}-${day}`;
+      const [hour, minute] = timePart.split(':').map(Number);
+
+      if (hour === 18 && minute === 0 && lastDailyReportSentDate !== todayIso) {
+        lastDailyReportSentDate = todayIso;
+        console.log(`[Cron] Soat 18:00 - Superadminga kunlik davomat hisoboti yuborilmoqda: ${todayIso}`);
+        const { sendDailyAttendanceSummaryToSuperadmin } = require('./telegramService');
+        await sendDailyAttendanceSummaryToSuperadmin(todayIso);
+      }
+    } catch (err) {
+      console.error('[Cron] 18:00 hisobot tekshiruvida xatolik:', err.message);
+    }
+  }, 30 * 1000);
 }
 
 module.exports = {

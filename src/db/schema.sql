@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS staff_user (
     twofa_enabled INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
     password_hash TEXT,
+    passport_id TEXT,
     telegram_user_id TEXT,
     phone TEXT,
     photo_url TEXT,

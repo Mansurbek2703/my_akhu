@@ -742,11 +742,372 @@ function getSuperadminKeyboard() {
         { text: '📺 Katta Ekran (TV)', url: tvUrl }
       ],
       [
-        { text: '🔄 Reytinglarni Yangilash', callback_data: 'admin_recalc' },
+        { text: '📊 Jonli Davomat & Turniket', callback_data: 'cb_att_summary' },
         { text: '📥 Kutilayotgan Arizalar', callback_data: 'admin_pending' }
+      ],
+      [
+        { text: '🔄 Reytinglarni Qayta Hisoblash', callback_data: 'admin_recalc' }
       ]
     ]
   };
+}
+
+/**
+ * Davomat monitoringi bo'yicha tezkor inline tugmalar
+ */
+function getAttendanceInlineKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: '🏢 Hozir Binoda', callback_data: 'cb_att_in_campus' },
+        { text: '❌ Kelmaganlar', callback_data: 'cb_att_absent' }
+      ],
+      [
+        { text: '⏱️ Kechikkanlar', callback_data: 'cb_att_late' },
+        { text: '👔 Xodimlar', callback_data: 'cb_att_staff' }
+      ],
+      [
+        { text: '📊 Jonli Umumiy Hisobot', callback_data: 'cb_att_summary' }
+      ],
+      [
+        { text: '💻 Davomat Veb Portali', url: `${config.baseUrl}/#campus-attendance-manage` }
+      ]
+    ]
+  };
+}
+
+/**
+ * Toshkent vaqti bo'yicha joriy sana va vaqtni olish (UTC+5)
+ */
+function getTashkentDateInfo() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.format(now).split(', ');
+  const [day, month, year] = parts[0].split('/');
+  return {
+    dateStr: `${year}-${month}-${day}`,
+    timeStr: parts[1] || ''
+  };
+}
+
+/**
+ * Talabalar va xodimlar davomati bo'yicha Telegram hisoboti tayyorlash
+ * @param {string|null} targetDate - 'YYYY-MM-DD'
+ * @param {string} filter - 'summary' | 'in_campus' | 'absent' | 'late' | 'staff'
+ * @param {boolean} isDaily18 - true bo'lsa soat 18:00 kunlik sarlavhasi bilan
+ */
+async function buildAttendanceTelegramReport(targetDate = null, filter = 'summary', isDaily18 = false) {
+  const { dateStr: todayTashkent, timeStr } = getTashkentDateInfo();
+  const dateStr = targetDate || todayTashkent;
+
+  // 1. Talabalar ma'lumotlari
+  const totalStudents = parseInt(db.prepare("SELECT count(*) as c FROM student WHERE status = 'active'").get()?.c || 0, 10);
+  const attStats = db.prepare(`
+    SELECT 
+      COUNT(*) as total_present,
+      SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as total_late,
+      SUM(CASE WHEN in_count > out_count THEN 1 ELSE 0 END) as in_campus
+    FROM campus_attendance
+    WHERE date = ?
+  `).get(dateStr);
+
+  const presentCount = parseInt(attStats?.total_present || 0, 10);
+  const lateCount = parseInt(attStats?.total_late || 0, 10);
+  const inCampusCount = parseInt(attStats?.in_campus || 0, 10);
+  const absentCount = Math.max(0, totalStudents - presentCount);
+  const attRate = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+
+  // 2. Xodimlar ma'lumotlari
+  const staffUsers = db.prepare(`
+    SELECT id, full_name, roles, passport_id, phone, telegram_username
+    FROM staff_user
+    WHERE active = 1 OR active IS NULL
+    ORDER BY full_name ASC
+  `).all();
+
+  let staffWithPassport = 0;
+  let staffPresent = 0;
+  let staffLate = 0;
+  let staffInCampus = 0;
+  let staffAbsent = 0;
+  let staffNoPassport = 0;
+  const staffDetails = [];
+
+  for (const st of staffUsers) {
+    const pid = (st.passport_id || '').trim().toUpperCase();
+    if (!pid) {
+      staffNoPassport++;
+      staffDetails.push({
+        staff: st,
+        status: 'no_passport',
+        firstIn: null,
+        lastOut: null,
+        inCount: 0,
+        outCount: 0,
+        isInCampus: false
+      });
+      continue;
+    }
+
+    staffWithPassport++;
+    const logs = db.prepare(`
+      SELECT event_time, direction, door_name
+      FROM access_control_log
+      WHERE (passport_id = ? OR UPPER(passport_id) = ?)
+        AND event_time LIKE ?
+      ORDER BY event_time ASC
+    `).all(pid, pid, `${dateStr}%`);
+
+    const inEvents = logs.filter(l => l.direction === 'in');
+    const outEvents = logs.filter(l => l.direction === 'out');
+    const inCount = inEvents.length;
+    const outCount = outEvents.length;
+    const firstIn = inEvents.length > 0 ? inEvents[0].event_time : (logs[0]?.event_time || null);
+    const lastOut = outEvents.length > 0 ? outEvents[outEvents.length - 1].event_time : null;
+    const isInCampus = inCount > outCount;
+
+    let status = 'absent';
+    if (inCount > 0 || logs.length > 0) {
+      status = 'present';
+      if (firstIn) {
+        const inDate = new Date(firstIn);
+        const hours = inDate.getHours();
+        const minutes = inDate.getMinutes();
+        if (hours > 9 || (hours === 9 && minutes > 15)) {
+          status = 'late';
+          staffLate++;
+        }
+      }
+      staffPresent++;
+      if (isInCampus) staffInCampus++;
+    } else {
+      staffAbsent++;
+    }
+
+    staffDetails.push({
+      staff: st,
+      status,
+      firstIn,
+      lastOut,
+      inCount,
+      outCount,
+      isInCampus
+    });
+  }
+
+  // Filtrlash bo'yicha javob matni
+  if (filter === 'in_campus') {
+    let msg = `🏢 <b>HOZIR UNIVERSITET BINOSIDA BO'LGANLAR</b>\n` +
+      `📅 Sana: <b>${dateStr}</b> | ⏰ Holat: <b>${timeStr}</b>\n\n`;
+
+    const inCampusStudents = db.prepare(`
+      SELECT s.first_name, s.last_name, s.group_code, ca.first_in_at, ca.in_count, ca.out_count
+      FROM campus_attendance ca
+      JOIN student s ON ca.student_id = s.id
+      WHERE ca.date = ? AND ca.in_count > ca.out_count
+      ORDER BY ca.first_in_at ASC
+    `).all(dateStr);
+
+    msg += `🎓 <b>Talabalar bino hududida:</b> <b>${inCampusStudents.length} nafar</b>\n`;
+    if (inCampusStudents.length === 0) {
+      msg += `<i>Hozir binoda birorta ham talaba yo'q yoki barchasi chiqib ketgan.</i>\n\n`;
+    } else {
+      const topStudents = inCampusStudents.slice(0, 25);
+      topStudents.forEach((st, idx) => {
+        const t = st.first_in_at ? new Date(st.first_in_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        msg += `${idx + 1}. <b>${st.first_name} ${st.last_name}</b> (${st.group_code}) — 🟢 Kirgan: ${t}\n`;
+      });
+      if (inCampusStudents.length > 25) {
+        msg += `<i>...va yana ${inCampusStudents.length - 25} nafar talaba hozir binoda.</i>\n`;
+      }
+      msg += `\n`;
+    }
+
+    const inCampusStaffList = staffDetails.filter(s => s.isInCampus);
+    msg += `👔 <b>Xodimlar bino hududida:</b> <b>${inCampusStaffList.length} nafar</b>\n`;
+    if (inCampusStaffList.length === 0) {
+      msg += `<i>Hozir bino hududida birorta ham mas'ul xodim qayd etilmagan.</i>\n\n`;
+    } else {
+      inCampusStaffList.forEach((item, idx) => {
+        const t = item.firstIn ? new Date(item.firstIn).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        let rName = 'Xodim';
+        try { const rArr = JSON.parse(item.staff.roles); rName = rArr[0] || 'Xodim'; } catch(e){}
+        msg += `${idx + 1}. <b>${item.staff.full_name}</b> (${rName}) — 🟢 Kirgan: ${t}\n`;
+      });
+      msg += `\n`;
+    }
+
+    return msg;
+  }
+
+  if (filter === 'absent') {
+    let msg = `❌ <b>TURNIKETDAN O'TMAGAN (KELMAGANLAR) RO'YXATI</b>\n` +
+      `📅 Sana: <b>${dateStr}</b> | ⏰ Holat: <b>${timeStr}</b>\n\n`;
+
+    const absentStudents = db.prepare(`
+      SELECT s.first_name, s.last_name, s.group_code, s.phone
+      FROM student s
+      LEFT JOIN campus_attendance ca ON ca.student_id = s.id AND ca.date = ?
+      WHERE s.status = 'active' AND ca.id IS NULL
+      ORDER BY s.group_code ASC, s.last_name ASC
+    `).all(dateStr);
+
+    msg += `🎓 <b>Kelmagan talabalar:</b> <b>${absentStudents.length} nafar</b>\n`;
+    if (absentStudents.length === 0) {
+      msg += `🎉 <i>Barcha faol talabalar turniketdan o'tgan! 100% davomat!</i>\n\n`;
+    } else {
+      const topAbs = absentStudents.slice(0, 25);
+      topAbs.forEach((st, idx) => {
+        msg += `${idx + 1}. <b>${st.first_name} ${st.last_name}</b> (${st.group_code})${st.phone ? ` 📞 <code>${st.phone}</code>` : ''}\n`;
+      });
+      if (absentStudents.length > 25) {
+        msg += `<i>...va yana ${absentStudents.length - 25} nafar talaba bugun kelmagan.</i>\n`;
+      }
+      msg += `\n`;
+    }
+
+    const absentStaffList = staffDetails.filter(s => s.status === 'absent');
+    msg += `👔 <b>Kelmagan xodimlar:</b> <b>${absentStaffList.length} nafar</b>\n`;
+    if (absentStaffList.length === 0) {
+      msg += `<i>Barcha pasporti biriktirilgan xodimlar tashrif buyurgan.</i>\n\n`;
+    } else {
+      absentStaffList.forEach((item, idx) => {
+        let rName = 'Xodim';
+        try { const rArr = JSON.parse(item.staff.roles); rName = rArr[0] || 'Xodim'; } catch(e){}
+        msg += `${idx + 1}. <b>${item.staff.full_name}</b> (${rName})\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (staffNoPassport > 0) {
+      msg += `⚠️ <i>Eslatma: ${staffNoPassport} nafar xodimga hali Pasport ID kiritilmagan. Ular davomatini nazorat qilish uchun veb-tizimda tahrirlab Pasport ID kiriting.</i>\n`;
+    }
+
+    return msg;
+  }
+
+  if (filter === 'late') {
+    let msg = `⏱️ <b>09:15 DAN KEYIN KELGANLAR (KECHIKKANLAR)</b>\n` +
+      `📅 Sana: <b>${dateStr}</b> | ⏰ Holat: <b>${timeStr}</b>\n\n`;
+
+    const lateStudents = db.prepare(`
+      SELECT s.first_name, s.last_name, s.group_code, ca.first_in_at
+      FROM campus_attendance ca
+      JOIN student s ON ca.student_id = s.id
+      WHERE ca.date = ? AND ca.status = 'late'
+      ORDER BY ca.first_in_at ASC
+    `).all(dateStr);
+
+    msg += `🎓 <b>Kechikkan talabalar:</b> <b>${lateStudents.length} nafar</b>\n`;
+    if (lateStudents.length === 0) {
+      msg += `🎉 <i>Bugun 09:15 dan kechikkan talabalar yo'q!</i>\n\n`;
+    } else {
+      lateStudents.forEach((st, idx) => {
+        const t = st.first_in_at ? new Date(st.first_in_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        msg += `${idx + 1}. <b>${st.first_name} ${st.last_name}</b> (${st.group_code}) — ⏱️ Kirgan vaqti: <b>${t}</b>\n`;
+      });
+      msg += `\n`;
+    }
+
+    const lateStaffList = staffDetails.filter(s => s.status === 'late');
+    msg += `👔 <b>Kechikkan xodimlar:</b> <b>${lateStaffList.length} nafar</b>\n`;
+    if (lateStaffList.length === 0) {
+      msg += `<i>09:15 dan keyin kelgan xodimlar yo'q.</i>\n\n`;
+    } else {
+      lateStaffList.forEach((item, idx) => {
+        const t = item.firstIn ? new Date(item.firstIn).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        let rName = 'Xodim';
+        try { const rArr = JSON.parse(item.staff.roles); rName = rArr[0] || 'Xodim'; } catch(e){}
+        msg += `${idx + 1}. <b>${item.staff.full_name}</b> (${rName}) — ⏱️ Kirgan: <b>${t}</b>\n`;
+      });
+      msg += `\n`;
+    }
+
+    return msg;
+  }
+
+  if (filter === 'staff') {
+    let msg = `👔 <b>XODIMLAR MONITORINGI VA DAVOMATI (FACE ID)</b>\n` +
+      `📅 Sana: <b>${dateStr}</b> | ⏰ Holat: <b>${timeStr}</b>\n\n` +
+      `👥 Jami xodimlar: <b>${staffUsers.length} nafar</b>\n` +
+      `🪪 Pasport ID biriktirilgan: <b>${staffWithPassport} nafar</b>\n` +
+      `✅ Bugun kelganlar: <b>${staffPresent} nafar</b>\n` +
+      `🏢 Hozir bino hududida: <b>${staffInCampus} nafar</b>\n` +
+      `❌ Turniketdan o'tmagan: <b>${staffAbsent} nafar</b>\n` +
+      `⚠️ Pasport kiritilmagan: <b>${staffNoPassport} nafar</b>\n\n` +
+      `📋 <b>XODIMLAR RO'YXATI:</b>\n`;
+
+    staffDetails.forEach((item, idx) => {
+      let icon = '⚪';
+      let statusText = 'Pasport ID yo\'q';
+      if (item.status === 'present') {
+        icon = item.isInCampus ? '🟢' : '🔵';
+        statusText = item.isInCampus ? 'Hozir Binoda' : 'Chiqib ketgan';
+      } else if (item.status === 'late') {
+        icon = '🟡';
+        statusText = item.isInCampus ? 'Kechikkan (Binoda)' : 'Kechikkan (Chiqib ketgan)';
+      } else if (item.status === 'absent') {
+        icon = '🔴';
+        statusText = 'Turniketdan o\'tmagan';
+      }
+
+      const inTime = item.firstIn ? new Date(item.firstIn).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const outTime = item.lastOut ? new Date(item.lastOut).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+
+      msg += `${idx + 1}. ${icon} <b>${item.staff.full_name}</b>\n` +
+        `   🪪 Pasport: <code>${item.staff.passport_id || 'Kiritilmagan'}</code> | <b>${statusText}</b>\n` +
+        (item.firstIn ? `   🕒 Kirdi: <b>${inTime}</b> | Chiqdi: ${outTime} (${item.inCount} marta)\n` : '');
+    });
+
+    return msg;
+  }
+
+  // DEFAULT: SUMMARY
+  const headerTitle = isDaily18 ? `🔔 <b>SOAT 18:00 KUNLIK DAVOMAT HISOBOTI</b>` : `📊 <b>JONLI DAVOMAT & TURNIKET HISOBOTI</b>`;
+  const summaryMsg = `${headerTitle}\n` +
+    `🏛️ <b>AL-XORAZMIY UNIVERSITETI</b>\n` +
+    `📅 <b>Sana:</b> <code>${dateStr}</code> | ⏰ <b>Vaqt:</b> <code>${timeStr}</code>\n\n` +
+    `🎓 <b>TALABALAR DAVOMATI:</b>\n` +
+    `• Jami talabalar: <b>${totalStudents} nafar</b>\n` +
+    `• Kelganlar: <b>${presentCount} nafar</b> (<b>${attRate}%</b>)\n` +
+    `• Kechikkanlar (>09:15): <b>${lateCount} nafar</b>\n` +
+    `• Hozir bino hududida: <b>${inCampusCount} nafar</b>\n` +
+    `• Turniketdan o'tmagan: <b>${absentCount} nafar</b>\n\n` +
+    `👔 <b>XODIMLAR DAVOMATI:</b>\n` +
+    `• Jami xodimlar: <b>${staffUsers.length} nafar</b>\n` +
+    `• Pasport ID biriktirilgan: <b>${staffWithPassport} nafar</b>\n` +
+    `• Kelganlar: <b>${staffPresent} nafar</b>\n` +
+    `• Hozir bino hududida: <b>${staffInCampus} nafar</b>\n` +
+    `• Turniketdan o'tmagan: <b>${staffAbsent} nafar</b>\n` +
+    (staffNoPassport > 0 ? `• ⚠️ Pasport kiritilmagan: <b>${staffNoPassport} nafar</b> <i>(Face ID nazorati uchun tizimda Pasport ID kiriting)</i>\n` : '') +
+    `\n<i>👇 Kerakli ro'yxatni ko'rish yoki filtrlash uchun quyidagi tugmalardan birini bosing:</i>`;
+
+  return summaryMsg;
+}
+
+/**
+ * Superadminga har kuni soat 18:00 da kunlik davomat hisobotini yuborish
+ */
+async function sendDailyAttendanceSummaryToSuperadmin(targetDate = null) {
+  try {
+    const { dateStr } = getTashkentDateInfo();
+    const finalDate = targetDate || dateStr;
+    const text = await buildAttendanceTelegramReport(finalDate, 'summary', true);
+    const keyboard = getAttendanceInlineKeyboard();
+    return await sendTelegramMessage(SUPERADMIN_TG_ID, text, { reply_markup: keyboard });
+  } catch (err) {
+    console.error('sendDailyAttendanceSummaryToSuperadmin xatolik:', err.message);
+    return null;
+  }
 }
 
 /**
@@ -852,6 +1213,15 @@ async function handleTelegramWebhook(update) {
       lastName: cb.from?.last_name
     });
 
+    if (data.startsWith('cb_att_')) {
+      const action = data.replace('cb_att_', '');
+      const report = await buildAttendanceTelegramReport(null, action);
+      const keyboard = getAttendanceInlineKeyboard();
+      await answerCallbackQuery(cb.id);
+      await sendTelegramMessage(chatId, report, { reply_markup: keyboard });
+      return;
+    }
+
     if (data === 'admin_recalc') {
       recalculateStudentScores();
       await answerCallbackQuery(cb.id, '✅ Reytinglar muvaffaqiyatli qayta hisoblandi!', true);
@@ -916,6 +1286,42 @@ async function handleTelegramWebhook(update) {
       `).run(tgId, rawUsername, nowIso, existingStaff.id);
     }
   } catch (e) {}
+
+  // Superadmin uchun jonli davomat va monitoring buyruqlari
+  if (isSuperadmin && text) {
+    const cleanLower = text.toLowerCase().trim();
+    if (
+      cleanLower.startsWith('/davomat') ||
+      cleanLower.startsWith('/binoda') ||
+      cleanLower.startsWith('/kelmagan') ||
+      cleanLower.startsWith('/kechik') ||
+      cleanLower.startsWith('/turniket') ||
+      cleanLower.startsWith('/hodim') ||
+      cleanLower.startsWith('/xodim') ||
+      cleanLower === 'davomat' ||
+      cleanLower === 'binoda' ||
+      cleanLower.includes('davomat') ||
+      cleanLower.includes('kim bor') ||
+      cleanLower.includes('kim yoq') ||
+      cleanLower.includes('kim yo\'q')
+    ) {
+      recordBotActivity(chatId, 'command_attendance', `Davomat so'rovi: "${text}"`, {
+        username: rawUsername,
+        firstName: msg.from?.first_name
+      });
+
+      let filter = 'summary';
+      if (cleanLower.includes('binoda') || cleanLower.includes('bor')) filter = 'in_campus';
+      else if (cleanLower.includes('kelmagan') || cleanLower.includes('yoq') || cleanLower.includes('yo\'q')) filter = 'absent';
+      else if (cleanLower.includes('kechik')) filter = 'late';
+      else if (cleanLower.includes('hodim') || cleanLower.includes('xodim')) filter = 'staff';
+
+      const report = await buildAttendanceTelegramReport(null, filter);
+      const keyboard = getAttendanceInlineKeyboard();
+      await sendTelegramMessage(chatId, report, { reply_markup: keyboard });
+      return;
+    }
+  }
 
   // 1. /start buyrug'i
   if (text.startsWith('/start')) {
@@ -1199,5 +1605,8 @@ module.exports = {
   notifyStudentEventRegistration,
   notifyStudentEventUnregister,
   notifyStudentEventCheckin,
-  resolveTelegramChatInfo
+  resolveTelegramChatInfo,
+  buildAttendanceTelegramReport,
+  getAttendanceInlineKeyboard,
+  sendDailyAttendanceSummaryToSuperadmin
 };

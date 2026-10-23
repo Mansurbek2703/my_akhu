@@ -8881,6 +8881,7 @@ function renderStaffTableRows() {
     filtered = filtered.filter(u =>
       (u.full_name || '').toLowerCase().includes(q) ||
       (u.username || '').toLowerCase().includes(q) ||
+      (u.passport_id || '').toLowerCase().includes(q) ||
       (u.id || '').toLowerCase().includes(q) ||
       (u.email || '').toLowerCase().includes(q) ||
       (u.phone || '').toLowerCase().includes(q) ||
@@ -8983,7 +8984,18 @@ function renderStaffTableRows() {
                 <span>${u.full_name}</span>
                 <span style="color:#2563EB; font-size:11px;" title="Monitoring">${icon('eye', 13)}</span>
               </div>
-              <div class="table-sub-text">@${u.username || u.id}</div>
+              <div class="table-sub-text" style="display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin-top:2px;">
+                <span>@${u.username || u.id}</span>
+                ${u.passport_id ? `
+                  <span style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:4px;" title="Face ID / Turniket Pasport ID: ${u.passport_id}">
+                    🪪 ${u.passport_id}
+                  </span>
+                ` : `
+                  <span style="background:#F8FAFC; color:#94A3B8; border:1px dashed #CBD5E1; font-size:10px; padding:1px 5px; border-radius:4px;" title="Face ID monitoring uchun pasport ID kiritilmagan">
+                    🪪 Pasport yo'q
+                  </span>
+                `}
+              </div>
             </div>
           </div>
         </td>
@@ -9097,14 +9109,19 @@ async function showCreateStaffModal() {
         <input type="text" id="new-staff-fullname" class="form-control" placeholder="Familiya Ism Sharif" required>
       </div>
 
-      <div class="grid grid-2 mb-3">
+      <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
         <div class="form-group">
-          <label class="form-label">Email *</label>
+          <label class="form-label">Email</label>
           <input type="email" id="new-staff-email" class="form-control" placeholder="staff@akhu.uz">
         </div>
         <div class="form-group">
           <label class="form-label">Asosiy Telefon</label>
           <input type="text" id="new-staff-phone" class="form-control" placeholder="+998901234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700; color:#1D4ED8;">🪪 Pasport ID (Turniket / Face ID)</label>
+          <input type="text" id="new-staff-passport" class="form-control" placeholder="AD1234567" style="text-transform:uppercase; font-weight:700; color:#1E40AF; border-color:#93C5FD;">
+          <small class="text-muted" style="font-size:11px;">Face ID monitoring va HikCentral uchun</small>
         </div>
       </div>
 
@@ -9179,6 +9196,7 @@ async function handleCreateStaffSubmit() {
   const full_name = document.getElementById('new-staff-fullname')?.value.trim();
   const email = document.getElementById('new-staff-email')?.value.trim();
   const phone = document.getElementById('new-staff-phone')?.value.trim();
+  const passport_id = document.getElementById('new-staff-passport')?.value.trim().toUpperCase() || null;
   const telegram_user_id = document.getElementById('new-staff-tgid')?.value.trim();
   const telegram_username = document.getElementById('new-staff-tgusername')?.value.trim();
   const telegram_phone = document.getElementById('new-staff-tgphone')?.value.trim();
@@ -9229,6 +9247,7 @@ async function handleCreateStaffSubmit() {
         username,
         password,
         full_name,
+        passport_id,
         email,
         phone: cleanPhone,
         telegram_user_id: cleanTgId,
@@ -9348,30 +9367,35 @@ async function showEditStaffModal(userId) {
           <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
         </div>
         <div class="form-group">
+          <label class="form-label" style="font-weight:700; color:#1D4ED8;">🪪 Pasport ID (Turniket / Face ID)</label>
+          <input type="text" id="edit-staff-passport" class="form-control" value="${user.passport_id || ''}" placeholder="AD1234567" style="text-transform:uppercase; font-weight:700; color:#1E40AF; border-color:#93C5FD;">
+          <small class="text-muted" style="font-size:11px;">Face ID monitoring va HikCentral integratsiyasi</small>
+        </div>
+        <div class="form-group">
           <label class="form-label">Telegram Username (@)</label>
           <div style="position:relative;">
             <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
             <input type="text" id="edit-staff-tgusername" class="form-control" style="padding-left:26px;" value="${user.telegram_username ? user.telegram_username.replace(/^@/, '') : ''}" placeholder="username">
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight:600;">Telegram User ID</label>
-          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857 (ixtiyoriy)" onblur="autoFetchTgUsername('edit-staff-tgid', 'edit-staff-tgusername', 'edit-staff-tgid-status')">
-          <div id="edit-staff-tgid-status" style="font-size:11px; margin-top:3px; color:var(--text-muted);">Bo'sh bo'lsa, xodim botga /start bosganda avtomatik to'ldiriladi</div>
-        </div>
       </div>
 
-      <div class="grid grid-2 mb-3">
+      <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1fr 1.2fr 1fr; gap:10px;">
         <div class="form-group">
-          <label class="form-label">Telegram Telefon Raqami (Bot bilan bog'langan)</label>
+          <label class="form-label">Telegram Telefon</label>
           <input type="text" id="edit-staff-tgphone" class="form-control" value="${user.telegram_phone || user.phone || ''}" placeholder="+998901234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-weight:600;">Telegram User ID</label>
+          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857" onblur="autoFetchTgUsername('edit-staff-tgid', 'edit-staff-tgusername', 'edit-staff-tgid-status')">
+          <div id="edit-staff-tgid-status" style="font-size:11px; margin-top:2px; color:var(--text-muted);">Botga /start bosganda to'ldiriladi</div>
         </div>
         <div class="form-group">
           <label class="form-label">Telegram Bot Holati</label>
           <select id="edit-staff-botstatus" class="form-control">
-            <option value="active" ${user.bot_status === 'active' ? 'selected' : ''}>🟢 Faol (Xabarlar yetib bormoqda)</option>
-            <option value="not_started" ${(!user.bot_status || user.bot_status === 'not_started') ? 'selected' : ''}>⚪ Botga kirmagan / Start bosmagan</option>
-            <option value="blocked" ${user.bot_status === 'blocked' ? 'selected' : ''}>🔴 Mute / Bot bloklangan</option>
+            <option value="active" ${user.bot_status === 'active' ? 'selected' : ''}>🟢 Faol</option>
+            <option value="not_started" ${(!user.bot_status || user.bot_status === 'not_started') ? 'selected' : ''}>⚪ Kirilmagan</option>
+            <option value="blocked" ${user.bot_status === 'blocked' ? 'selected' : ''}>🔴 Mute/Blok</option>
           </select>
         </div>
       </div>
@@ -9487,6 +9511,7 @@ async function handleEditStaffSubmit(userId) {
   const password = document.getElementById('edit-staff-password')?.value?.trim();
   const email = document.getElementById('edit-staff-email')?.value.trim();
   const phone = document.getElementById('edit-staff-phone')?.value.trim();
+  const passport_id = document.getElementById('edit-staff-passport')?.value.trim().toUpperCase() || null;
   const photo_url = document.getElementById('edit-staff-photourl')?.value.trim();
   const telegram_user_id = document.getElementById('edit-staff-tgid')?.value.trim();
   const telegram_username = document.getElementById('edit-staff-tgusername')?.value.trim();
@@ -9548,6 +9573,7 @@ async function handleEditStaffSubmit(userId) {
     const payload = {
       username,
       full_name,
+      passport_id,
       email,
       phone: cleanPhone,
       photo_url: photo_url || null,
@@ -10229,67 +10255,67 @@ async function renderCampusAttendance(targetContainer) {
   targetContainer.innerHTML = `
     <div class="attendance-container" style="display:flex; flex-direction:column; gap:20px;">
       <!-- KPI STATISTIKA KARTALARI (BOSILADIGAN FILTRLAR) -->
-      <div id="att-summary-cards" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+      <div id="att-summary-cards" style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:14px;">
         <!-- 1. Jami Talabalar -->
-        <div id="kpi-card-all" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('')" style="background:#FFFFFF; border:2px solid #E2E8F0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.03); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Barcha talabalar ro'yxatini ko'rish uchun bosing">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">Jami Talabalar</div>
+        <div id="kpi-card-all" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('')" style="background:#FFFFFF; border:2px solid #E2E8F0;" title="Barcha talabalar ro'yxatini ko'rish uchun bosing">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">Jami Talabalar</span>
             <span class="kpi-active-pill" style="font-size:10px; font-weight:700; background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:8px;">Barchasi</span>
           </div>
-          <div id="kpi-total-students" style="font-size:28px; font-weight:800; color:#0F172A; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#94A3B8; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+          <div id="kpi-total-students" style="font-size:32px; font-weight:800; color:#0F172A; line-height:1.1; margin:10px 0 8px 0;">...</div>
+          <div style="font-size:11px; color:#64748B; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #E2E8F0; padding-top:8px; margin-top:auto;">
             <span>Faol talabalar</span>
             <span style="color:#2563EB; font-weight:700;">Ro'yxat 👆</span>
           </div>
         </div>
 
         <!-- 2. Kelganlar -->
-        <div id="kpi-card-present" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('present')" style="background:#F0FDF4; border:2px solid #BBF7D0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(16,185,129,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Faqat universitetga kelgan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:12px; font-weight:700; color:#15803D; text-transform:uppercase; letter-spacing:0.5px;">Kelganlar</div>
-            <span id="kpi-att-rate" class="badge" style="background:#22C55E; color:white; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">0%</span>
+        <div id="kpi-card-present" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('present')" style="background:#F0FDF4; border:2px solid #BBF7D0;" title="Faqat universitetga kelgan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="font-size:11px; font-weight:700; color:#15803D; text-transform:uppercase; letter-spacing:0.5px;">Kelganlar</span>
+            <span id="kpi-att-rate" class="badge" style="background:#22C55E; color:white; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">0%</span>
           </div>
-          <div id="kpi-present-students" style="font-size:28px; font-weight:800; color:#166534; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#15803D; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+          <div id="kpi-present-students" style="font-size:32px; font-weight:800; color:#166534; line-height:1.1; margin:10px 0 8px 0;">...</div>
+          <div style="font-size:11px; color:#15803D; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #BBF7D0; padding-top:8px; margin-top:auto;">
             <span>Tashrif buyurgan</span>
             <span style="color:#166534; font-weight:700;">Ro'yxat 👆</span>
           </div>
         </div>
 
         <!-- 3. Kechikkanlar -->
-        <div id="kpi-card-late" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('late')" style="background:#FFFBEB; border:2px solid #FDE68A; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(245,158,11,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="09:15 dan so'ng kelgan kechikkan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:12px; font-weight:700; color:#B45309; text-transform:uppercase; letter-spacing:0.5px;">Kechikkanlar</div>
+        <div id="kpi-card-late" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('late')" style="background:#FFFBEB; border:2px solid #FDE68A;" title="09:15 dan so'ng kelgan kechikkan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="font-size:11px; font-weight:700; color:#B45309; text-transform:uppercase; letter-spacing:0.5px;">Kechikkanlar</span>
             <span style="font-size:10px; font-weight:700; background:#FEF3C7; color:#92400E; padding:2px 6px; border-radius:6px;">> 09:15</span>
           </div>
-          <div id="kpi-late-students" style="font-size:28px; font-weight:800; color:#92400E; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#B45309; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+          <div id="kpi-late-students" style="font-size:32px; font-weight:800; color:#92400E; line-height:1.1; margin:10px 0 8px 0;">...</div>
+          <div style="font-size:11px; color:#B45309; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #FDE68A; padding-top:8px; margin-top:auto;">
             <span>09:15 dan keyin</span>
             <span style="color:#92400E; font-weight:700;">Ro'yxat 👆</span>
           </div>
         </div>
 
         <!-- 4. Hozir Binoda -->
-        <div id="kpi-card-in_campus" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('in_campus')" style="background:#EFF6FF; border:2px solid #BFDBFE; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(59,130,246,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Hozir universitet binosida bo'lib turgan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:12px; font-weight:700; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px;">Hozir Binoda</div>
+        <div id="kpi-card-in_campus" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('in_campus')" style="background:#EFF6FF; border:2px solid #BFDBFE;" title="Hozir universitet binosida bo'lib turgan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="font-size:11px; font-weight:700; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px;">Hozir Binoda</span>
             <span style="font-size:10px; font-weight:700; background:#DBEAFE; color:#1E40AF; padding:2px 6px; border-radius:6px;">Hududda</span>
           </div>
-          <div id="kpi-in-campus" style="font-size:28px; font-weight:800; color:#1E40AF; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#2563EB; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+          <div id="kpi-in-campus" style="font-size:32px; font-weight:800; color:#1E40AF; line-height:1.1; margin:10px 0 8px 0;">...</div>
+          <div style="font-size:11px; color:#1D4ED8; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #BFDBFE; padding-top:8px; margin-top:auto;">
             <span>Chiqish qayd etilmagan</span>
             <span style="color:#1E40AF; font-weight:700;">Ro'yxat 👆</span>
           </div>
         </div>
 
         <!-- 5. Kelmaganlar -->
-        <div id="kpi-card-absent" class="stat-card kpi-filter-card" onclick="filterAttendanceByCard('absent')" style="background:#FEF2F2; border:2px solid #FECACA; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(239,68,68,0.05); cursor:pointer; transition:all 0.2s ease; position:relative;" title="Turniketdan umuman o'tmagan kelmagan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:12px; font-weight:700; color:#B91C1C; text-transform:uppercase; letter-spacing:0.5px;">Kelmaganlar</div>
+        <div id="kpi-card-absent" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('absent')" style="background:#FEF2F2; border:2px solid #FECACA;" title="Turniketdan umuman o'tmagan kelmagan talabalar ro'yxatini ko'rish">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="font-size:11px; font-weight:700; color:#B91C1C; text-transform:uppercase; letter-spacing:0.5px;">Kelmaganlar</span>
             <span style="font-size:10px; font-weight:700; background:#FEE2E2; color:#991B1B; padding:2px 6px; border-radius:6px;">0 marta</span>
           </div>
-          <div id="kpi-absent-students" style="font-size:28px; font-weight:800; color:#991B1B; margin-top:6px;">...</div>
-          <div style="font-size:11.5px; color:#DC2626; margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+          <div id="kpi-absent-students" style="font-size:32px; font-weight:800; color:#991B1B; line-height:1.1; margin:10px 0 8px 0;">...</div>
+          <div style="font-size:11px; color:#DC2626; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #FECACA; padding-top:8px; margin-top:auto;">
             <span>Turniketdan o'tmagan</span>
             <span style="color:#991B1B; font-weight:700;">Ro'yxat 👆</span>
           </div>

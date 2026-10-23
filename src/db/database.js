@@ -54,9 +54,11 @@ function initPostgresSchema() {
   try {
     // Migration: ensure telegram columns exist on staff_user
     db.exec(`
+      ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS passport_id TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS telegram_user_id TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS phone TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS photo_url TEXT;
+      ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS passport_id TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS telegram_username TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS telegram_phone TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS bot_started_at TEXT;
@@ -145,6 +147,9 @@ function initSqliteSchema() {
   // Migration: ensure telegram columns exist on staff_user
   try {
     const cols = db.pragma('table_info(staff_user)').map(c => c.name);
+    if (!cols.includes('passport_id')) {
+      db.exec('ALTER TABLE staff_user ADD COLUMN passport_id TEXT;');
+    }
     if (!cols.includes('telegram_user_id')) {
       db.exec('ALTER TABLE staff_user ADD COLUMN telegram_user_id TEXT;');
     }
@@ -277,6 +282,13 @@ function initSqliteSchema() {
         );
     `);
   } catch (e) {}
+}
+
+// Avtomatik ravishda sxema va migratsiyalarni ishga tushirish
+try {
+  initSchema();
+} catch (e) {
+  console.error('[DB] initSchema xatolik:', e.message);
 }
 
 module.exports = {
