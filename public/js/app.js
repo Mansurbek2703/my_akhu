@@ -4,14 +4,10 @@
 
 const AppState = {
   isLoggedIn: false,
-  currentRole: 'observer',
-  currentPage: 'observe-dashboard',
+  currentRole: null,
+  currentPage: '',
   catalog: { categories: [], items: [], scale: [] },
-  user: {
-    id: 'observer',
-    name: 'Ommaviy Kuzatuvchi',
-    roles: ['observer']
-  }
+  user: null
 };
 
 const ROLE_META = {
@@ -24,7 +20,7 @@ const ROLE_META = {
   'dep_ib': { label: 'Ilmiy bo\'lim', color: '#3B82F6', bg: '#EFF6FF' },
   'dep_sb': { label: 'Sanoat hamkorlik', color: '#3B82F6', bg: '#EFF6FF' },
   'dep_pb': { label: 'Matbuot (PR)', color: '#3B82F6', bg: '#EFF6FF' },
-  'observer': { label: 'Ommaviy Kuzatuv', color: '#60A5FA', bg: 'rgba(96, 165, 250, 0.1)' }
+  'staff': { label: 'Xodim', color: '#3B82F6', bg: '#EFF6FF' }
 };
 
 function formatApproverRole(role) {
@@ -100,14 +96,19 @@ function icon(name, size = 16) {
 
 // API so'rov yuborish uchun yordamchi funksiya
 async function apiFetch(endpoint, options = {}) {
+  const currentUserId = (AppState.user && AppState.user.id) ? AppState.user.id : '';
   const headers = {
     'Content-Type': 'application/json',
-    'x-user-id': AppState.user.id,
+    'x-user-id': currentUserId,
     ...(options.headers || {})
   };
   try {
     const res = await fetch(endpoint, { credentials: 'omit', ...options, headers });
     if (!res.ok) {
+      if (res.status === 401) {
+        logoutStaffUser(false);
+        throw new Error("Sessiya muddati tugagan yoki ruxsat berilmagan. Qaytadan kiring.");
+      }
       const err = await res.json().catch(() => ({ error: `Server xatosi: ${res.status}` }));
       throw new Error(err.error || `Xato yuz berdi (${res.status})`);
     }
@@ -118,41 +119,112 @@ async function apiFetch(endpoint, options = {}) {
   }
 }
 
-// Boshlang'ich yuklash
+// Rollarga mos boshlang'ich sahifani aniqlash
+function getDefaultPageForRoles(roles = []) {
+  if (!roles || !Array.isArray(roles) || roles.length === 0) return 'staff-my-profile';
+  if (roles.includes('superadmin')) return 'admin-students-manage';
+  if (roles.includes('dep_ob')) return 'admin-students-manage';
+  if (roles.includes('tutor')) return 'tutor-my-students';
+  if (roles.includes('prorektor')) return 'dept-approvals';
+  if (roles.some(r => r && r.startsWith('dep_'))) return 'dept-approvals';
+  return 'staff-my-profile';
+}
+
+// Muayyan sahifa foydalanuvchi roliga ruxsat etilganmi?
+function isPagePermittedForUser(pageName, userRoles = []) {
+  if (!userRoles || userRoles.length === 0) return false;
+  if (userRoles.includes('superadmin')) return true;
+
+  // Barcha xodimlar shaxsiy profilini ko'ra oladi
+  if (pageName === 'staff-my-profile') return true;
+
+  // Tyutor kabineti
+  if (pageName.startsWith('tutor-')) {
+    return userRoles.includes('tutor');
+  }
+
+  // Talabalar boshqaruvi (Registrator va Superadmin)
+  if (pageName === 'admin-students-manage' || pageName === 'dept-students-manage' || pageName === 'dept-gpa-import') {
+    return userRoles.includes('dep_ob') || userRoles.includes('superadmin');
+  }
+
+  // Tadbirlar & QR (Faqat ruxsat berilgan bo'lim xodimlari, prorektor va superadmin)
+  if (pageName === 'dept-events' || pageName === 'observe-events') {
+    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'superadmin'));
+  }
+
+  // Tasdiqlash & Ijro
+  if (pageName === 'dept-approvals' || pageName === 'prorektor-queue' || pageName === 'prorektor-risks' || pageName === 'prorektor-appeals') {
+    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'superadmin'));
+  }
+
+  // Tizim sozlamalari, xodimlar boshqaruvi, audit
+  if (pageName.startsWith('admin-')) {
+    return userRoles.includes('superadmin');
+  }
+
+  // Rahbariyat monitoringi (Faqat Prorektor va Superadmin)
+  if (pageName.startsWith('observe-')) {
+    return userRoles.includes('prorektor') || userRoles.includes('superadmin');
+  }
+
+  return false;
+}
+
+// Boshlang'ich yuklash (DOM tayyor bo'lganda)
 document.addEventListener('DOMContentLoaded', async () => {
   // Saqlangan tizim xodimi autentifikatsiyasini tekshirish
   const savedAuth = localStorage.getItem('akhu_auth_user');
   if (savedAuth) {
     try {
       const u = JSON.parse(savedAuth);
-      if (u && u.id && u.roles) {
+      if (u && u.id && u.roles && Array.isArray(u.roles) && u.roles.length > 0) {
         AppState.isLoggedIn = true;
         AppState.user = u;
         AppState.currentRole = u.roles[0] || 'staff';
+      } else {
+        localStorage.removeItem('akhu_auth_user');
       }
     } catch (e) {
       localStorage.removeItem('akhu_auth_user');
     }
   }
 
-  updateAuthUI();
-  updateSidebarPermissions();
   initNavigation();
   initModals();
   initLoginForm();
+
+  const loginScreen = document.getElementById('portal-login-screen');
+  const appContainer = document.getElementById('app-container');
+
+  // AGAR FOYDALANUVCHI TIZIMGA KIRMANGAN BO'LSA:
+  // FAQAT LOGIN DARCHASI OCHILADI (BATAMOM OCHIQ MONITORING VA TV MODE YO'Q)
+  if (!AppState.isLoggedIn || !AppState.user) {
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (appContainer) appContainer.style.display = 'none';
+    const uInput = document.getElementById('portal-username');
+    if (uInput) setTimeout(() => uInput.focus(), 80);
+    return; // Orqa fonda hech qanday ma'lumot yuklanmaydi!
+  }
+
+  // AGAR TIZIMGA KIRILGAN BO'LSA:
+  if (loginScreen) loginScreen.style.display = 'none';
+  if (appContainer) appContainer.style.display = 'flex';
+
+  updateAuthUI();
+  updateSidebarPermissions();
   await loadCatalogData();
-  
-  // Boshlang'ich sahifani aniqlash (Hash yoki localStorage orqali tiklash)
+
+  // Boshlang'ich sahifani aniqlash (Hash yoki roliga mos standart sahifa)
   const hashPage = (window.location.hash || '').replace(/^#/, '').trim();
   const savedPage = localStorage.getItem('akhu_current_page');
-  const targetPage = hashPage || savedPage || 'observe-dashboard';
+  let targetPage = hashPage || savedPage;
 
-  // Agar xodim kirmagan bo'lsa va sahifa yopiq xodimlar bo'limi bo'lsa
-  if (!AppState.isLoggedIn && !targetPage.startsWith('observe-')) {
-    AppState.currentPage = 'observe-dashboard';
-  } else {
-    AppState.currentPage = targetPage;
+  if (!targetPage || !isPagePermittedForUser(targetPage, AppState.user.roles)) {
+    targetPage = getDefaultPageForRoles(AppState.user.roles);
   }
+
+  AppState.currentPage = targetPage;
   navigateTo(AppState.currentPage);
 
   // Hash o'zgarganda sahifani avtomatik almashtirish (Browser Back/Forward)
@@ -163,35 +235,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Hodimlar kirishi tugmasi (to'g'ridan-to'g'ri tinglovchi)
-  const loginBtn = document.getElementById('btn-login-modal');
-  if (loginBtn) {
-    loginBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      openLoginModal();
-    });
-  }
-  const sideLoginBtn = document.getElementById('btn-sidebar-login');
-  if (sideLoginBtn) {
-    sideLoginBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      openLoginModal();
-    });
-  }
-
   // Refresh tugmasi
   const refreshBtn = document.getElementById('btn-refresh-data');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
-      navigateTo(AppState.currentPage);
+      if (AppState.isLoggedIn && AppState.currentPage) {
+        navigateTo(AppState.currentPage);
+      }
     });
   }
 });
 
 // FOYDALANUVCHI STATUSI VA INTERFEYSINI YANGILASH
 function updateAuthUI() {
-  const loginBtn = document.getElementById('btn-login-modal');
-  const sideLoginBtn = document.getElementById('btn-sidebar-login');
   const loggedBox = document.getElementById('auth-logged-box');
   const topbarUser = document.getElementById('topbar-user-name');
   const topbarAvatarImg = document.getElementById('topbar-avatar-img');
@@ -199,9 +255,7 @@ function updateAuthUI() {
   const roleTag = document.getElementById('role-tag');
   const authUserDisplay = document.getElementById('auth-user-display');
 
-  if (AppState.isLoggedIn) {
-    if (loginBtn) loginBtn.style.display = 'none';
-    if (sideLoginBtn) sideLoginBtn.style.display = 'none';
+  if (AppState.isLoggedIn && AppState.user) {
     if (loggedBox) loggedBox.style.display = 'inline-flex';
     const fullName = AppState.user.full_name || AppState.user.name || AppState.user.id;
     if (topbarUser) topbarUser.textContent = fullName;
@@ -220,7 +274,7 @@ function updateAuthUI() {
     }
 
     const mainRole = (AppState.user.roles || [])[0] || 'staff';
-    const meta = ROLE_META[mainRole] || { label: mainRole, color: '#3B82F6', bg: '#EFF6FF' };
+    const meta = ROLE_META[mainRole] || { label: formatApproverRole(mainRole), color: '#3B82F6', bg: '#EFF6FF' };
     
     if (roleTag) {
       roleTag.textContent = meta.label;
@@ -231,93 +285,92 @@ function updateAuthUI() {
     if (authUserDisplay) {
       authUserDisplay.textContent = fullName;
     }
-  } else {
-    if (loginBtn) loginBtn.style.display = 'inline-flex';
-    if (sideLoginBtn) sideLoginBtn.style.display = 'flex';
-    if (loggedBox) loggedBox.style.display = 'none';
-
-    if (roleTag) {
-      roleTag.textContent = 'Ommaviy Kuzatuv';
-      roleTag.style.color = '#60A5FA';
-      roleTag.style.background = 'rgba(96, 165, 250, 0.1)';
-      roleTag.style.borderColor = 'rgba(96, 165, 250, 0.2)';
-    }
-    if (authUserDisplay) {
-      authUserDisplay.textContent = 'Ochiq Monitoring';
-    }
   }
 }
 
 // XODIMNING TIZIMDAN CHIQISHI (LOGOUT)
-function logoutStaffUser() {
-  if (confirm("Haqiqatan ham tizimdan chiqmoqchimisiz?")) {
-    localStorage.removeItem('akhu_auth_user');
-    localStorage.removeItem('akhu_current_page');
-    AppState.isLoggedIn = false;
-    AppState.currentRole = 'observer';
-    AppState.user = {
-      id: 'observer',
-      name: 'Ommaviy Kuzatuvchi',
-      roles: ['observer']
-    };
-    updateAuthUI();
-    updateSidebarPermissions();
-    window.location.hash = '#observe-dashboard';
-    navigateTo('observe-dashboard');
+function logoutStaffUser(askConfirm = true) {
+  if (askConfirm && !confirm("Haqiqatan ham tizimdan chiqmoqchimisiz?")) {
+    return;
   }
-}
+  localStorage.removeItem('akhu_auth_user');
+  localStorage.removeItem('akhu_current_page');
+  AppState.isLoggedIn = false;
+  AppState.currentRole = null;
+  AppState.user = null;
+  AppState.currentPage = '';
 
-// LOGIN MODAL
-function openLoginModal() {
-  const modal = document.getElementById('login-modal');
-  const errBox = document.getElementById('login-error-msg');
+  const loginScreen = document.getElementById('portal-login-screen');
+  const appContainer = document.getElementById('app-container');
+  if (loginScreen) loginScreen.style.display = 'flex';
+  if (appContainer) appContainer.style.display = 'none';
+
+  const uInput = document.getElementById('portal-username');
+  const pInput = document.getElementById('portal-password');
+  const errBox = document.getElementById('portal-login-error');
   if (errBox) errBox.style.display = 'none';
-  if (modal) {
-    modal.classList.add('active');
-    modal.style.display = 'flex';
-    setTimeout(() => {
-      const uInput = document.getElementById('login-username');
-      if (uInput) uInput.focus();
-    }, 50);
-  }
+  if (pInput) pInput.value = '';
+  if (uInput) setTimeout(() => uInput.focus(), 50);
+
+  try {
+    history.replaceState(null, '', window.location.pathname);
+  } catch (e) {}
 }
 
-function closeLoginModal() {
-  const modal = document.getElementById('login-modal');
-  if (modal) {
-    modal.classList.remove('active');
-    modal.style.display = 'none';
-  }
-}
-
-window.openLoginModal = openLoginModal;
-window.closeLoginModal = closeLoginModal;
 window.logoutStaffUser = logoutStaffUser;
 
+// ASOSIY LOGIN FORMASI VA PAROL TEKSHIRUVI
 function initLoginForm() {
-  const form = document.getElementById('portal-login-form');
+  const form = document.getElementById('portal-main-login-form');
+  const togglePassBtn = document.getElementById('btn-toggle-password');
+  const pInput = document.getElementById('portal-password');
+  const eyeOpen = document.getElementById('icon-eye-open');
+  const eyeClosed = document.getElementById('icon-eye-closed');
+
+  if (togglePassBtn && pInput) {
+    togglePassBtn.addEventListener('click', () => {
+      const isPassword = pInput.type === 'password';
+      pInput.type = isPassword ? 'text' : 'password';
+      if (eyeOpen) eyeOpen.style.display = isPassword ? 'none' : 'block';
+      if (eyeClosed) eyeClosed.style.display = isPassword ? 'block' : 'none';
+    });
+  }
+
   if (!form) return;
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const usernameInput = document.getElementById('login-username');
-    const passwordInput = document.getElementById('login-password');
-    const errBox = document.getElementById('login-error-msg');
+    const usernameInput = document.getElementById('portal-username');
+    const passwordInput = document.getElementById('portal-password');
+    const errBox = document.getElementById('portal-login-error');
+    const errText = document.getElementById('portal-login-error-text');
+    const submitBtn = document.getElementById('btn-portal-submit');
 
     const username = usernameInput ? usernameInput.value.trim() : '';
     const password = passwordInput ? passwordInput.value : '';
 
-    if (!username || !password) return;
+    if (!username || !password) {
+      if (errBox && errText) {
+        errText.textContent = "Login va parol kiritilishi shart!";
+        errBox.style.display = 'flex';
+      }
+      return;
+    }
 
     try {
       if (errBox) errBox.style.display = 'none';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px;"></span> Kirilmoqda...`;
+      }
+
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Kirish xatosi');
+      if (!res.ok) throw new Error(data.error || "Login yoki parol noto'g'ri");
 
       AppState.isLoggedIn = true;
       AppState.user = {
@@ -333,30 +386,33 @@ function initLoginForm() {
       AppState.currentRole = (data.user.roles || [])[0] || 'staff';
       localStorage.setItem('akhu_auth_user', JSON.stringify(AppState.user));
 
+      // UI ni almashtirish: login ekranini yopib, boshqaruv tizimini ko'rsatish
+      const loginScreen = document.getElementById('portal-login-screen');
+      const appContainer = document.getElementById('app-container');
+      if (loginScreen) loginScreen.style.display = 'none';
+      if (appContainer) appContainer.style.display = 'flex';
+
       updateAuthUI();
       updateSidebarPermissions();
-      closeLoginModal();
+      await loadCatalogData();
 
-      // Muvaffaqiyatli xabarnoma va sahifaga yo'naltirish
-      if (AppState.user.roles.includes('superadmin')) {
-        navigateTo('admin-users-manage');
-      } else if (AppState.user.roles.includes('tutor')) {
-        navigateTo('tutor-my-students');
-      } else if (AppState.user.roles.includes('prorektor')) {
-        navigateTo('prorektor-queue');
-      } else if (AppState.user.roles.includes('dep_ob')) {
-        navigateTo('admin-students-manage');
-      } else if (AppState.user.roles.some(r => r.startsWith('dep_'))) {
-        navigateTo('dept-approvals');
-      } else {
-        navigateTo('observe-dashboard');
-      }
+      // Foydalanuvchi roliga mos bosh sahifaga yo'naltirish
+      const target = getDefaultPageForRoles(AppState.user.roles);
+      navigateTo(target);
     } catch (err) {
-      if (errBox) {
-        errBox.textContent = err.message;
-        errBox.style.display = 'block';
+      if (errBox && errText) {
+        errText.textContent = err.message || "Kirishda xatolik yuz berdi";
+        errBox.style.display = 'flex';
       } else {
         alert(err.message);
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          <span>Tizimga Kirish</span>
+        `;
       }
     }
   });
@@ -364,7 +420,7 @@ function initLoginForm() {
 
 function updateSidebarPermissions() {
   const sections = document.querySelectorAll('.nav-role-section');
-  const userRoles = AppState.isLoggedIn ? (AppState.user.roles || []) : [];
+  const userRoles = (AppState.isLoggedIn && AppState.user) ? (AppState.user.roles || []) : [];
 
   sections.forEach(el => {
     const forRole = el.getAttribute('data-for-role');
@@ -377,7 +433,11 @@ function updateSidebarPermissions() {
         visible = true; // Superadmin barcha bo'limlarni ko'radi
       } else if (forRole === 'tutor' && userRoles.includes('tutor')) {
         visible = true;
-      } else if (forRole === 'approver' && (userRoles.some(r => r.startsWith('dep_')) || userRoles.includes('prorektor'))) {
+      } else if (forRole === 'approver' && (userRoles.some(r => r && r.startsWith('dep_')) || userRoles.includes('prorektor'))) {
+        visible = true;
+      } else if (forRole === 'events' && (userRoles.includes('superadmin') || userRoles.includes('prorektor') || userRoles.some(r => r && r.startsWith('dep_')))) {
+        visible = true;
+      } else if (forRole === 'leadership' && (userRoles.includes('superadmin') || userRoles.includes('prorektor'))) {
         visible = true;
       } else if (forRole === 'students' && (userRoles.includes('dep_ob') || userRoles.includes('superadmin'))) {
         visible = true;
@@ -394,7 +454,7 @@ function updateSidebarPermissions() {
   });
 
   // Agar bo'lim xodimi bo'lsa navbat sonini yuklash
-  if (AppState.isLoggedIn && (userRoles.some(r => r.startsWith('dep_')) || userRoles.includes('prorektor') || userRoles.includes('superadmin'))) {
+  if (AppState.isLoggedIn && (userRoles.some(r => r && r.startsWith('dep_')) || userRoles.includes('prorektor') || userRoles.includes('superadmin'))) {
     checkPendingBadge();
   }
 }
@@ -532,15 +592,16 @@ function initNavigation() {
 }
 
 function navigateTo(pageName) {
-  // Himoya: Xodimlar bo'limiga kirish uchun tizimga kirish talab qilinadi
-  if (!AppState.isLoggedIn && !pageName.startsWith('observe-') && pageName !== 'dept-events') {
-    openLoginModal();
-    const errBox = document.getElementById('login-error-msg');
-    if (errBox) {
-      errBox.textContent = "Ushbu boshqaruv bo'limiga kirish uchun xodim akkauntingizga kiring!";
-      errBox.style.display = 'block';
-    }
-    pageName = 'observe-dashboard';
+  // Qat'iy himoya: Tizimga kirmagan bo'lsa darhol login darchasiga o'tkazish
+  if (!AppState.isLoggedIn || !AppState.user) {
+    logoutStaffUser(false);
+    return;
+  }
+
+  // Ruxsat tekshiruvi: Agar sahifa foydalanuvchi roliga ruxsat etilmagan bo'lsa, uning asosiy sahifasiga yo'naltirish
+  const userRoles = AppState.user.roles || [];
+  if (!isPagePermittedForUser(pageName, userRoles)) {
+    pageName = getDefaultPageForRoles(userRoles);
   }
 
   AppState.currentPage = pageName;

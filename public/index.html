@@ -3,14 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Al-Xorazmiy Universiteti — Talabalar Reyting Portali</title>
+  <title>Al-Xorazmiy Universiteti — Talabalar Reyting va Boshqaruv Tizimi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=20261019_photos_v1">
+  <link rel="stylesheet" href="/css/main.css?v=20261023_auth_portal_v1">
 </head>
 <body>
-  <div class="app-container">
+  <!-- 1. MAXSUS TIZIMGA KIRISH DARCHASI (FAQAT SHU OCHILADI AGAR TIZIMGA KIRILMAGAN BO'LSA) -->
+  <div id="portal-login-screen" class="portal-login-screen" style="display: flex;">
+    <div class="portal-login-card">
+      <div class="portal-login-header">
+        <div class="portal-login-logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <h1 class="portal-login-title">AL-XORAZMIY UNIVERSITETI</h1>
+        <div class="portal-login-subtitle">Talabalar Reyting va Boshqaruv Tizimi</div>
+        <span class="portal-login-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Xizmat Doirasida Kirish
+        </span>
+      </div>
+
+      <form id="portal-main-login-form">
+        <div class="portal-form-group">
+          <label class="portal-form-label" for="portal-username">Foydalanuvchi nomi yoki Login *</label>
+          <div class="portal-input-wrapper">
+            <span class="portal-input-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <input type="text" id="portal-username" class="portal-input" placeholder="superadmin yoki xodim logini" required autocomplete="username" autofocus>
+          </div>
+        </div>
+
+        <div class="portal-form-group">
+          <label class="portal-form-label" for="portal-password">Maxfiy Parol *</label>
+          <div class="portal-input-wrapper">
+            <span class="portal-input-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <input type="password" id="portal-password" class="portal-input" placeholder="••••••••" required autocomplete="current-password" style="padding-right: 40px;">
+            <button type="button" class="portal-toggle-pass" id="btn-toggle-password" title="Parolni ko'rsatish/yashirish">
+              <svg id="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="icon-eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="portal-login-error" class="portal-login-error">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="portal-login-error-text">Login yoki parol noto'g'ri!</span>
+        </div>
+
+        <button type="submit" id="btn-portal-submit" class="portal-btn-submit">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          <span>Tizimga Kirish</span>
+        </button>
+      </form>
+
+      <div class="portal-login-footer-info">
+        Tizim ma'lumotlariga faqat ruxsat berilgan universitet xodimlari va ma'muriyati shaxsiy login hamda paroli orqali kirishi mumkin. Barcha xatti-harakatlar qayd etiladi.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. AVTORIZATSIYADAN O'TGANDAN KEYINGI BOSHQARUV VA XIZMAT PANELI -->
+  <div class="app-container" id="app-container" style="display: none;">
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -21,62 +81,62 @@
         </div>
         <div class="logo-text">
           <h1>AL-XORAZMIY</h1>
-          <span>TALABALAR REYTINGI</span>
+          <span>TALABALAR TIZIMI</span>
         </div>
       </div>
 
-      <!-- FOYDALANUVCHI STATUSI (Kuzatuv yoki Xodim) -->
+      <!-- XIZMAT FOYDALANUVCHISI STATUSI -->
       <div class="role-switcher-box" id="auth-status-box">
         <div class="role-label" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-          <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Rejim:</span>
-          <span id="role-tag" style="color: #60A5FA; font-weight: 700; font-size: 11px; background: rgba(96, 165, 250, 0.1); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(96, 165, 250, 0.2);">Ommaviy Kuzatuv</span>
+          <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Lavozim:</span>
+          <span id="role-tag" style="color: #60A5FA; font-weight: 700; font-size: 11px; background: rgba(96, 165, 250, 0.1); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(96, 165, 250, 0.2);">Xodim</span>
         </div>
-        <div id="auth-user-display" style="margin-top: 6px; font-size: 12.5px; font-weight: 600; color: #F8FAFC;">
-          Ochiq Monitoring
+        <div id="auth-user-display" style="margin-top: 6px; font-size: 12.5px; font-weight: 600; color: #F8FAFC; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          Yuklanmoqda...
         </div>
       </div>
 
-      <!-- NAVIGATION -->
+      <!-- NAVIGATION (FAQAT RUXSAT ETILGAN BO'LIMLAR) -->
       <nav class="sidebar-nav">
-        <div class="nav-section-title">ASOSIY MENYU</div>
+        <div class="nav-section-title">XIZMAT BO'LIMLARI</div>
 
-        <!-- 1. Umumiy Monitoring -->
-        <a class="nav-item active" data-page="observe-dashboard" title="Umumiy Monitoring">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-          Umumiy Monitoring
-        </a>
-
-        <!-- 2. Talabalar Boshqaruvi -->
+        <!-- 1. Talabalar Boshqaruvi (Superadmin va Registrator) -->
         <a class="nav-item nav-role-section" data-for-role="students" data-page="admin-students-manage" title="Talabalar Boshqaruvi">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Talabalar Boshqaruvi
         </a>
 
-        <!-- 3. Tadbirlar & QR -->
-        <a class="nav-item" data-page="dept-events" title="Tadbirlar & QR">
+        <!-- 2. Tadbirlar & QR (Faqat ruxsat berilgan bo'limlar: Superadmin, Mas'ul Bo'limlar, Prorektor) -->
+        <a class="nav-item nav-role-section" data-for-role="events" data-page="dept-events" title="Tadbirlar & QR">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="13" r="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
           Tadbirlar & QR
         </a>
 
-        <!-- 4. Tasdiqlash & Nazorat -->
+        <!-- 3. Tasdiqlash & Ijro (Bo'lim boshliqlari, Prorektor, Superadmin) -->
         <a class="nav-item nav-role-section" data-for-role="approver" data-page="dept-approvals" title="Tasdiqlash & Ijro">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           Tasdiqlash & Ijro <span class="badge" id="pending-badge" style="display:none;">0</span>
         </a>
 
-        <!-- 5. Tyutor Kabineti -->
+        <!-- 4. Tyutor Kabineti (Faqat Tyutor va Superadmin) -->
         <a class="nav-item nav-role-section" data-for-role="tutor" data-page="tutor-my-students" title="Tyutor Kabineti">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
           Tyutor Kabineti
         </a>
 
-        <!-- 6. Tizim & Boshqaruv (Superadmin) -->
-        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-users-manage" title="Tizim & Rollar Boshqaruvi">
+        <!-- 5. Tizim & Sozlamalar (Faqat Superadmin) -->
+        <a class="nav-item nav-role-section" data-for-role="superadmin" data-page="admin-users-manage" title="Tizim Sozlamalari">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Tizim Sozlamalari
         </a>
 
-        <!-- 7. Mening Profilim -->
+        <!-- 6. Rahbariyat Monitoringi (Faqat Superadmin va Prorektor) -->
+        <a class="nav-item nav-role-section" data-for-role="leadership" data-page="observe-dashboard" title="Monitoring & Tahlil">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          Monitoring & Tahlil
+        </a>
+
+        <!-- 7. Mening Profilim (Barcha xodimlar uchun) -->
         <a class="nav-item nav-role-section" data-for-role="staff" data-page="staff-my-profile" title="Mening Profilim">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           Mening Profilim
@@ -84,14 +144,10 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button id="btn-sidebar-login" class="btn btn-outline btn-sm w-100 mb-2" onclick="openLoginModal()" style="color: #93C5FD; border-color: rgba(147, 197, 253, 0.3); display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          Hodimlar Kirishi
+        <button class="btn btn-outline btn-sm w-100" onclick="logoutStaffUser()" style="color: #FECACA; border-color: rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Tizimdan Chiqish
         </button>
-        <a href="/tv?token=akhu_tv_display_token_2026_xyz" target="_blank" class="btn btn-outline btn-sm w-100" style="color: #60A5FA; border-color: rgba(96, 165, 250, 0.3);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
-          Katta Ekran (TV)
-        </a>
       </div>
     </aside>
 
@@ -100,36 +156,32 @@
       <!-- TOP BAR -->
       <header class="topbar">
         <div class="page-title">
-          <h2 id="current-page-title">Kuzatuv Paneli</h2>
-          <p id="current-page-desc">Universitet talabalari faolligi va ko'rsatkichlari monitoringi</p>
+          <h2 id="current-page-title">Boshqaruv Paneli</h2>
+          <p id="current-page-desc">Al-Xorazmiy Universiteti Talabalar Reyting va Boshqaruv Tizimi</p>
         </div>
 
         <div class="topbar-actions">
-          <a href="/miniapp" target="_blank" class="btn btn-outline btn-sm">
+          <a href="/miniapp" target="_blank" class="btn btn-outline btn-sm" title="Talaba Mini App interfeysini ko'rish">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             Talaba Mini App
           </a>
-          
-          <!-- Xodim Kirish / Profil qismi -->
+
+          <!-- Foydalanuvchi Profil qismi -->
           <div id="auth-action-area" style="display: inline-flex; align-items: center; gap: 8px;">
-            <button id="btn-login-modal" class="btn btn-primary btn-sm" onclick="openLoginModal()" style="display: inline-flex; align-items: center; gap: 6px;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-              <span>Hodimlar Kirishi</span>
-            </button>
-            <div id="auth-logged-box" style="display: none; align-items: center; gap: 8px;">
+            <div id="auth-logged-box" style="display: flex; align-items: center; gap: 8px;">
               <div id="topbar-user-badge" onclick="navigateTo('staff-my-profile')" style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 30px; padding: 4px 14px 4px 6px;" title="Mening Profilimga o'tish">
                 <img id="topbar-avatar-img" src="" alt="Avatar" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: none;">
                 <span id="topbar-avatar-fallback" style="width: 26px; height: 26px; border-radius: 50%; background: #3B82F6; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">👤</span>
-                <span id="topbar-user-name" style="font-weight: 600; font-size: 12.5px; color: #1D4ED8;">Mansurbek Qazaqov</span>
+                <span id="topbar-user-name" style="font-weight: 600; font-size: 12.5px; color: #1D4ED8;">Foydalanuvchi</span>
               </div>
-              <button class="btn btn-outline btn-sm text-danger" onclick="logoutStaffUser()" title="Tizimdan chiqish" style="border-color: #FECACA; color: #DC2626;">
+              <button class="btn btn-outline btn-sm text-danger" onclick="logoutStaffUser()" title="Tizimdan chiqish" style="border-color: #FECACA; color: #DC2626; display: flex; align-items: center; gap: 4px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 Chiqish
               </button>
             </div>
           </div>
 
-          <button id="btn-refresh-data" class="btn btn-outline btn-sm">
+          <button id="btn-refresh-data" class="btn btn-outline btn-sm" title="Sahifani yangilash">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Yangilash
           </button>
@@ -143,7 +195,7 @@
     </main>
   </div>
 
-  <!-- MODAL: Ball kiritish / Tafsilotlar -->
+  <!-- MODAL: Umumiy Tafsilotlar -->
   <div class="modal-overlay" id="common-modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -161,41 +213,7 @@
     </div>
   </div>
 
-  <!-- MODAL: Tizimga Kirish (Login) -->
-  <div class="modal-overlay" id="login-modal">
-    <div class="modal-content" style="max-width: 420px;">
-      <div class="modal-header">
-        <h3>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          Hodimlar uchun Tizimga Kirish
-        </h3>
-        <button class="btn btn-sm btn-outline btn-icon-only" onclick="closeLoginModal()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <form id="portal-login-form">
-          <div class="form-group mb-3">
-            <label class="form-label" style="font-weight: 600;">Login yoki Foydalanuvchi Nomi *</label>
-            <input type="text" id="login-username" class="form-control" placeholder="superadmin yoki xodim logini" required autofocus>
-          </div>
-          <div class="form-group mb-3">
-            <label class="form-label" style="font-weight: 600;">Parol *</label>
-            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
-          </div>
-          <div id="login-error-msg" style="color: var(--danger); font-size: 12px; margin-bottom: 12px; display: none; background: #FEF2F2; padding: 8px 12px; border-radius: 6px; border: 1px solid #FCA5A5;"></div>
-          <button type="submit" class="btn btn-primary w-100" style="padding: 10px; font-weight: 600;">
-            Tizimga Kirish
-          </button>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline w-100" onclick="closeLoginModal()">Bekor Qilish</button>
-      </div>
-    </div>
-  </div>
-
   <script src="/js/html5-qrcode.min.js"></script>
-  <script src="/js/app.js?v=20261019_photos_v1"></script>
+  <script src="/js/app.js?v=20261023_auth_portal_v1"></script>
 </body>
 </html>

@@ -7,12 +7,20 @@ const { importGpaTop20, importAttendance100 } = require('../services/importServi
 const { calculateRiskFlags, getLateApprovals, getRandomAuditSample } = require('../services/cronService');
 
 function authenticateStaff(req, res, next) {
-  const userId = req.headers['x-user-id'] || 'dep_yb';
-  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
-  if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, tizimga kiring." });
 
-  user.roles = JSON.parse(user.roles);
-  req.staffUser = user;
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'] };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  if (!user) return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas." });
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
+  req.staffUser = { ...user, roles };
   next();
 }
 

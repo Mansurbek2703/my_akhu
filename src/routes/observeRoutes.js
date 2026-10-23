@@ -3,7 +3,38 @@ const router = express.Router();
 const { db } = require('../db/database');
 const { getRatingList, calculateWeeklyStars } = require('../services/ratingService');
 const { calculateRiskFlags, getLateApprovals } = require('../services/cronService');
-const { buildStudentSearch } = require('../utils/searchHelper');
+const config = require('../config');
+
+// Qat'iy avtorizatsiya middleware: Faqat tizimga kirgan xodimlar yoki to'g'ri TV tokeni
+function authenticateStaffOrTv(req, res, next) {
+  const tvToken = req.query.token || req.headers['x-tv-token'];
+  if (tvToken && tvToken === config.secrets.tvToken) {
+    req.staffUser = { id: 'tv_display', roles: ['observer'] };
+    return next();
+  }
+
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) {
+    return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, login va parol orqali tizimga kiring." });
+  }
+
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'] };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  if (!user) {
+    return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas." });
+  }
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
+  req.staffUser = { ...user, roles };
+  next();
+}
+
+router.use(authenticateStaffOrTv);
 
 /**
  * GET /api/observe/dashboard

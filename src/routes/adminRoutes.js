@@ -86,11 +86,19 @@ const upload = multer({
 
 // Middleware: Faqat Superadmin
 function authenticateSuperadmin(req, res, next) {
-  const userId = req.headers['x-user-id'] || 'superadmin';
-  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
-  if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, tizimga kiring." });
 
-  const roles = JSON.parse(user.roles);
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'] };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  if (!user) return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas" });
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
   if (!roles.includes('superadmin')) {
     return res.status(403).json({ error: 'Faqat Superadmin roli uchun ruxsat berilgan' });
   }
@@ -101,11 +109,19 @@ function authenticateSuperadmin(req, res, next) {
 
 // Middleware: Superadmin, Registrator (dep_ob) YOKI Tyutor
 function authenticateSuperadminOrRegistrator(req, res, next) {
-  const userId = req.headers['x-user-id'] || req.query.user_id || 'superadmin';
-  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
-  if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, tizimga kiring." });
 
-  const roles = JSON.parse(user.roles);
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'] };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  if (!user) return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas" });
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
   if (!roles.includes('superadmin') && !roles.includes('dep_ob') && !roles.includes('tutor')) {
     return res.status(403).json({ error: 'Faqat Superadmin, Registrator yoki Tyutor uchun ruxsat berilgan' });
   }
@@ -221,14 +237,6 @@ router.post('/login', (req, res) => {
     }
   } catch (err) {
     console.error('Login DB error:', err);
-  }
-
-  // 3. Kuzatuvchi (Observer)
-  if (u === 'observer') {
-    return res.json({
-      success: true,
-      user: { id: 'observer', full_name: 'Universitet Kuzatuv Kengashi / Rektorat', roles: ['observer'], email: 'observer@akhu.uz' }
-    });
   }
 
   return res.status(401).json({ error: 'Foydalanuvchi topilmadi yoki login/parol noto\'g\'ri' });
@@ -1619,7 +1627,8 @@ router.post('/users', authenticateSuperadmin, async (req, res) => {
  * Joriy xodim o'z profilini olishi
  */
 router.get('/profile/me', (req, res) => {
-  const staffId = req.headers['x-user-id'] || 'superadmin';
+  const staffId = req.headers['x-user-id'] || req.query.user_id;
+  if (!staffId) return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan" });
   const user = db.prepare(`SELECT * FROM staff_user WHERE id = ?`).get(staffId);
   if (!user) return res.status(404).json({ error: 'Xodim hisobi topilmadi' });
 

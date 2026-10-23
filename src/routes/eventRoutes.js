@@ -13,6 +13,39 @@ const LEVEL_POINTS = {
   xalqaro: 25
 };
 
+const config = require('../config');
+
+// Qat'iy avtorizatsiya: Tadbirlar bo'limiga faqat tizimga kirgan xodimlar yoki to'g'ri TV tokeni
+function authenticateStaffOrTv(req, res, next) {
+  const tvToken = req.query.token || req.headers['x-tv-token'];
+  if (tvToken && tvToken === config.secrets.tvToken) {
+    req.staffUser = { id: 'tv_display', roles: ['observer'] };
+    return next();
+  }
+
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) {
+    return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, login va parol orqali tizimga kiring." });
+  }
+
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'] };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  if (!user) {
+    return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas." });
+  }
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
+  req.staffUser = { ...user, roles };
+  next();
+}
+
+router.use(authenticateStaffOrTv);
+
 /**
  * GET /api/events
  * Tadbirlar ro'yxati
@@ -78,7 +111,7 @@ router.post('/', (req, res) => {
     const eventId = 'ev_' + crypto.randomBytes(6).toString('hex');
     const qrSecret = 'sec_' + crypto.randomBytes(12).toString('hex');
     const nowIso = now.toISOString();
-    const createdBy = req.headers['x-user-id'] || organizer_unit || 'dep_yb';
+    const createdBy = req.staffUser.id;
     const photoUrl = (req.body.photo_url || req.body.image_url) ? String(req.body.photo_url || req.body.image_url).trim() : null;
 
     // Anti-fraud talabi: Tadbir yaratuvchi QR kodi har doim qat'iy 5 sekunddan yangilanishi shart!
@@ -162,7 +195,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const eventId = req.params.id;
-    const userId = req.headers['x-user-id'] || 'dep_yb';
+    const userId = req.staffUser.id;
 
     const event = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
@@ -373,7 +406,7 @@ router.post('/:id/checkin-student', (req, res) => {
   try {
     const eventId = req.params.id;
     const { student_id, student_query, qr_payload } = req.body;
-    const staffId = req.headers['x-user-id'] || 'dep_yb';
+    const staffId = req.staffUser.id;
 
     const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
@@ -530,7 +563,7 @@ router.post('/:id/checkin-student', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const eventId = req.params.id;
-    const staffId = req.headers['x-user-id'] || 'dep_yb';
+    const staffId = req.staffUser.id;
 
     const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });

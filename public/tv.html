@@ -248,9 +248,12 @@
     }
 
     // Ma'lumotlarni yuklash
+    const urlParams = new URLSearchParams(window.location.search);
+    const tvToken = urlParams.get('token') || '';
+
     async function loadTvData() {
       try {
-        const res = await fetch('/api/observe/dashboard');
+        const res = await fetch(`/api/observe/dashboard?token=${encodeURIComponent(tvToken)}`);
         const data = await res.json();
 
         // 1. Weekly Stars (Haftaning Qahramonlari)
@@ -313,7 +316,7 @@
         `).join('');
 
         // 3. Tadbirlar
-        const evRes = await fetch('/api/events');
+        const evRes = await fetch(`/api/events?token=${encodeURIComponent(tvToken)}`);
         const evData = await evRes.json();
         const evGrid = document.getElementById('tv-events-grid');
         

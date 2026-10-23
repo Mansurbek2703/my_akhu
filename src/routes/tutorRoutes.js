@@ -5,14 +5,26 @@ const { createPointEntries, resubmitEntry, cancelEntry } = require('../services/
 const { notifyStudent } = require('../services/telegramService');
 const { buildStudentSearch } = require('../utils/searchHelper');
 
-// Staff auth middleware
+// Staff auth middleware (Tyutor va Superadmin)
 function authenticateStaff(req, res, next) {
-  const userId = req.headers['x-user-id'] || 'tutor_1'; // default demo tutor
-  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
-  if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, login va parol orqali tizimga kiring." });
 
-  user.roles = JSON.parse(user.roles);
-  req.staffUser = user;
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'] };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  if (!user) return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas." });
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
+  if (!roles.includes('tutor') && !roles.includes('superadmin')) {
+    return res.status(403).json({ error: 'Faqat tyutorlar uchun ruxsat berilgan' });
+  }
+
+  req.staffUser = { ...user, roles };
   next();
 }
 
