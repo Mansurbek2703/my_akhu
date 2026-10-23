@@ -26,6 +26,13 @@ module.exports = {
     dataEncryption: process.env.DATA_ENCRYPTION_KEY || 'akhu_data_aes256_key_32chars!',
     tvToken: process.env.TV_ACCESS_TOKEN || 'akhu_tv_display_token_2026_xyz'
   },
+  hikcentral: {
+    enabled: process.env.HIKCENTRAL_ENABLED === 'True' || process.env.HIKCENTRAL_ENABLED === 'true',
+    host: process.env.HIKCENTRAL_HOST || 'https://172.20.20.8',
+    appKey: process.env.HIKCENTRAL_APP_KEY || '35525590',
+    appSecret: process.env.HIKCENTRAL_APP_SECRET || 'KkW8WbxTG5X6S9bSN3BU',
+    verifySsl: process.env.HIKCENTRAL_VERIFY_SSL === 'True' || process.env.HIKCENTRAL_VERIFY_SSL === 'true'
+  },
   uploadDir: path.join(__dirname, '../uploads'),
   timeZone: 'Asia/Tashkent'
 };

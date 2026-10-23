@@ -94,6 +94,44 @@ function initPostgresSchema() {
             SELECT tg.group_code FROM tutor_group tg WHERE tg.tutor_id = student.tutor_id
           )
         );
+
+      -- Campus Attendance & Access Control Logs
+      CREATE TABLE IF NOT EXISTS campus_attendance (
+          id TEXT PRIMARY KEY,
+          student_id TEXT NOT NULL,
+          passport_id TEXT NOT NULL,
+          date TEXT NOT NULL,
+          first_in_at TEXT,
+          last_out_at TEXT,
+          in_count INTEGER NOT NULL DEFAULT 0,
+          out_count INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'present' CHECK(status IN ('present', 'late', 'absent')),
+          raw_events TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (student_id, date),
+          FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_campus_attendance_date ON campus_attendance(date);
+      CREATE INDEX IF NOT EXISTS idx_campus_attendance_student ON campus_attendance(student_id, date);
+      CREATE INDEX IF NOT EXISTS idx_campus_attendance_passport ON campus_attendance(passport_id, date);
+
+      CREATE TABLE IF NOT EXISTS access_control_log (
+          id TEXT PRIMARY KEY,
+          student_id TEXT,
+          passport_id TEXT NOT NULL,
+          person_name TEXT,
+          event_time TEXT NOT NULL,
+          direction TEXT NOT NULL CHECK(direction IN ('in', 'out', 'unknown')),
+          door_name TEXT,
+          device_name TEXT,
+          card_no TEXT,
+          raw_payload TEXT,
+          created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_access_log_passport ON access_control_log(passport_id, event_time);
+      CREATE INDEX IF NOT EXISTS idx_access_log_student ON access_control_log(student_id, event_time);
+      CREATE INDEX IF NOT EXISTS idx_access_log_time ON access_control_log(event_time);
     `);
   } catch (err) {
     console.error('[DB] PostgreSQL initSchema warning:', err.message);

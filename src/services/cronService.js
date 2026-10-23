@@ -212,6 +212,18 @@ function initBackgroundJobs() {
       console.error('No-show tekshirishda xatolik:', e.message);
     }
   }, 10 * 60 * 1000);
+
+  // Har 10 daqiqada HikCentral turniket/Face ID davomatini avtomatik sinxronlash
+  setInterval(async () => {
+    try {
+      if (config.hikcentral && config.hikcentral.enabled) {
+        const { syncCampusAttendance } = require('./hikcentralService');
+        await syncCampusAttendance();
+      }
+    } catch (e) {
+      // Tarmoq ulanishi kutilyotgan paytda ortiqcha xatolik logini bostirish
+    }
+  }, 10 * 60 * 1000);
 }
 
 module.exports = {

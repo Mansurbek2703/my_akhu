@@ -27,6 +27,7 @@ app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/observe', require('./routes/observeRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
 
 // Telegram Bot Webhook endpoint
 app.post('/api/telegram/webhook', async (req, res) => {

@@ -307,3 +307,43 @@ CREATE TABLE IF NOT EXISTS telegram_bot_log (
 CREATE INDEX IF NOT EXISTS idx_bot_log_user ON telegram_bot_log(telegram_user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_bot_log_created ON telegram_bot_log(created_at);
 
+-- 22. KAMPUSGA KIRISH-CHIQISH VA DAVOMAT (campus_attendance)
+CREATE TABLE IF NOT EXISTS campus_attendance (
+    id TEXT PRIMARY KEY,
+    student_id TEXT NOT NULL,
+    passport_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    first_in_at TEXT,
+    last_out_at TEXT,
+    in_count INTEGER NOT NULL DEFAULT 0,
+    out_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'present' CHECK(status IN ('present', 'late', 'absent')),
+    raw_events TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (student_id, date),
+    FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_campus_attendance_date ON campus_attendance(date);
+CREATE INDEX IF NOT EXISTS idx_campus_attendance_student ON campus_attendance(student_id, date);
+CREATE INDEX IF NOT EXISTS idx_campus_attendance_passport ON campus_attendance(passport_id, date);
+
+-- 23. TURNIKET / FACE ID EVENT JURNALI (access_control_log)
+CREATE TABLE IF NOT EXISTS access_control_log (
+    id TEXT PRIMARY KEY,
+    student_id TEXT,
+    passport_id TEXT NOT NULL,
+    person_name TEXT,
+    event_time TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK(direction IN ('in', 'out', 'unknown')),
+    door_name TEXT,
+    device_name TEXT,
+    card_no TEXT,
+    raw_payload TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_access_log_passport ON access_control_log(passport_id, event_time);
+CREATE INDEX IF NOT EXISTS idx_access_log_student ON access_control_log(student_id, event_time);
+CREATE INDEX IF NOT EXISTS idx_access_log_time ON access_control_log(event_time);
+
+
