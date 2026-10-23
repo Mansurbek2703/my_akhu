@@ -50,8 +50,19 @@ def hik_request(path, body=None):
         return {"error": str(e)}
 
 if __name__ == '__main__':
-    path = sys.argv[1] if len(sys.argv) > 1 else "/artemis/api/resource/v1/person/personList"
-    payload = {"pageNo": 1, "pageSize": 10}
+    path = sys.argv[1] if len(sys.argv) > 1 else "/artemis/api/acs/v1/door/events"
+    now_date = time.strftime("%Y-%m-%d")
+    payload = {
+        "pageNo": 1,
+        "pageSize": 10,
+        "startTime": f"{now_date}T00:00:00+05:00",
+        "endTime": f"{now_date}T23:59:59+05:00",
+        "doorIndexCodes": ["1", "2", "3", "4"],
+        "eventType": 196893
+    }
+    if "person" in path:
+        payload = {"pageNo": 1, "pageSize": 10}
+        
     res = hik_request(path, payload)
     print("RESPONSE:")
     print(json.dumps(res, indent=2, ensure_ascii=False))

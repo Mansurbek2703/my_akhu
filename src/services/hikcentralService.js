@@ -106,7 +106,8 @@ async function testHikCentralConnection() {
       host: cfg.host,
       appKey: cfg.appKey,
       responseCode: res.code,
-      message: res.msg || 'Ulanish muvaffaqiyatli'
+      message: res.msg || 'Ulanish muvaffaqiyatli',
+      totalPersons: (res.data && res.data.total) ? res.data.total : 0
     };
   } catch (err) {
     return {
@@ -119,47 +120,86 @@ async function testHikCentralConnection() {
 }
 
 /**
- * Xodimlar va talabalar ro'yxatini olish (Passport ID bilan)
+ * Universitetdagi barcha turniket eshiklari ro'yxatini olish
  */
-async function fetchHikPersonList(pageNo = 1, pageSize = 100) {
+async function fetchDoorList() {
   try {
-    const res = await makeHikRequest('/artemis/api/resource/v1/person/personList', { pageNo, pageSize });
+    const res = await makeHikRequest('/artemis/api/resource/v1/acsDoor/acsDoorList', { pageNo: 1, pageSize: 100 });
     if (res && res.data && Array.isArray(res.data.list)) {
-      return res.data;
+      return res.data.list;
     }
-    // Fallback v2
-    const res2 = await makeHikRequest('/artemis/api/resource/v2/person/personList', { pageNo, pageSize });
-    if (res2 && res2.data && Array.isArray(res2.data.list)) {
-      return res2.data;
-    }
-    return res.data || { list: [], total: 0 };
+    return [
+      { doorIndexCode: "1", doorName: "Turniket_Kirish1" },
+      { doorIndexCode: "4", doorName: "Turniket_kirish2_Door_1" },
+      { doorIndexCode: "2", doorName: "Turniket_chiqish1_Door_1" },
+      { doorIndexCode: "3", doorName: "Turniket_chiqish2_Door_1" }
+    ];
   } catch (err) {
-    console.error('[HikCentral] fetchHikPersonList error:', err.message);
-    throw err;
+    console.warn('[HikCentral] fetchDoorList warning, using fallback turnstiles:', err.message);
+    return [
+      { doorIndexCode: "1", doorName: "Turniket_Kirish1" },
+      { doorIndexCode: "4", doorName: "Turniket_kirish2_Door_1" },
+      { doorIndexCode: "2", doorName: "Turniket_chiqish1_Door_1" },
+      { doorIndexCode: "3", doorName: "Turniket_chiqish2_Door_1" }
+    ];
   }
 }
 
 /**
- * Turniket/Face ID kirish-chiqish voqealarini olish
- * @param {Object} params { startTime, endTime, pageNo, pageSize }
+ * Xodimlar va talabalar ro'yxatini xotiraga yuklash (personId -> personCode / Passport ID)
  */
-async function fetchDoorEvents({ startTime, endTime, pageNo = 1, pageSize = 200 }) {
+async function fetchHikPersonMapping() {
+  const personIdToPassport = new Map();
+  const personIdToName = new Map();
+  let pageNo = 1;
+  const pageSize = 100;
+  let hasMore = true;
+
+  while (hasMore) {
+    const res = await makeHikRequest('/artemis/api/resource/v1/person/personList', { pageNo, pageSize });
+    if (res && res.data && Array.isArray(res.data.list)) {
+      const list = res.data.list;
+      for (const p of list) {
+        const passport = normalizePassport(p.personCode || p.certificateNo || '');
+        if (p.personId) {
+          personIdToPassport.set(p.personId.toString(), passport);
+          personIdToName.set(p.personId.toString(), p.personName || '');
+        }
+      }
+      if (list.length < pageSize || (res.data.total && pageNo * pageSize >= res.data.total)) {
+        hasMore = false;
+      } else {
+        pageNo++;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return { personIdToPassport, personIdToName };
+}
+
+/**
+ * Turniket/Face ID kirish-chiqish voqealarini olish
+ */
+async function fetchDoorEvents({ startTime, endTime, pageNo = 1, pageSize = 200, doorIndexCodes = null }) {
   try {
+    const doors = doorIndexCodes && doorIndexCodes.length > 0 
+      ? doorIndexCodes 
+      : ["1", "2", "3", "4"];
+
     const payload = {
       pageNo,
       pageSize,
-      startTime: startTime || new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
-      endTime: endTime || new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
+      startTime,
+      endTime,
+      doorIndexCodes: doors,
+      eventType: 196893 // Legal card / face authentication passed
     };
 
     const res = await makeHikRequest('/artemis/api/acs/v1/door/events', payload);
     if (res && res.data && Array.isArray(res.data.list)) {
       return res.data;
-    }
-    // Fallback v2
-    const res2 = await makeHikRequest('/artemis/api/acs/v2/door/events', payload);
-    if (res2 && res2.data && Array.isArray(res2.data.list)) {
-      return res2.data;
     }
     return res.data || { list: [], total: 0 };
   } catch (err) {
@@ -180,15 +220,20 @@ function normalizePassport(passport) {
  * Voqea yo'nalishini aniqlash ('in' yoki 'out')
  */
 function resolveDirection(event) {
-  // inAndOutType: 1=In, 0=Out, or string
-  if (event.inAndOutType === 1 || event.inAndOutType === '1' || event.direction === 'in') return 'in';
-  if (event.inAndOutType === 0 || event.inAndOutType === '0' || event.direction === 'out') return 'out';
-  
-  const doorName = (event.doorName || event.deviceName || '').toLowerCase();
-  if (doorName.includes('kirish') || doorName.includes('in') || doorName.includes('entry')) return 'in';
-  if (doorName.includes('chiqish') || doorName.includes('out') || doorName.includes('exit')) return 'out';
-  
-  return 'in'; // standart holatda kirish
+  const doorName = (event.doorName || '').toLowerCase();
+  const code = (event.doorIndexCode || '').toString();
+
+  if (doorName.includes('chiqish') || code === '2' || code === '3') {
+    return 'out';
+  }
+  if (doorName.includes('kirish') || code === '1' || code === '4') {
+    return 'in';
+  }
+
+  if (event.checkInAndOutType === 1 || event.checkInAndOutType === '1') return 'in';
+  if (event.checkInAndOutType === 0 || event.checkInAndOutType === '0') return 'out';
+
+  return 'in';
 }
 
 /**
@@ -202,12 +247,15 @@ async function syncCampusAttendance(targetDate = null) {
 
   console.log(`[HikCentral] Sinxronizatsiya boshlandi: sana ${dateStr} (${startTime} - ${endTime})`);
 
-  let pageNo = 1;
-  const pageSize = 200;
-  let totalProcessed = 0;
-  let hasMore = true;
+  // 1. Turniketlar ro'yxatini aniqlash
+  const doors = await fetchDoorList();
+  const doorIndexCodes = doors.map(d => d.doorIndexCode.toString());
 
-  // Barcha talabalarning pasport ID larini xotiraga yuklash (tezkor qidirish uchun)
+  // 2. HikCentral personId -> Pasport ID mappingini olish
+  const { personIdToPassport, personIdToName } = await fetchHikPersonMapping();
+  console.log(`[HikCentral] HikCentral xodimlar/talabalar xaritasi yuklandi: ${personIdToPassport.size} nafar`);
+
+  // 3. Bazadagi talabalarni pasport bo'yicha indekslash
   const students = db.prepare('SELECT id, external_id, first_name, last_name, group_code FROM student').all();
   const studentByPassport = new Map();
   for (const s of students) {
@@ -217,11 +265,23 @@ async function syncCampusAttendance(targetDate = null) {
     }
   }
 
-  // Talabalar bo'yicha kunlik voqealar yig'indisi
-  const dailyStudentEvents = new Map(); // studentId -> { student, events: [] }
+  // 4. Turniket o'tish voqealarini sahifama-sahifa tortib olish
+  let pageNo = 1;
+  const pageSize = 200;
+  let totalProcessed = 0;
+  let hasMore = true;
+
+  const dailyStudentEvents = new Map(); // studentId -> { student, passport, events: [] }
 
   while (hasMore) {
-    const eventData = await fetchDoorEvents({ startTime, endTime, pageNo, pageSize });
+    const eventData = await fetchDoorEvents({
+      startTime,
+      endTime,
+      pageNo,
+      pageSize,
+      doorIndexCodes
+    });
+
     const list = eventData.list || [];
     if (list.length === 0) {
       hasMore = false;
@@ -229,16 +289,15 @@ async function syncCampusAttendance(targetDate = null) {
     }
 
     for (const evt of list) {
-      // HikCentral passport / certificate field
-      const rawPassport = evt.certificateNo || evt.jobNo || evt.certNo || evt.personId || '';
-      const normPassport = normalizePassport(rawPassport);
+      const pid = evt.personId ? evt.personId.toString() : '';
+      const normPassport = personIdToPassport.get(pid) || normalizePassport(evt.personCode || evt.certificateNo || '');
       const student = studentByPassport.get(normPassport);
 
       const direction = resolveDirection(evt);
-      const eventTime = evt.eventTime || evt.time || new Date().toISOString();
-      const eventId = evt.eventId || evt.eventIndexCode || `evt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const eventTime = evt.eventTime || evt.deviceTime || new Date().toISOString();
+      const eventId = evt.eventId || `evt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
-      // access_control_log jadvaliga yozish
+      // access_control_log ga yozish
       try {
         db.prepare(`
           INSERT INTO access_control_log (
@@ -249,18 +308,16 @@ async function syncCampusAttendance(targetDate = null) {
           eventId,
           student ? student.id : null,
           normPassport || 'UNKNOWN',
-          evt.personName || (student ? `${student.first_name} ${student.last_name}` : null),
+          evt.personName || personIdToName.get(pid) || (student ? `${student.first_name} ${student.last_name}` : null),
           eventTime,
           direction,
           evt.doorName || null,
-          evt.deviceName || null,
+          evt.readerName || null,
           evt.cardNo || null,
           JSON.stringify(evt),
           new Date().toISOString()
         );
-      } catch (logErr) {
-        // Agar id takrorlangan bo'lsa e'tiborsiz qoldiramiz
-      }
+      } catch (logErr) {}
 
       if (student) {
         if (!dailyStudentEvents.has(student.id)) {
@@ -279,19 +336,18 @@ async function syncCampusAttendance(targetDate = null) {
       totalProcessed++;
     }
 
-    if (list.length < pageSize) {
+    if (list.length < pageSize || (eventData.total && pageNo * pageSize >= eventData.total)) {
       hasMore = false;
     } else {
       pageNo++;
     }
   }
 
-  // Endi har bir talabaning kunlik birinchi kirishi va oxirgi chiqishini hisoblash
+  // 5. Har bir talabaning kunlik birinchi kirishi va oxirgi chiqishini hisoblab saqlash
   let updatedAttendanceCount = 0;
   const nowIso = new Date().toISOString();
 
   for (const [studentId, data] of dailyStudentEvents.entries()) {
-    // Vaqt bo'yicha tartiblash
     data.events.sort((a, b) => new Date(a.time) - new Date(b.time));
 
     const inEvents = data.events.filter(e => e.direction === 'in');
@@ -303,7 +359,7 @@ async function syncCampusAttendance(targetDate = null) {
     const inCount = inEvents.length;
     const outCount = outEvents.length;
 
-    // Statusni aniqlash: Agar 09:15 dan kech kelgan bo'lsa 'late', aks holda 'present'
+    // Status: 09:15 dan kech kelgan bo'lsa 'late', aks holda 'present'
     let status = 'present';
     if (firstIn) {
       const inDate = new Date(firstIn);
@@ -372,14 +428,14 @@ function getCampusAttendanceSummary(targetDate = null) {
     WHERE date = ?
   `).get(dateStr);
 
-  const presentCount = attStats.total_present || 0;
-  const lateCount = attStats.total_late || 0;
-  const inCampusCount = attStats.currently_in_campus || 0;
-  const absentCount = Math.max(0, totalStudents - presentCount);
+  const presentCount = parseInt((attStats && attStats.total_present) || 0, 10);
+  const lateCount = parseInt((attStats && attStats.total_late) || 0, 10);
+  const inCampusCount = parseInt((attStats && attStats.currently_in_campus) || 0, 10);
+  const absentCount = Math.max(0, parseInt(totalStudents, 10) - presentCount);
 
   return {
     date: dateStr,
-    totalStudents,
+    totalStudents: parseInt(totalStudents, 10),
     presentCount,
     lateCount,
     absentCount,
@@ -467,7 +523,7 @@ function getCampusAttendanceList({ date = null, group_code = null, status = null
 
   return {
     date: dateStr,
-    total,
+    total: parseInt(total, 10),
     page: parseInt(page, 10),
     limit: parseInt(limit, 10),
     totalPages: Math.ceil(total / limit),
@@ -509,7 +565,8 @@ module.exports = {
   getHikConfig,
   makeHikRequest,
   testHikCentralConnection,
-  fetchHikPersonList,
+  fetchDoorList,
+  fetchHikPersonMapping,
   fetchDoorEvents,
   syncCampusAttendance,
   getCampusAttendanceSummary,
