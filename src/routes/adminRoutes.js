@@ -2447,6 +2447,8 @@ router.get('/bot-monitoring/logs', authenticateSuperadmin, (req, res) => {
   `).all(...params);
 
   res.json({ logs });
+});
+
 /**
  * POST /api/admin/sync-student-photos
  * Turniket serveridan rasmi yo'q talabalar rasmlarini yuklab to'ldirish
