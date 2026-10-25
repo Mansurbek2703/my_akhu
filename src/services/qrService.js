@@ -35,19 +35,24 @@ function generateEventQrPayload(eventId) {
 async function generateEventQrDataUrl(eventId) {
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
   if (!event) throw new Error('Tadbir topilmadi');
-  // Tadbir yaratuvchi o'z QR sini ko'rsatganda har doim qat'iy 5 sekunddan yangilanishi shart
-  const ttl = 5;
+  
+  // Tadbir yaratuvchi QR kodi har doim qat'iy 60 sekunddan yangilanadi!
+  const ttl = 60;
   const payload = generateEventQrPayload(eventId);
   const payloadStr = JSON.stringify(payload);
+  const validForSeconds = 60 - (payload.ts % 60);
   const dataUrl = await QRCode.toDataURL(payloadStr, {
-    width: 320,
+    width: 480,
     margin: 2,
+    errorCorrectionLevel: 'M',
     color: { dark: '#0F172A', light: '#FFFFFF' }
   });
   return {
     payload,
     dataUrl,
-    ttl
+    ttl,
+    valid_for_seconds: validForSeconds,
+    expires_at: new Date((Math.floor(payload.ts / 60) + 1) * 60 * 1000).toISOString()
   };
 }
 
@@ -56,12 +61,14 @@ async function generateEventQrDataUrl(eventId) {
  */
 function generateStudentQrPayload(studentId) {
   const ts = Math.floor(Date.now() / 1000);
-  const dataToSign = `${studentId}|${ts}`;
+  const nonce = crypto.randomBytes(4).toString('hex');
+  const dataToSign = `${studentId}|${ts}|${nonce}`;
   const sig = crypto.createHmac('sha256', QR_SECRET).update(dataToSign).digest('hex');
 
   return {
     student_id: studentId,
     ts,
+    nonce,
     sig
   };
 }
@@ -69,15 +76,19 @@ function generateStudentQrPayload(studentId) {
 async function generateStudentQrDataUrl(studentId) {
   const payload = generateStudentQrPayload(studentId);
   const payloadStr = JSON.stringify(payload);
+  const validForSeconds = 60 - (payload.ts % 60);
   const dataUrl = await QRCode.toDataURL(payloadStr, {
-    width: 280,
+    width: 360,
     margin: 2,
+    errorCorrectionLevel: 'M',
     color: { dark: '#0F172A', light: '#FFFFFF' }
   });
   return {
     payload,
     dataUrl,
-    ttl: 60
+    ttl: 60,
+    valid_for_seconds: validForSeconds,
+    expires_at: new Date((Math.floor(payload.ts / 60) + 1) * 60 * 1000).toISOString()
   };
 }
 
@@ -101,13 +112,13 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(event_id);
   if (!event) throw new Error('Tadbir topilmadi');
 
-  // Anti-fraud chorasi: Tadbir yaratuvchining QR kodi har doim 5 sekunddan yangilanadi!
-  // Ruxsat etilgan vaqt oralig'i: 5 soniya + 4 soniya tarmoq buferi (jami 9s)
-  const refreshSec = 5;
-  const allowedWindow = refreshSec + 4;
+  // Anti-fraud chorasi: Tadbir yaratuvchining QR kodi har doim 60 sekunddan yangilanadi!
+  // Ruxsat etilgan vaqt oralig'i: 60 soniya + 15 soniya tarmoq buferi (jami 75s)
+  const refreshSec = 60;
+  const allowedWindow = refreshSec + 15;
   const nowTs = Math.floor(Date.now() / 1000);
   if (Math.abs(nowTs - ts) > allowedWindow) {
-    throw new Error(`QR kodi eskirgan (amal qilish muddati 5 soniya). Ekranda har 5 sekundda yangilanayotgan yangi QR kodni skanerlang!`);
+    throw new Error(`QR kodi eskirgan (amal qilish muddati 60 soniya). Ekranda har 60 sekundda yangilanayotgan yangi QR kodni skanerlang!`);
   }
 
   // Imzo (sig) tekshiruvi
@@ -119,21 +130,17 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
   }
 
   // Davomat vaqti tekshiruvi:
-  // Default: tadbirdan 5 daqiqa oldin ochiladi (yoki tashkilotchi/superadmin sozlagan daqiqa)
-  // Tadbir tugashi bilan davomat darhol avtomatik yopiladi!
+  // Talab bo'yicha: Davomat tadbir boshlanish vaqtida ochiladi va tadbir tugaganidan keyin 5 daqiqa davom etadi!
   const now = new Date();
   const startsAt = new Date(event.starts_at);
   const endsAt = new Date(event.ends_at);
-  const openMinutesBefore = (event.attendance_open_minutes_before !== undefined && event.attendance_open_minutes_before !== null)
-    ? Number(event.attendance_open_minutes_before)
-    : 5;
-  const minAllowedTime = new Date(startsAt.getTime() - openMinutesBefore * 60 * 1000);
+  const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
 
-  if (now < minAllowedTime) {
-    throw new Error(`Tadbir davomati hali boshlanmagan. Davomat tadbir boshlanishidan ${openMinutesBefore} daqiqa oldin ochiladi.`);
+  if (now < startsAt) {
+    throw new Error(`Tadbir davomati hali boshlanmagan. Davomat faqat tadbir rejalashtirilgan boshlanish vaqtida ochiladi.`);
   }
-  if (now > endsAt) {
-    throw new Error('Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.');
+  if (now > closesAt) {
+    throw new Error('Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan (tadbirdan so\'ng 5 daqiqalik qo\'shimcha vaqt tugadi).');
   }
 
   // Q-04: Bir talaba — bir tadbir — bir check-in
@@ -251,7 +258,7 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
 }
 
 /**
- * Tashkilotchi talabaning QR kodini skanerlaganda (2-rejim, kichik tadbirlar)
+ * Tashkilotchi talabaning QR kodini skanerlaganda (2-rejim: hodim talabani skanerlaydi)
  */
 function checkinStudentQr(staffUser, eventId, studentQrPayloadStr, ip = '127.0.0.1') {
   let payload;
@@ -261,63 +268,131 @@ function checkinStudentQr(staffUser, eventId, studentQrPayloadStr, ip = '127.0.0
     throw new Error('Talaba QR kodi formati noto\'g\'ri');
   }
 
-  const { student_id, ts, sig } = payload;
+  const { student_id, ts, sig, nonce } = payload;
   if (!student_id || !ts || !sig) throw new Error('Talaba QR kodi to\'liq emas');
 
   const nowTs = Math.floor(Date.now() / 1000);
-  if (Math.abs(nowTs - ts) > 90) {
-    throw new Error('Talaba QR kodi eskirgan (90s oyna)');
+  // 60 soniya + 15 soniya bufer (jami 75 soniya)
+  if (Math.abs(nowTs - ts) > 75) {
+    throw new Error('Talaba QR kodi eskirgan (amal qilish muddati 60 soniya). Talaba ilovasida yangilangan QR kodni skanerlang.');
   }
 
-  const expectedData = `${student_id}|${ts}`;
-  const expectedSig = crypto.createHmac('sha256', QR_SECRET).update(expectedData).digest('hex');
-  if (sig !== expectedSig) {
+  // Imzo tekshiruvi (nonce bilan yoki nonce-siz orqaga moslik)
+  const expectedWithNonce = nonce ? crypto.createHmac('sha256', QR_SECRET).update(`${student_id}|${ts}|${nonce}`).digest('hex') : null;
+  const expectedWithoutNonce = crypto.createHmac('sha256', QR_SECRET).update(`${student_id}|${ts}`).digest('hex');
+
+  if (sig !== expectedWithNonce && sig !== expectedWithoutNonce) {
     throw new Error('Talaba QR xavfsizlik imzosi mos kelmadi');
   }
 
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
   if (!event) throw new Error('Tadbir topilmadi');
 
+  // Davomat vaqti tekshiruvi (tadbir boshlanishidan to yakunidan keyingi 5 daqiqagacha)
+  const now = new Date();
+  const startsAt = new Date(event.starts_at);
+  const endsAt = new Date(event.ends_at);
+  const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
+
+  if (now < startsAt) {
+    throw new Error('Tadbir davomati hali boshlanmagan. Davomat faqat tadbir rejalashtirilgan boshlanish vaqtida ochiladi.');
+  }
+  if (now > closesAt) {
+    throw new Error('Tadbir davomat vaqti yakunlangan (tadbirdan so\'ng 5 daqiqalik qo\'shimcha vaqt tugadi).');
+  }
+
+  const student = db.prepare(`SELECT * FROM student WHERE id = ? AND status = 'active'`).get(student_id);
+  if (!student) {
+    throw new Error('Talaba bazada topilmadi yoki hisobi faol emas');
+  }
+
   const existingCheckin = db.prepare(`SELECT * FROM checkin WHERE event_id = ? AND student_id = ?`).get(eventId, student_id);
   if (existingCheckin) {
-    throw new Error('Ushbu talaba allaqachon ro\'yxatga olingan');
+    throw new Error(`Ushbu talaba (${student.first_name} ${student.last_name}) tadbirga allaqachon ro'yxatga olingan`);
+  }
+
+  // Agar tadbir oldindan ro'yxat talab qilsa, avtomatik ro'yxatga qo'shamiz
+  if (event.requires_registration) {
+    const reg = db.prepare(`SELECT * FROM event_registration WHERE event_id = ? AND student_id = ?`).get(eventId, student_id);
+    if (!reg) {
+      try { registerForEvent(student_id, eventId); } catch(e) {}
+    }
   }
 
   const currentSeason = db.prepare(`SELECT * FROM season WHERE is_current = 1 LIMIT 1`).get() || { id: '2026-2027' };
   const pointEntryId = 'pe_' + crypto.randomBytes(6).toString('hex');
   const checkinId = 'chk_' + crypto.randomBytes(6).toString('hex');
-  const nowIso = new Date().toISOString();
+  const nowIso = now.toISOString();
   const points = event.points || 5;
+  const staffIdentifier = (staffUser && (staffUser.full_name || staffUser.id || staffUser.name)) || 'KPI Hodim';
 
-  db.prepare(`
-    INSERT INTO point_entry (
-      id, student_id, item_id, item_version, category_id, base_points, points,
-      note, event_date, source, created_by, created_at, status, approver_role,
-      approved_by, approved_at, event_id, season_id
-    ) VALUES (?, ?, 'i1', 1, ?, ?, ?, ?, ?, 'qr', ?, 'approved', 'dep_yb', ?, ?, ?, ?)
-  `).run(
-    pointEntryId,
-    student_id,
-    event.category_id,
-    points,
-    points,
-    `Tashkilotchi tekshiruvi: ${event.title}`,
-    nowIso.split('T')[0],
-    staffUser.id,
-    nowIso,
-    staffUser.id,
-    nowIso,
-    eventId,
-    currentSeason.id
-  );
+  let itemId = 'i1';
+  if (event.category_id === '2') itemId = 'm1';
+  else if (event.category_id === '5') itemId = 'p1';
+  else if (event.level === 'klub') itemId = 'i2';
 
-  db.prepare(`
-    INSERT INTO checkin (id, event_id, student_id, at, mode, scanned_by, entry_id)
-    VALUES (?, ?, ?, ?, 'student_qr', ?, ?)
-  `).run(checkinId, eventId, student_id, nowIso, staffUser.id, pointEntryId);
+  const category = db.prepare(`SELECT * FROM catalog_category WHERE id = ?`).get(event.category_id) || { approver_role: 'dep_yb' };
 
+  const tx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO point_entry (
+        id, student_id, item_id, item_version, category_id, base_points, points,
+        note, event_date, source, created_by, created_at, status, approver_role,
+        approved_by, approved_at, event_id, season_id
+      ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, 'qr', ?, ?, 'approved', ?, ?, ?, ?, ?)
+    `).run(
+      pointEntryId,
+      student_id,
+      itemId,
+      event.category_id,
+      points,
+      points,
+      `Hodim skaner tekshiruvi: ${event.title}`,
+      nowIso.split('T')[0],
+      staffIdentifier,
+      nowIso,
+      category.approver_role,
+      staffIdentifier,
+      nowIso,
+      eventId,
+      currentSeason.id
+    );
+
+    db.prepare(`
+      INSERT INTO checkin (id, event_id, student_id, at, mode, scanned_by, entry_id)
+      VALUES (?, ?, ?, ?, 'student_qr', ?, ?)
+    `).run(checkinId, eventId, student_id, nowIso, staffIdentifier, pointEntryId);
+  });
+
+  tx();
   recalculateStudentScores();
-  return { success: true, points, student_id };
+
+  // Telegram orqali xabar yuborish
+  try {
+    const { notifyStudentEventCheckin } = require('./telegramService');
+    notifyStudentEventCheckin(student_id, event, points);
+  } catch (e) {
+    console.error('Checkin student telegram notify error:', e.message);
+  }
+
+  return {
+    success: true,
+    points,
+    student_id,
+    checked_in_at: nowIso,
+    event_title: event.title,
+    student: {
+      id: student.id,
+      external_id: student.external_id,
+      first_name: student.first_name,
+      last_name: student.last_name,
+      full_name: `${student.first_name} ${student.last_name}`,
+      group_code: student.group_code,
+      program_code: student.program_code,
+      course: student.course,
+      photo_url: student.photo_url || null
+    }
+  };
 }
 
 /**

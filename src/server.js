@@ -5,6 +5,7 @@ const config = require('./config');
 const { initSchema } = require('./db/database');
 const { initBackgroundJobs } = require('./services/cronService');
 const { handleTelegramWebhook, startTelegramPolling } = require('./services/telegramService');
+const { startKpiEventSyncCron } = require('./services/kpiEventService');
 
 // Initialize Database Schema if not exists
 initSchema();
@@ -28,6 +29,7 @@ app.use('/api/observe', require('./routes/observeRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use(['/api/integration/events', '/api/v1/integration/events'], require('./routes/integrationRoutes'));
 
 // Telegram Bot Webhook endpoint
 app.post('/api/telegram/webhook', async (req, res) => {
@@ -66,6 +68,9 @@ app.use((req, res) => {
 
 // Start Background Jobs (recalculate scores, cron)
 initBackgroundJobs();
+
+// Start KPI Event Sync Cron (syncs events from kpi.akhu.uz every 60s)
+startKpiEventSyncCron();
 
 // Start Telegram Polling (ensures bot responds immediately to all users)
 startTelegramPolling();

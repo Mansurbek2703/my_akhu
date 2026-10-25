@@ -33,6 +33,11 @@ module.exports = {
     appSecret: process.env.HIKCENTRAL_APP_SECRET || 'KkW8WbxTG5X6S9bSN3BU',
     verifySsl: process.env.HIKCENTRAL_VERIFY_SSL === 'True' || process.env.HIKCENTRAL_VERIFY_SSL === 'true'
   },
+  kpi: {
+    apiUrl: process.env.KPI_API_URL || 'https://kpi.akhu.uz/api/v1',
+    apiToken: process.env.KPI_API_TOKEN || 'akhu_sfiPn4O6Fog0GIH662e7JHFrt3-mbpXdo5E-kvaH95c',
+    syncIntervalSeconds: parseInt(process.env.KPI_SYNC_INTERVAL_SECONDS || '60', 10)
+  },
   uploadDir: path.join(__dirname, '../uploads'),
   timeZone: 'Asia/Tashkent'
 };

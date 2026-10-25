@@ -543,8 +543,8 @@ function renderModuleSubNav(pageName) {
     if (AppState.isLoggedIn) {
       extraActions = `
         <div class="module-nav-actions">
-          <button class="btn btn-primary btn-sm" onclick="openCreateEventModal()" style="display:inline-flex; align-items:center; gap:6px;">
-            ${icon('calendar', 14)} <span>Yangi Tadbir Qo'shish</span>
+          <button class="btn btn-secondary btn-sm" onclick="syncKpiEventsManually()" id="btn-sync-kpi-events" style="display:inline-flex; align-items:center; gap:6px;">
+            ${icon('refresh', 14)} <span>🔄 KPI dan sinxronlash</span>
           </button>
           <button class="btn btn-outline btn-sm" onclick="showStudentCheckinModal()" style="display:inline-flex; align-items:center; gap:6px; border-color:#3B82F6; color:#2563EB; background:#EFF6FF;">
             ${icon('qrCode', 14)} <span>Talaba QR Check-in</span>
@@ -3008,9 +3008,12 @@ async function renderDeptEvents(container) {
             </p>
           </div>
           ${isStaffOrAdmin ? `
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="btn btn-primary" onclick="openCreateEventModal()" style="display: inline-flex; align-items: center; gap: 6px;">
-                ${icon('calendar', 15)} <span>+ Yangi Tadbir Yaratish</span>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <div style="font-size: 12px; color: #475569; background: #F1F5F9; padding: 6px 12px; border-radius: 8px; border: 1px solid #CBD5E1; display: inline-flex; align-items: center; gap: 6px;">
+                <span>ℹ️</span> Tadbirlar <strong>kpi.akhu.uz</strong> dan har daqiqada avtomatik sinxronlanadi
+              </div>
+              <button class="btn btn-secondary" onclick="syncKpiEventsManually()" id="btn-sync-kpi-events-main" style="display: inline-flex; align-items: center; gap: 6px;">
+                ${icon('refresh', 15)} <span>🔄 KPI dan sinxronlash</span>
               </button>
               <button class="btn btn-outline" onclick="showStudentCheckinModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF;">
                 ${icon('qrCode', 15)} <span>📷 Talaba QR Skanerlash / Qabul Qilish</span>
@@ -3027,12 +3030,12 @@ async function renderDeptEvents(container) {
           <div style="font-size: 40px; margin-bottom: 12px; color: #3B82F6;">${icon('calendar', 42)}</div>
           <h3 style="margin-bottom: 8px;">Hozircha tizimda e'lon qilingan tadbirlar mavjud emas</h3>
           <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 20px; font-size: 13.5px; line-height: 1.5;">
-            Universitet talabalari uchun yangi ilmiy, madaniy, sport yoki ijtimoiy tadbir e'lon qiling va talabalar uchun QR kodlarini yarating.
+            Tadbirlar hodimlar tomonidan <strong>kpi.akhu.uz</strong> platformasida rejalashtiriladi va ushbu tizim bilan avtomatik sinxronlanadi.
           </p>
           ${isStaffOrAdmin ? `
             <div style="display: flex; justify-content: center; gap: 10px;">
-              <button class="btn btn-primary" onclick="openCreateEventModal()">
-                ${icon('calendar', 15)} + Yangi Tadbir Yaratish
+              <button class="btn btn-secondary" onclick="syncKpiEventsManually()">
+                ${icon('refresh', 15)} 🔄 KPI dan sinxronlash
               </button>
             </div>
           ` : ''}
@@ -3584,14 +3587,74 @@ function updateEventDateTimeSummary(prefix = '') {
   };
 }
 
-// Yangi Tadbir Yaratish Modali
+// KPI dan tadbirlarni qo'lda darhol sinxronlash
+async function syncKpiEventsManually() {
+  const btns = [document.getElementById('btn-sync-kpi-events'), document.getElementById('btn-sync-kpi-events-main')].filter(Boolean);
+  btns.forEach(b => {
+    b.disabled = true;
+    b.innerHTML = `<span>⏳ Sinxronlanmoqda...</span>`;
+  });
+
+  try {
+    const res = await apiFetch('/api/events/sync-kpi', { method: 'POST' });
+    if (res && res.success) {
+      showToast(`✅ KPI dan muvaffaqiyatli sinxronlandi: ${res.total_from_kpi || 0} ta tadbir olindi (Yangi: ${res.inserted || 0}, Yangilandi: ${res.updated || 0})`, 'success');
+      await renderDeptEvents();
+    } else {
+      showToast(`Xatolik: ${(res && res.error) || 'Sinxronlab bo\'lmadi'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Sinxronlashda xatolik: ${err.message}`, 'error');
+  } finally {
+    btns.forEach(b => {
+      b.disabled = false;
+      b.innerHTML = `${icon('refresh', 14)} <span>🔄 KPI dan sinxronlash</span>`;
+    });
+  }
+}
+window.syncKpiEventsManually = syncKpiEventsManually;
+
+// Yangi Tadbir Yaratish Modali (kpi.akhu.uz ga yo'naltirilgan)
 async function openCreateEventModal() {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('calendar', 18)} Yangi Tadbir Yaratish</span>`;
+  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">ℹ️ Tadbirlar Boshqaruvi</span>`;
 
+  modalBody.innerHTML = `
+    <div style="text-align: center; padding: 20px 10px;">
+      <div style="font-size: 50px; margin-bottom: 16px;">🏛️</div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #0F172A; margin-bottom: 10px;">
+        Tadbirlar KPI Tizimi orqali yaratiladi
+      </h3>
+      <p style="color: #475569; font-size: 14px; line-height: 1.6; max-width: 480px; margin: 0 auto 20px;">
+        Universitet xodimlari barcha ilmiy, madaniy va ommaviy tadbirlarni <strong>kpi.akhu.uz</strong> hodimlar platformasida yaratadilar.
+        U yerdan yaratilgan va tasdiqlangan tadbirlar ushbu reyting tizimiga <strong>har 1 daqiqada avtomatik sinxronlanadi</strong>.
+      </p>
+      <div style="background: #F1F5F9; border-radius: 12px; padding: 14px; text-align: left; font-size: 13px; color: #334155; line-height: 1.5; margin-bottom: 20px;">
+        <div>✅ <strong>Sinxronlash davriyligi:</strong> Har 60 sekundda avtomatik</div>
+        <div>🛡️ <strong>QR kodi formati:</strong> 60 sekundlik dinamik va soxtalashtirishga qarshi himoyalangan</div>
+        <div>⏱️ <strong>Davomat oynasi:</strong> Tadbir boshlanishidan to yakunlangandan keyingi 5 daqiqagacha</div>
+      </div>
+      <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+        <a href="https://kpi.akhu.uz" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>🌐 kpi.akhu.uz tizimiga o'tish</span>
+        </a>
+        <button class="btn btn-secondary" onclick="syncKpiEventsManually(); closeModal();" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>🔄 Hozir sinxronlash</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+  `;
+
+  openModal();
+  return;
+  // Eski kod qismi quyida qoldirildi
   let categories = [];
   try {
     const catRes = await apiFetch('/api/observe/catalog');

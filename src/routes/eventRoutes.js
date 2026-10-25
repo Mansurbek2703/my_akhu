@@ -68,123 +68,25 @@ router.get('/', (req, res) => {
 
 /**
  * POST /api/events
- * B-04 & Q-10: Yangi tadbir yaratish
+ * Tadbir yaratish kpi.akhu.uz hodimlar platformasiga o'tkazilgan!
  */
 router.post('/', (req, res) => {
+  return res.status(403).json({
+    error: "Tadbirlar faqat kpi.akhu.uz platformasi orqali yaratiladi! Tizimga tadbirlar har daqiqada avtomatik sinxronlanadi."
+  });
+});
+
+/**
+ * POST /api/events/sync-kpi
+ * KPI tizimidan qo'lda sinxronlash
+ */
+router.post('/sync-kpi', async (req, res) => {
   try {
-    const {
-      title,
-      starts_at,
-      ends_at,
-      place,
-      organizer_unit,
-      category_id,
-      level,
-      capacity,
-      requires_registration,
-      attendance_open_minutes_before
-    } = req.body;
-
-    if (!title || !starts_at || !ends_at || !place || !category_id || !level) {
-      return res.status(400).json({ error: 'Majburiy maydonlar to\'ldirilishi shart' });
-    }
-
-    const now = new Date();
-    const minAllowedStart = new Date(now.getTime() + 10 * 60 * 1000);
-    const startsDate = new Date(starts_at);
-    const endsDate = new Date(ends_at);
-
-    if (startsDate < minAllowedStart) {
-      return res.status(400).json({
-        error: `Tadbir boshlanish sanasi va vaqti hozirgi vaqtdan kamida 10 daqiqa keyinga sozlanishi shart! (Eng erta boshlanish vaqti: ${minAllowedStart.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })})`
-      });
-    }
-
-    if (endsDate <= startsDate) {
-      return res.status(400).json({
-        error: 'Tadbir tugash vaqti boshlanish vaqtidan keyin bo\'lishi shart!'
-      });
-    }
-
-    // Q-10: Ball darajadan avtomatik belgilanadi
-    const points = LEVEL_POINTS[level] || 5;
-    const eventId = 'ev_' + crypto.randomBytes(6).toString('hex');
-    const qrSecret = 'sec_' + crypto.randomBytes(12).toString('hex');
-    const nowIso = now.toISOString();
-    const createdBy = req.staffUser.id;
-    const photoUrl = (req.body.photo_url || req.body.image_url) ? String(req.body.photo_url || req.body.image_url).trim() : null;
-
-    // Anti-fraud talabi: Tadbir yaratuvchi QR kodi har doim qat'iy 5 sekunddan yangilanishi shart!
-    const qrRefresh = 5;
-
-    // Davomat boshlanish vaqti: default 5 daqiqa oldin, lekin yaratuvchi/superadmin sozlashi mumkin
-    const rawOpenMinutes = Number(attendance_open_minutes_before);
-    const attendanceOpenMinutes = (!isNaN(rawOpenMinutes) && rawOpenMinutes >= 0) ? rawOpenMinutes : 5;
-
-    db.prepare(`
-      INSERT INTO event (
-        id, title, starts_at, ends_at, place, photo_url, image_url, organizer_unit, category_id,
-        level, points, capacity, requires_registration, status, qr_secret,
-        qr_refresh_seconds, attendance_open_minutes_before, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, 5, ?, ?, ?)
-    `).run(
-      eventId,
-      title,
-      starts_at,
-      ends_at,
-      place,
-      photoUrl,
-      photoUrl,
-      organizer_unit || 'dep_yb',
-      category_id,
-      level,
-      points,
-      capacity ? Number(capacity) : null,
-      requires_registration ? 1 : 0,
-      qrSecret,
-      attendanceOpenMinutes,
-      createdBy,
-      nowIso
-    );
-
-    logAudit({
-      actor_id: createdBy,
-      actor_role: 'staff',
-      action: 'CREATE_EVENT',
-      object_type: 'event',
-      object_id: eventId,
-      after: { title, level, points, qr_refresh_seconds: 5, attendance_open_minutes_before: attendanceOpenMinutes },
-      ip: req.ip || '127.0.0.1'
-    });
-
-    // BARCHA TALABALARGA TELEGRAM BOT ORQALI BILDIRISHNOMA YUBORISH
-    try {
-      const { broadcastNewEventToStudents } = require('../services/telegramService');
-      broadcastNewEventToStudents({
-        id: eventId,
-        title,
-        starts_at,
-        ends_at,
-        place,
-        photo_url: photoUrl,
-        image_url: photoUrl,
-        points,
-        attendance_open_minutes_before: attendanceOpenMinutes
-      });
-    } catch (e) {
-      console.error('Broadcast notification error:', e.message);
-    }
-
-    res.json({
-      success: true,
-      event_id: eventId,
-      points,
-      qr_refresh_seconds: 5,
-      attendance_open_minutes_before: attendanceOpenMinutes,
-      message: `Tadbir yaratildi (${points} ball, QR yangilanish: 5 soniya, Davomat: tadbirdan ${attendanceOpenMinutes} daqiqa oldin boshlanadi). Barcha talabalarga Telegram bildirishnoma yuborilmoqda!`
-    });
+    const { syncEventsFromKpi } = require('../services/kpiEventService');
+    const result = await syncEventsFromKpi();
+    res.json(result);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 

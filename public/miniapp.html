@@ -154,10 +154,13 @@
       <img id="student-qr-image" src="" alt="QR Kod" style="width: 220px; height: 220px; display: block; margin: 0 auto;">
     </div>
 
-    <div>
-      <span class="badge" style="background: #EFF6FF; color: #2563EB; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-        ⏱️ QR kod har 5 daqiqada yangilanadi
+    <div style="margin-top: 4px;">
+      <span class="badge" id="student-qr-timer-badge" style="background: #EFF6FF; color: #2563EB; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;">
+        ⏱️ QR yangilanishiga: 60s
       </span>
+      <div style="font-size: 11.5px; color: #64748B; margin-top: 6px;">
+        🛡️ Har 60 sekundda dinamik yangilanadi (HMAC-SHA256)
+      </div>
     </div>
   </div>
 
@@ -260,9 +263,12 @@
         <img id="modal-qr-student-image" src="" alt="Talaba QR" style="width: 200px; height: 200px; display: block; margin: 0 auto; border-radius: 6px;">
       </div>
       <div style="margin-top: 10px;">
-        <span class="badge" style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 12px;">
-          ⏱️ HMAC Xavfsiz Shaxsiy QR
+        <span class="badge" id="modal-qr-timer-badge" style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11.5px; padding: 5px 12px; border-radius: 12px;">
+          ⏱️ QR yangilanishiga: 60s
         </span>
+        <div style="font-size: 11px; color: #64748B; margin-top: 4px;">
+          Har 60 soniyada yangilanadi
+        </div>
       </div>
       <button onclick="switchScanMethod('camera')" style="margin-top: 12px; width: 100%; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
         📷 1-Usul: Kameraga qaytish
@@ -477,6 +483,35 @@
       }
     }
 
+    let studentQrInterval = null;
+    let studentQrRemainingSeconds = 60;
+
+    function startStudentQrCountdown(initialSeconds) {
+      if (studentQrInterval) clearInterval(studentQrInterval);
+      studentQrRemainingSeconds = initialSeconds || 60;
+
+      const updateBadges = () => {
+        const badge1 = document.getElementById('student-qr-timer-badge');
+        const badge2 = document.getElementById('modal-qr-timer-badge');
+        const text = `⏱️ QR yangilanishiga: ${studentQrRemainingSeconds}s`;
+        if (badge1) badge1.textContent = text;
+        if (badge2) badge2.textContent = text;
+      };
+      updateBadges();
+
+      studentQrInterval = setInterval(() => {
+        studentQrRemainingSeconds--;
+        if (studentQrRemainingSeconds <= 0) {
+          clearInterval(studentQrInterval);
+          studentQrInterval = null;
+          loadStudentQr();
+          loadModalStudentQr();
+        } else {
+          updateBadges();
+        }
+      }, 1000);
+    }
+
     async function loadStudentQr() {
       try {
         const res = await fetch('/api/app/my-qr', {
@@ -488,6 +523,7 @@
           const imgEl = document.getElementById('student-qr-image');
           if (imgEl) imgEl.src = qrUrl;
         }
+        startStudentQrCountdown(d.valid_for_seconds || 60);
       } catch (e) {
         console.error('QR yuklanmadi', e);
       }
@@ -793,6 +829,7 @@
           const imgEl = document.getElementById('modal-qr-student-image');
           if (imgEl) imgEl.src = qrUrl;
         }
+        startStudentQrCountdown(d.valid_for_seconds || 60);
       } catch (e) {
         console.error('Modal QR yuklanmadi', e);
       }
