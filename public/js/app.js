@@ -7181,6 +7181,9 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #059669; border-color: #059669;">
             ${icon('userPlus', 14)} <span>Yangi Talaba</span>
           </button>
+          <button id="btn-sync-students-photos" class="btn btn-outline" onclick="triggerHikPhotosSync(this)" style="display: inline-flex; align-items: center; gap: 6px; border-color: #CBD5E1; color: #1E293B;" title="Turniket serveridan rasmi yo'q talabalarning rasmlarini yuklab to'ldirish">
+            📸 <span>Turniket Rasmlari</span>
+          </button>
           ${roleTitle === 'Superadmin' ? `
             <button class="btn btn-outline" onclick="handleClearAllStudents()" style="color: #F87171; border-color: rgba(239, 68, 68, 0.5); display: inline-flex; align-items: center; gap: 6px;" title="Barcha talabalarni tozalash">
               ${icon('trash', 14)} <span>Tozalash</span>
@@ -10375,6 +10378,11 @@ async function renderCampusAttendance(targetContainer) {
               📡 Tekshirish
             </button>
 
+            <!-- RASMLARNI TURNIKETDAN YUKLAB OLISH -->
+            <button id="btn-sync-photos" class="btn" onclick="triggerHikPhotosSync(this)" title="Tizimda rasmi mavjud bo'lmagan talabalarning rasmlarini turniket serverdan yuklab to'ldirish" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px; border-radius:8px; background:#F8FAFC; border:1px solid #CBD5E1; color:#1E293B; font-weight:600; cursor:pointer;">
+              📸 <span>Rasmlarni To'ldirish</span>
+            </button>
+
             <!-- JONLI MONITORING STATUSI (HAR 1 DAQIQADA YANGILANADI) -->
             <span id="att-live-status-badge" style="font-size:11.5px; font-weight:600; color:#15803D; background:#DCFCE7; border:1px solid #BBF7D0; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:6px;">
               <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22C55E;"></span>
@@ -10804,6 +10812,48 @@ async function checkHikConnectionStatus() {
     }
   } catch (err) {
     alert(`Xatolik: ${err.message}`);
+  }
+}
+
+// TURNIKET SERVERIDAN RASMI YO'Q TALABALARNING RASMLARINI YUKLASH VA BAZAGA TO'LDIRISH
+async function triggerHikPhotosSync(btnEl) {
+  const btn = btnEl || document.getElementById('btn-sync-photos') || document.getElementById('btn-sync-students-photos');
+  if (btn && btn.disabled) return;
+
+  if (!confirm("Turniket serveridan rasmi yo'q talabalarning rasmlarini yuklab olib to'ldirishni boshlaysizmi?")) {
+    return;
+  }
+
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:6px;"></span> Yuklanmoqda...`;
+  }
+
+  try {
+    const res = await apiFetch('/api/attendance/sync-photos', { method: 'POST' });
+    if (res.success) {
+      if (res.downloadedCount > 0) {
+        alert(`✅ Muvaffaqiyatli yakunlandi!\n\nTurniket serveridan ${res.downloadedCount} nafar talabaning rasmi yuklab olindi va bazaga saqlandi.`);
+      } else {
+        alert(`ℹ️ ${res.message || "Barcha talabalarda rasm mavjud yoki turniketda yangi rasm topilmadi."}`);
+      }
+      if (typeof loadAttendanceData === 'function' && document.getElementById('att-table-body')) {
+        await loadAttendanceData();
+      }
+      if (typeof renderStudentsList === 'function' && document.getElementById('students-table-body')) {
+        renderStudentsList();
+      }
+    } else {
+      alert(`⚠️ Xatolik: ${res.error || 'Noma\'lum xatolik'}`);
+    }
+  } catch (err) {
+    alert(`Rasmlarni yuklashda xatolik:\n${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
   }
 }
 

@@ -254,6 +254,54 @@ function initBackgroundJobs() {
       console.error('[Cron] 18:00 hisobot tekshiruvida xatolik:', err.message);
     }
   }, 30 * 1000);
+
+  // Haftada 1 marta turniket serverdan rasmlari yo'q talabalarning rasmlarini avtomatik yuklab to'ldirish
+  // Har 10 daqiqada tekshiradi: Agar oxirgi sinxronizatsiyadan 7 kun o'tgan bo'lsa yoki Yakshanba soat 03:00 bo'lsa (va kamida 5 kun o'tgan bo'lsa)
+  setInterval(async () => {
+    try {
+      if (!config.hikcentral || !config.hikcentral.enabled) return;
+
+      const now = new Date();
+      const tashkentFormatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Tashkent',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        weekday: 'short',
+        hour12: false
+      });
+      const parts = tashkentFormatter.formatToParts(now);
+      const weekdayPart = parts.find(p => p.type === 'weekday')?.value; // 'Sun', 'Mon', etc.
+      const hourPart = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+      const isSunday = weekdayPart === 'Sun';
+
+      let shouldRun = false;
+      let lastSyncRow = null;
+      try {
+        lastSyncRow = db.prepare("SELECT value FROM setting WHERE key = 'last_student_photos_sync_at'").get();
+      } catch (dbErr) {}
+
+      if (!lastSyncRow || !lastSyncRow.value) {
+        shouldRun = true;
+      } else {
+        const lastSyncTime = new Date(lastSyncRow.value).getTime();
+        const diffDays = (now.getTime() - lastSyncTime) / (1000 * 60 * 60 * 24);
+        if (diffDays >= 7 || (isSunday && hourPart === 3 && diffDays >= 5)) {
+          shouldRun = true;
+        }
+      }
+
+      if (shouldRun) {
+        console.log('[Cron] Haftalik talabalar rasmlari sinxronizatsiyasi avtomatik ishga tushirildi (HikCentral)...');
+        const { syncMissingStudentPhotos } = require('./hikcentralService');
+        await syncMissingStudentPhotos();
+      }
+    } catch (photoCronErr) {
+      console.error('[Cron] Haftalik talabalar rasmlari sinxronizatsiyasida xatolik:', photoCronErr.message);
+    }
+  }, 10 * 60 * 1000);
 }
 
 module.exports = {

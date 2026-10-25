@@ -1,6 +1,8 @@
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const config = require('../config');
 const { db } = require('../db/database');
 
@@ -561,6 +563,226 @@ function getStudentAttendanceHistory(studentId, days = 30) {
   };
 }
 
+/**
+ * HikCentral serveridan shaxs rasmini yuklab olish (Artemis OpenAPI)
+ * @param {string|number} personId 
+ * @param {string} picUri 
+ */
+async function downloadPersonPicture(personId, picUri) {
+  if (!personId || !picUri) {
+    return { success: false, error: "personId yoki picUri ko'rsatilmadi" };
+  }
+
+  try {
+    const res = await makeHikRequest('/artemis/api/resource/v1/person/picture_data', {
+      personId: personId.toString(),
+      picUri: picUri.toString()
+    });
+
+    const rawData = (res && res.raw) || (res && typeof res.data === 'string' ? res.data : null);
+    if (!rawData || typeof rawData !== 'string') {
+      return { success: false, error: `Rasm ma'lumoti topilmadi (${res ? res.code || res.statusCode : 'Noma\'lum javob'})` };
+    }
+
+    const matches = rawData.match(/^data:image\/([A-Za-z-+]+);base64,(.+)$/);
+    let ext = '.jpg';
+    let buffer = null;
+
+    if (matches && matches.length === 3) {
+      const mime = matches[1].toLowerCase();
+      if (mime === 'png') ext = '.png';
+      else if (mime === 'webp') ext = '.webp';
+      else ext = '.jpg';
+      buffer = Buffer.from(matches[2], 'base64');
+    } else if (rawData.startsWith('data:image/')) {
+      const b64 = rawData.replace(/^data:image\/\w+;base64,/, '');
+      buffer = Buffer.from(b64, 'base64');
+      ext = '.jpg';
+    } else {
+      buffer = Buffer.from(rawData, 'base64');
+      ext = '.jpg';
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return { success: false, error: "Rasm buferi bo'sh" };
+    }
+
+    return {
+      success: true,
+      buffer,
+      ext,
+      size: buffer.length
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Tizimda rasmi mavjud bo'lmagan talabalarning rasmlarini HikCentral turniket serveridan yuklab olib to'ldirish
+ */
+async function syncMissingStudentPhotos() {
+  const cfg = getHikConfig();
+  if (!cfg || !cfg.enabled) {
+    return { success: false, error: "HikCentral o'chirilgan (disabled)" };
+  }
+
+  console.log('[HikCentral] Rasmlari yo\'q talabalarni turniket serverdan sinxronlash boshlandi...');
+
+  // 1. Bazadagi rasmi yo'q talabalar ro'yxatini olish
+  const missingStudents = db.prepare(`
+    SELECT id, first_name, last_name, external_id, photo_url 
+    FROM student 
+    WHERE photo_url IS NULL OR photo_url = ''
+  `).all();
+
+  if (!missingStudents || missingStudents.length === 0) {
+    console.log('[HikCentral] Rasmi mavjud bo\'lmagan talabalar yo\'q. Barcha talabalarda rasm mavjud.');
+    const nowIso = new Date().toISOString();
+    try {
+      db.prepare(`
+        INSERT INTO setting (key, value, updated_by, updated_at)
+        VALUES ('last_student_photos_sync_at', ?, 'system', ?)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
+      `).run(nowIso, nowIso);
+    } catch (e) {}
+    return {
+      success: true,
+      message: "Barcha talabalarda rasm mavjud",
+      totalMissing: 0,
+      downloadedCount: 0,
+      updatedStudents: []
+    };
+  }
+
+  console.log(`[HikCentral] Tizimda ${missingStudents.length} nafar talabada rasm yo'q.`);
+
+  // 2. Talabalarni pasport raqami bo'yicha indekslash
+  const studentByPassport = new Map();
+  for (const st of missingStudents) {
+    const norm = normalizePassport(st.external_id);
+    if (norm) {
+      studentByPassport.set(norm, st);
+    }
+  }
+
+  // 3. HikCentral Artemis serveridan barcha xodim va talabalarni sahifama-sahifa olish
+  let pageNo = 1;
+  const pageSize = 100;
+  let hasMore = true;
+  const matchedPersons = [];
+
+  while (hasMore) {
+    let res;
+    try {
+      res = await makeHikRequest('/artemis/api/resource/v1/person/personList', { pageNo, pageSize });
+    } catch (apiErr) {
+      console.error(`[HikCentral] personList olishda xatolik (sahifa ${pageNo}):`, apiErr.message);
+      break;
+    }
+
+    if (res && res.data && Array.isArray(res.data.list)) {
+      const list = res.data.list;
+      for (const p of list) {
+        const normPass = normalizePassport(p.personCode || p.certificateNo || '');
+        if (normPass && studentByPassport.has(normPass)) {
+          const student = studentByPassport.get(normPass);
+          const picUri = p.personPhoto ? p.personPhoto.picUri : null;
+          if (picUri) {
+            matchedPersons.push({
+              student,
+              personId: p.personId,
+              picUri,
+              personName: p.personName
+            });
+          }
+        }
+      }
+
+      if (list.length < pageSize || (res.data.total && pageNo * pageSize >= res.data.total)) {
+        hasMore = false;
+      } else {
+        pageNo++;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  console.log(`[HikCentral] Turniket serverida ${matchedPersons.length} nafar talabaning rasmi topildi.`);
+
+  // 4. Har bir talabaning rasmini yuklab olib bazaga saqlash
+  const uploadDir = config.uploadDir || path.join(__dirname, '../../uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  let downloadedCount = 0;
+  let failedCount = 0;
+  const updatedStudents = [];
+
+  for (const item of matchedPersons) {
+    const { student, personId, picUri } = item;
+    try {
+      const picResult = await downloadPersonPicture(personId, picUri);
+      if (picResult.success && picResult.buffer) {
+        const filename = `avatar_${student.id}_${Date.now()}${picResult.ext}`;
+        const savePath = path.join(uploadDir, filename);
+        fs.writeFileSync(savePath, picResult.buffer);
+
+        const photoUrl = `/api/files/${filename}`;
+        const nowIso = new Date().toISOString();
+
+        db.prepare('UPDATE student SET photo_url = ?, updated_at = ? WHERE id = ?').run(
+          photoUrl,
+          nowIso,
+          student.id
+        );
+
+        downloadedCount++;
+        updatedStudents.push({
+          student_id: student.id,
+          name: `${student.first_name} ${student.last_name}`,
+          passport: student.external_id,
+          photo_url: photoUrl,
+          size_bytes: picResult.size
+        });
+        console.log(`[HikCentral] Talaba rasmi saqlandi: ${student.first_name} ${student.last_name} (${student.external_id}) -> ${photoUrl}`);
+      } else {
+        console.warn(`[HikCentral] Rasm yuklab olinmadi (${student.first_name} ${student.last_name}):`, picResult.error);
+        failedCount++;
+      }
+    } catch (dlErr) {
+      console.error(`[HikCentral] Talaba rasmini yuklashda xatolik (${student.first_name}):`, dlErr.message);
+      failedCount++;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+
+  // 5. Oxirgi sinxronizatsiya vaqtini sozlamalar jadvaliga yozish
+  const syncFinishIso = new Date().toISOString();
+  try {
+    db.prepare(`
+      INSERT INTO setting (key, value, updated_by, updated_at)
+      VALUES ('last_student_photos_sync_at', ?, 'system', ?)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
+    `).run(syncFinishIso, syncFinishIso);
+  } catch (settingErr) {
+    console.warn('[HikCentral] last_student_photos_sync_at saqlashda ogohlantirish:', settingErr.message);
+  }
+
+  console.log(`[HikCentral] Rasmlar sinxronizatsiyasi yakunlandi: ${downloadedCount} ta yangilandi, ${failedCount} ta xato, jami rasm kutganlar: ${missingStudents.length}.`);
+
+  return {
+    success: true,
+    totalMissing: missingStudents.length,
+    downloadedCount,
+    failedCount,
+    updatedStudents
+  };
+}
+
 module.exports = {
   getHikConfig,
   makeHikRequest,
@@ -568,6 +790,9 @@ module.exports = {
   fetchDoorList,
   fetchHikPersonMapping,
   fetchDoorEvents,
+  normalizePassport,
+  downloadPersonPicture,
+  syncMissingStudentPhotos,
   syncCampusAttendance,
   getCampusAttendanceSummary,
   getCampusAttendanceList,

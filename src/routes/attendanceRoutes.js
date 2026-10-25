@@ -6,6 +6,7 @@ const config = require('../config');
 const {
   testHikCentralConnection,
   syncCampusAttendance,
+  syncMissingStudentPhotos,
   getCampusAttendanceSummary,
   getCampusAttendanceList,
   getStudentAttendanceHistory
@@ -230,6 +231,19 @@ router.get('/status', async (req, res) => {
     res.json(status);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/attendance/sync-photos
+ * Tizimda rasmi mavjud bo'lmagan talabalarning rasmlarini HikCentral turniket serveridan yuklab to'ldirish
+ */
+router.post('/sync-photos', async (req, res) => {
+  try {
+    const result = await syncMissingStudentPhotos();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: `Rasmlarni sinxronlash xatosi: ${err.message}` });
   }
 });
 

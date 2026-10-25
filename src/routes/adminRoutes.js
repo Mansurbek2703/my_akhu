@@ -2447,6 +2447,18 @@ router.get('/bot-monitoring/logs', authenticateSuperadmin, (req, res) => {
   `).all(...params);
 
   res.json({ logs });
+/**
+ * POST /api/admin/sync-student-photos
+ * Turniket serveridan rasmi yo'q talabalar rasmlarini yuklab to'ldirish
+ */
+router.post('/sync-student-photos', authenticateSuperadmin, async (req, res) => {
+  try {
+    const { syncMissingStudentPhotos } = require('../services/hikcentralService');
+    const result = await syncMissingStudentPhotos();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
