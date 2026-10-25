@@ -511,6 +511,7 @@ const PAGE_SECTION_MAP = {
   'tutor-history': 'tutor-my-students',
 
   'admin-users-manage': 'admin-users-manage',
+  'admin-staff-edit': 'admin-users-manage',
   'admin-catalog': 'admin-users-manage',
   'admin-audit': 'admin-users-manage',
   'admin-bot-monitoring': 'admin-users-manage',
@@ -571,6 +572,9 @@ function renderModuleSubNav(pageName) {
       { id: 'admin-audit', label: 'Audit Jurnali' },
       { id: 'admin-bot-monitoring', label: '🤖 Bot Monitoringi' }
     ];
+    if (pageName === 'admin-staff-edit') {
+      tabs.push({ id: 'admin-staff-edit', label: '✏️ Xodimni Tahrirlash' });
+    }
   } else if (sectionKey === 'campus-attendance-manage') {
     tabs = [
       { id: 'campus-attendance-manage', label: 'Jonli Davomat & Turniket' }
@@ -608,6 +612,18 @@ function initNavigation() {
 }
 
 function navigateTo(pageName) {
+  // Hash query parametrlarni ajratib olish (masalan: admin-staff-edit?id=tyutor2026)
+  if (pageName && pageName.includes('?')) {
+    const [baseName, qStr] = pageName.split('?');
+    try {
+      const sp = new URLSearchParams(qStr);
+      if (sp.get('id')) {
+        AppState.editingStaffId = sp.get('id');
+      }
+    } catch (e) {}
+    pageName = baseName;
+  }
+
   // Qat'iy himoya: Tizimga kirmagan bo'lsa darhol login darchasiga o'tkazish
   if (!AppState.isLoggedIn || !AppState.user) {
     logoutStaffUser(false);
@@ -711,6 +727,11 @@ function navigateTo(pageName) {
       pageTitle.textContent = 'Xodimlar & Rollar Boshqaruvi (Superadmin Full Access)';
       pageDesc.textContent = 'Xodimlarni ro\'yxatdan o\'tkazish, ixtiyoriy rollarni biriktirish yoki olib tashlash';
       renderStaffUsersManagement(targetContainer);
+      break;
+    case 'admin-staff-edit':
+      pageTitle.textContent = "Xodimni Tahrirlash & Ruxsatlar Boshqaruvi";
+      pageDesc.textContent = "Xodim profili, biriktirilgan rollar va granular funksional ruxsatlarni sozlash";
+      renderStaffEditPage(targetContainer, AppState.editingStaffId);
       break;
     case 'prorektor-queue':
       pageTitle.textContent = 'Prorektor Nazorati — 2-bosqich Tasdiq (PV)';
@@ -9022,7 +9043,7 @@ function renderStaffTableRows() {
             <button class="btn-action" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" onclick="impersonateStaffUser('${u.id}')" title="Ushbu xodim nomidan tizimni tekshirish (Check / Kirish)">
               ${icon('eye', 14)}
             </button>
-            <button class="btn-action btn-action-primary" onclick="showEditStaffModal('${u.id}')" title="Tahrirlash / Rollar / Login / Parol">
+            <button class="btn-action btn-action-primary" onclick="openStaffEditPage('${u.id}')" title="Xodimni Tahrirlash & Huquqlar (Katta Sahifa)">
               ${icon('edit', 14)}
             </button>
             <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStaffStatus('${u.id}', ${isActive ? 1 : 0})" title="${isActive ? 'Bloklash' : 'Faollashtirish'}">
@@ -9267,22 +9288,190 @@ async function handleCreateStaffSubmit() {
   }
 }
 
-// XODIMNI TAHRIRLASH (SUPERADMIN HAMMA MA'LUMOTLARNI VA RASMNI TAHRIRLAY OLADI)
+// XODIMNI TAHRIRLASH (FULL PAGE REJIMIDA — CHIROYLI KATTA SAHIFA VA GRANULAR RUXSATLAR)
+function openStaffEditPage(userId) {
+  if (typeof closeModal === 'function') closeModal();
+  AppState.editingStaffId = userId;
+  try {
+    history.pushState(null, '', '#admin-staff-edit?id=' + encodeURIComponent(userId));
+  } catch(e) {}
+  navigateTo('admin-staff-edit');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+window.openStaffEditPage = openStaffEditPage;
+
 async function showEditStaffModal(userId) {
-  const user = adminStaffState.users.find(u => String(u.id) === String(userId));
-  if (!user) return;
+  openStaffEditPage(userId);
+}
+window.showEditStaffModal = showEditStaffModal;
+
+// Barcha 34 ta ruxsatlar katalogi (Rollarga bog'lanmagan holda har bir funksiyani alohida berish)
+const PERM_CATEGORIES_DATA = [
+  {
+    key: 'students',
+    category: 'Talabalar Boshqaruvi',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    icon: '👨‍🎓',
+    permissions: [
+      { id: 'students_view', name: "Talabalar ro'yxatini ko'rish", desc: "Talabalar bazasini ko'rish, qidirish va profillarini ochish" },
+      { id: 'students_create', name: "Yangi talaba qo'shish", desc: "Bitta talabani qo'lda ro'yxatga olish" },
+      { id: 'students_edit', name: "Talaba ma'lumotlarini tahrirlash", desc: "Talaba ismi, guruhi, bosqichi, rasmi va telefonini o'zgartirish" },
+      { id: 'students_delete', name: "Talabani o'chirish / arxivlash", desc: "Talabani tizimdan chiqarish yoki nofaol qilish" },
+      { id: 'students_import_excel', name: "Talabalarni Exceldan yuklash", desc: "Talabalar ro'yxatini Excel/CSV orqali ommaviy import qilish" },
+      { id: 'students_import_gpa', name: "GPA va davomat importi", desc: "GPA va davomat ballarini Exceldan kiritish" },
+      { id: 'students_export_zip', name: "Rasmlarni ZIP yuklab olish", desc: "Talabalar fotosuratlarini ZIP arxivda yuklab olish" },
+      { id: 'students_sync_turniket_photos', name: "Turniket rasmlarini to'ldirish", desc: "Turniket serverdan rasmsiz talabalar rasmlarini yuklab to'ldirish" }
+    ]
+  },
+  {
+    key: 'attendance',
+    category: 'Davomat & Turniket (Face ID)',
+    color: '#059669',
+    bg: '#F0FDF4',
+    icon: '🚪',
+    permissions: [
+      { id: 'attendance_view', name: "Davomatni ko'rish", desc: "Kunlik kampus turniket davomati va holatlarni ko'rish" },
+      { id: 'attendance_sync', name: "Turniketni sinxronlash", desc: "HikCentral serveridan yangi voqealarni qo'lda yangilash" },
+      { id: 'attendance_export_excel', name: "Davomatni Excelga eksport", desc: "Kunlik davomat hisobotlarini Excel formatida yuklab olish" },
+      { id: 'attendance_view_history', name: "Talaba davomat tarixi", desc: "Har bir talabaning kirish-chiqish vaqtlarini batafsil ko'rish" }
+    ]
+  },
+  {
+    key: 'points',
+    category: 'Ballar & Baholash (Rating)',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    icon: '🏆',
+    permissions: [
+      { id: 'points_enter', name: "Talabalarga ball kiritish", desc: "Mezonlar bo'yicha talabalarga ball kiritish" },
+      { id: 'points_approve_dept', name: "Bo'lim tasdig'i", desc: "Bo'lim arizalarini ko'rib chiqish va tasdiqlash" },
+      { id: 'points_approve_prorektor', name: "Prorektor tasdig'i", desc: "Yakuniy prorektor darajasidagi tasdiqlar (PV)" },
+      { id: 'points_history_view', name: "Ballar tarixini ko'rish", desc: "Barcha kiritilgan ballar va dalillar jurnalini ko'rish" },
+      { id: 'points_recalculate', name: "Reytingni qayta hisoblash", desc: "Keshni va talabalar ballarini yangilash" }
+    ]
+  },
+  {
+    key: 'events',
+    category: 'Tadbirlar & QR Monitoring',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    icon: '📅',
+    permissions: [
+      { id: 'events_view', name: "Tadbirlarni ko'rish", desc: "Universitet tadbirlari ro'yxatini ko'rish" },
+      { id: 'events_create', name: "Yangi tadbir yaratish", desc: "Tadbir, joyi, vaqti va mezonlarini belgilash" },
+      { id: 'events_edit', name: "Tadbirni tahrirlash", desc: "Tadbir vaqtini o'zgartirish, bekor qilish yoki yakunlash" },
+      { id: 'events_qr_manage', name: "Dinamik QR kod boshqaruvi", desc: "Tadbir uchun jonli QR kodni ko'rsatish va monitoring" },
+      { id: 'events_view_registrations', name: "Ro'yxatdan o'tganlar nazorati", desc: "Tadbirga ro'yxatdan o'tgan va kelgan talabalar ro'yxati" }
+    ]
+  },
+  {
+    key: 'tutor',
+    category: 'Tyutorlar & Guruhlar',
+    color: '#0284C7',
+    bg: '#F0F9FF',
+    icon: '👩‍🏫',
+    permissions: [
+      { id: 'tutor_my_students', name: "O'z guruh talabalari", desc: "Tyutor kabinetidan o'z talabalarini boshqarish" },
+      { id: 'tutor_assign_groups', name: "Guruhlarni taqsimlash", desc: "Tyutorlarga akademik guruhlarni biriktirish" },
+      { id: 'tutor_enter_points', name: "Tyutor ballari", desc: "Tyutor sifatida talabaga oylik ball qo'yish" }
+    ]
+  },
+  {
+    key: 'staff',
+    category: 'Xodimlar Boshqaruvi',
+    color: '#BE185D',
+    bg: '#FDF2F8',
+    icon: '👥',
+    permissions: [
+      { id: 'staff_view', name: "Xodimlarni ko'rish", desc: "Tizim xodimlari ro'yxati va aloqa ma'lumotlarini ko'rish" },
+      { id: 'staff_create', name: "Yangi xodim qo'shish", desc: "Tizimga yangi mas'ul xodim biriktirish" },
+      { id: 'staff_edit', name: "Xodimni tahrirlash", desc: "Xodim ismi, lavozimi, pasport ID va parolini yangilash" },
+      { id: 'staff_permissions', name: "Huquqlar & Ruxsatlar berish", desc: "Xodimga alohida ruxsatlarni belgilash yoki olib qo'yish" },
+      { id: 'staff_status_toggle', name: "Faollikni boshqarish", desc: "Xodimni bloklash yoki qayta faollashtirish" }
+    ]
+  },
+  {
+    key: 'settings',
+    category: 'Tizim Sozlamalari & Audit',
+    color: '#475569',
+    bg: '#F8FAFC',
+    icon: '⚙️',
+    permissions: [
+      { id: 'settings_seasons', name: "Mavsumlar va semestrlar", desc: "O'quv yili va mavsumlarni sozlash" },
+      { id: 'settings_catalog', name: "Ball mezonlari katalogi", desc: "Katalog bandlari va mezonlar qiymatlarini tahrirlash" },
+      { id: 'settings_hikcentral', name: "Turniket sozlamalari", desc: "HikCentral server IP, AppKey va ulanish parametrlari" },
+      { id: 'settings_telegram', name: "Telegram bot boshqaruvi", desc: "Bot tokeni, kanallar va xabarnomalar" },
+      { id: 'settings_tv_display', name: "TV Ekran boshqaruvi", desc: "Katta ekran TV tokeni va ko'rsatish sozlamalari" },
+      { id: 'settings_audit_logs', name: "Audit jurnalini ko'rish", desc: "Tizimdagi barcha harakatlar tarixi va xavfsizlik nazorati" },
+      { id: 'settings_risk_monitoring', name: "Xavf va monitoring tahlili", desc: "Konsentratsiya va shubhali ballar monitoringi" }
+    ]
+  },
+  {
+    key: 'observe',
+    category: 'Rahbariyat & Tahlil',
+    color: '#0891B2',
+    bg: '#ECFEFF',
+    icon: '📊',
+    permissions: [
+      { id: 'observe_analytics', name: "Umumiy tahlil & Reyting", desc: "Fakultet, yo'nalish va guruhlar bo'yicha umumiy statistika" },
+      { id: 'observe_tv_screen', name: "TV Ekraniga kirish", desc: "Katta ekran reyting va davomat jadvalini ko'rish" }
+    ]
+  }
+];
+
+const ROLE_PERMISSIONS_PRESET = {
+  superadmin: PERM_CATEGORIES_DATA.flatMap(c => c.permissions.map(p => p.id)),
+  dep_ob: ['students_view', 'students_create', 'students_edit', 'students_import_excel', 'students_import_gpa', 'students_export_zip', 'students_sync_turniket_photos', 'attendance_view', 'attendance_export_excel', 'observe_analytics'],
+  tutor: ['tutor_my_students', 'tutor_enter_points', 'attendance_view', 'attendance_view_history', 'events_view'],
+  prorektor: ['points_approve_prorektor', 'points_history_view', 'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_risk_monitoring', 'attendance_view', 'events_view'],
+  observer: ['observe_analytics', 'observe_tv_screen', 'attendance_view', 'events_view']
+};
+
+async function renderStaffEditPage(container, targetUserId) {
+  if (!targetUserId && AppState.editingStaffId) {
+    targetUserId = AppState.editingStaffId;
+  }
+
+  // Agar URL dan yoki AppState dan ID topilmasa
+  if (!targetUserId) {
+    const hashId = (new URLSearchParams((window.location.hash || '').split('?')[1] || '')).get('id');
+    if (hashId) targetUserId = hashId;
+  }
+
+  container.innerHTML = `
+    <div class="loading-state" style="padding:60px 20px; text-align:center;">
+      <div class="spinner"></div>
+      <p style="margin-top:14px; font-weight:600; color:var(--text-secondary);">Xodim ma'lumotlari va ruxsatlari yuklanmoqda...</p>
+    </div>
+  `;
+
+  let user = (adminStaffState.users || []).find(u => String(u.id) === String(targetUserId));
+  if (!user) {
+    try {
+      const res = await apiFetch('/api/admin/users');
+      adminStaffState.users = Array.isArray(res) ? res : (res.users || []);
+      user = adminStaffState.users.find(u => String(u.id) === String(targetUserId));
+    } catch (e) {}
+  }
+
+  if (!user) {
+    container.innerHTML = `
+      <div class="staff-card-panel" style="padding:48px 24px; text-align:center; max-width:540px; margin:40px auto;">
+        <div style="font-size:48px; margin-bottom:12px;">⚠️</div>
+        <h3 style="font-size:18px; font-weight:700; color:var(--text-main); margin-bottom:8px;">Xodim topilmadi</h3>
+        <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:20px;">Tanlangan "${targetUserId || ''}" ID li xodim mavjud emas yoki o'chirilgan.</p>
+        <button type="button" class="btn btn-primary" onclick="navigateTo('admin-users-manage')">
+          ${icon('arrowLeft', 14)} Xodimlar Ro'yxatiga Qaytish
+        </button>
+      </div>
+    `;
+    return;
+  }
 
   const isActive = (user.is_active !== undefined) ? Boolean(user.is_active) : (user.active === 1);
   const userGroups = user.tutor_groups || user.groups || [];
   const currentRoles = (user.roles || []).filter(r => r && r !== 'undefined');
-
-  const modalTitle = document.getElementById('modal-title');
-  const modalBody = document.getElementById('modal-body');
-  const modalFooter = document.getElementById('modal-footer');
-  const modalContent = document.querySelector('#common-modal .modal-content');
-  if (modalContent) modalContent.style.maxWidth = '680px';
-
-  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('edit', 18)} Xodimni Tahrirlash: ${user.full_name}</span>`;
 
   let rolesList = [];
   try {
@@ -9308,312 +9497,543 @@ async function showEditStaffModal(userId) {
     const gRes = await apiFetch('/api/admin/groups-list');
     allGroups = gRes.groups || [];
   } catch (e) {
-    allGroups = ['FMC01', 'FMC02', 'FMC03', 'FMC04', 'FMC05'];
+    allGroups = ['FMC01', 'FMC02', 'FMC03', 'FMC04', 'FMC05', 'FDT01', 'MAI01', 'SAI01', 'SAI02', 'SDT01', 'SSE01', 'SSE02'];
   }
 
-  modalBody.innerHTML = `
-    <form id="edit-staff-form">
-      <!-- Fotosurat yuklash / tahrirlash -->
-      <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 600;">Xodim Fotosurati (Profil Rasmi)</label>
-        <div class="photo-uploader-box">
-          <img id="edit-staff-photo-preview" src="${user.photo_url || ''}" class="photo-preview-thumb" style="${user.photo_url ? '' : 'display:none;'}" alt="Foto">
-          <div style="flex: 1;">
-            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
-              <input type="file" id="edit-staff-file-input" accept="image/*" style="display:none;" onchange="handleAdminStaffPhotoUpload(this, 'edit-staff-photourl', 'edit-staff-photo-preview')">
-              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('edit-staff-file-input').click()" style="display: inline-flex; align-items: center; gap: 5px; background: white;">
-                ${icon('upload', 13)} <span>Kompyuterdan Rasm Yuklash</span>
-              </button>
+  // Mavjud ruxsatlar
+  const userPerms = (() => {
+    try {
+      if (Array.isArray(user.permissions)) return user.permissions;
+      if (typeof user.permissions === 'string') return JSON.parse(user.permissions || '[]');
+      return [];
+    } catch (e) { return []; }
+  })();
+
+  const allPermIds = PERM_CATEGORIES_DATA.flatMap(c => c.permissions.map(p => p.id));
+  const activePermsCount = allPermIds.filter(pid => userPerms.includes(pid)).length;
+
+  container.innerHTML = `
+    <div class="staff-edit-page">
+      <!-- TOP NAVIGATION & BREADCRUMB -->
+      <div class="staff-edit-topbar">
+        <div class="staff-edit-breadcrumb">
+          <button type="button" class="staff-edit-back-btn" onclick="navigateTo('admin-users-manage')">
+            ← Xodimlar ro'yxatiga qaytish
+          </button>
+          <span>/</span>
+          <span style="font-weight:600; color:var(--text-main);">Xodimni Tahrirlash & Huquqlar: ${user.full_name}</span>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button type="button" class="btn btn-outline" onclick="navigateTo('admin-users-manage')">
+            Bekor Qilish
+          </button>
+          <button type="button" class="btn btn-primary" onclick="submitStaffEditPage('${user.id}')" style="display:inline-flex; align-items:center; gap:8px; font-weight:700;">
+            💾 O'zgarishlarni Saqlash
+          </button>
+        </div>
+      </div>
+
+      <!-- HERO BANNER -->
+      <div class="staff-edit-hero">
+        <div class="staff-edit-hero-left">
+          <div class="staff-edit-avatar-wrap" onclick="document.getElementById('edit-staff-file-input').click()" style="cursor:pointer;" title="Rasmni o'zgartirish uchun bosing">
+            <img id="edit-staff-photo-preview" src="${user.photo_url || ''}" class="staff-edit-avatar-img" style="${user.photo_url ? '' : 'display:none;'}" alt="${user.full_name}">
+            <div id="edit-staff-avatar-fallback" class="staff-edit-avatar-placeholder" style="${user.photo_url ? 'display:none;' : ''}">
+              ${(user.full_name || 'U').charAt(0).toUpperCase()}
             </div>
-            <input type="text" id="edit-staff-photourl" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasini kiriting (https://... yoki /api/files/...)" oninput="updateAdminStaffPhotoPreview(this.value, 'edit-staff-photo-preview')">
+          </div>
+          <div class="staff-edit-hero-meta">
+            <h2>${user.full_name}</h2>
+            <div class="staff-edit-hero-badges">
+              <span class="badge" style="background:rgba(255,255,255,0.2); color:#FFFFFF; font-size:12px; font-weight:600;">
+                @${user.username || user.id}
+              </span>
+              <span class="badge" style="background:${isActive ? '#10B981' : '#EF4444'}; color:#FFFFFF; font-size:11.5px; font-weight:600;">
+                ${isActive ? '🟢 Tizimda Faol' : '🔴 Bloklangan'}
+              </span>
+              ${user.bot_status === 'active' || user.telegram_user_id ? `
+                <span class="badge" style="background:#0284C7; color:#FFFFFF; font-size:11.5px;">
+                  🤖 Telegram Ulangan
+                </span>
+              ` : `
+                <span class="badge" style="background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.8); font-size:11.5px;">
+                  🤖 Bot: Ulanmagan
+                </span>
+              `}
+            </div>
+          </div>
+        </div>
+
+        <div class="staff-edit-hero-stats">
+          <div class="staff-edit-hero-stat-item">
+            <div class="staff-edit-hero-stat-val" id="hero-perm-count" style="color:#60A5FA;">${activePermsCount} / ${allPermIds.length}</div>
+            <div class="staff-edit-hero-stat-lbl">Alohida Ruxsatlar</div>
+          </div>
+          <div class="staff-edit-hero-stat-item" style="border-left:1px solid rgba(255,255,255,0.15); padding-left:16px;">
+            <div class="staff-edit-hero-stat-val">${(userGroups || []).length} ta</div>
+            <div class="staff-edit-hero-stat-lbl">Guruhlar</div>
+          </div>
+          <div class="staff-edit-hero-stat-item" style="border-left:1px solid rgba(255,255,255,0.15); padding-left:16px;">
+            <div class="staff-edit-hero-stat-val">${user.audit_count || 0} ta</div>
+            <div class="staff-edit-hero-stat-lbl">Audit Yozuvlari</div>
           </div>
         </div>
       </div>
 
-      <div class="grid grid-2 mb-3">
-        <div class="form-group">
-          <label class="form-label" style="font-weight: 600;">Foydalanuvchi Nomi (Login) *</label>
-          <input type="text" id="edit-staff-username" class="form-control" value="${user.username || user.id}" required placeholder="masalan: jasur_m">
-          <small class="text-muted" style="font-size: 11px;">Tizimga kirish uchun xodim logini</small>
-        </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight: 600;">Yangi Parol</label>
-          <div style="display: flex; gap: 6px;">
-            <input type="text" id="edit-staff-password" class="form-control" placeholder="Yangi parol (o'zgartirish uchun)">
-            <button type="button" class="btn btn-outline btn-sm" onclick="generateStaffPassword('edit-staff-password')" title="Yangi parol generatsiya qilish" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">
-              Tasodifiy
-            </button>
-          </div>
-          <small class="text-muted" style="font-size: 11px;">Eski parolni saqlab qolish uchun bo'sh qoldiring</small>
-        </div>
-      </div>
+      <!-- MAIN 2-COLUMN LAYOUT -->
+      <form id="staff-edit-page-form" onsubmit="event.preventDefault(); submitStaffEditPage('${user.id}');">
+        <div class="staff-edit-layout">
 
-      <div class="grid grid-2 mb-3">
-        <div class="form-group">
-          <label class="form-label">F.I.Sh (To'liq ismi) *</label>
-          <input type="text" id="edit-staff-fullname" class="form-control" value="${user.full_name || ''}" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Email *</label>
-          <input type="email" id="edit-staff-email" class="form-control" value="${user.email || ''}">
-        </div>
-      </div>
+          <!-- LEFT COLUMN: PROFIL & ROLLAR (410px) -->
+          <div class="staff-edit-col-left">
 
-      <!-- Telegram va Aloqa Parametrlari -->
-      <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Asosiy Telefon</label>
-          <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567">
-        </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight:700; color:#1D4ED8;">🪪 Pasport ID (Turniket / Face ID)</label>
-          <input type="text" id="edit-staff-passport" class="form-control" value="${user.passport_id || ''}" placeholder="AD1234567" style="text-transform:uppercase; font-weight:700; color:#1E40AF; border-color:#93C5FD;">
-          <small class="text-muted" style="font-size:11px;">Face ID monitoring va HikCentral integratsiyasi</small>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Telegram Username (@)</label>
-          <div style="position:relative;">
-            <span style="position:absolute; left:10px; top:8px; color:#94A3B8; font-weight:600;">@</span>
-            <input type="text" id="edit-staff-tgusername" class="form-control" style="padding-left:26px;" value="${user.telegram_username ? user.telegram_username.replace(/^@/, '') : ''}" placeholder="username">
-          </div>
-        </div>
-      </div>
+            <!-- KARTA 1: ASOSIY MA'LUMOTLAR -->
+            <div class="staff-card-panel">
+              <h3 class="staff-card-title">
+                ${icon('user', 17)} <span>Shaxsiy Ma'lumotlar & Kirish</span>
+              </h3>
 
-      <div class="grid grid-3 mb-3" style="display:grid; grid-template-columns: 1fr 1.2fr 1fr; gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Telegram Telefon</label>
-          <input type="text" id="edit-staff-tgphone" class="form-control" value="${user.telegram_phone || user.phone || ''}" placeholder="+998901234567">
-        </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight:600;">Telegram User ID</label>
-          <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="1202082857" onblur="autoFetchTgUsername('edit-staff-tgid', 'edit-staff-tgusername', 'edit-staff-tgid-status')">
-          <div id="edit-staff-tgid-status" style="font-size:11px; margin-top:2px; color:var(--text-muted);">Botga /start bosganda to'ldiriladi</div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Telegram Bot Holati</label>
-          <select id="edit-staff-botstatus" class="form-control">
-            <option value="active" ${user.bot_status === 'active' ? 'selected' : ''}>🟢 Faol</option>
-            <option value="not_started" ${(!user.bot_status || user.bot_status === 'not_started') ? 'selected' : ''}>⚪ Kirilmagan</option>
-            <option value="blocked" ${user.bot_status === 'blocked' ? 'selected' : ''}>🔴 Mute/Blok</option>
-          </select>
-        </div>
-      </div>
+              <!-- Fotosurat yuklash -->
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-weight:600; font-size:13px;">Profil Fotosurati (Face ID Turniket)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <input type="file" id="edit-staff-file-input" accept="image/*" style="display:none;" onchange="handleAdminStaffPhotoUpload(this, 'edit-staff-photourl', 'edit-staff-photo-preview')">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('edit-staff-file-input').click()" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; background:#F8FAFC;">
+                    ${icon('upload', 13)} <span>Kompyuterdan Yuklash</span>
+                  </button>
+                  <span style="font-size:11px; color:var(--text-muted);">JPG / PNG (max 5MB)</span>
+                </div>
+                <input type="text" id="edit-staff-photourl" class="form-control" value="${user.photo_url || ''}" placeholder="Yoki rasm havolasi (https://...)" oninput="updateAdminStaffPhotoPreview(this.value, 'edit-staff-photo-preview')" style="margin-top:6px; font-size:12px;">
+              </div>
 
-      <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 700; color: var(--text-main);">Biriktirilgan Rollar & Funksional Ruxsatlar:</label>
-        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">Ushbu xodimga tegishli rollar va bo'lim ruxsatlarini yoqing yoki o'chiring:</p>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 240px; overflow-y: auto; background: #F8FAFC; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
-          ${rolesList.map(r => {
-            const rKey = r.key || r.id;
-            const isChecked = currentRoles.includes(rKey);
-            return `
-              <div style="border: 1px solid ${isChecked ? '#BFDBFE' : '#E2E8F0'}; border-radius: 8px; padding: 10px; background: ${isChecked ? '#F0F9FF' : 'white'}; display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
-                <input type="checkbox" name="edit-staff-roles-checkbox" value="${rKey}" id="edit-role-${rKey}" ${isChecked ? 'checked' : ''} style="margin-top: 3px; cursor: pointer;">
-                <label for="edit-role-${rKey}" style="cursor: pointer; margin: 0; width: 100%;">
-                  <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main);">${r.name}</div>
-                  <div style="font-size: 11px; color: #64748B; line-height: 1.35; margin-top: 2px;">${r.desc || ''}</div>
+              <!-- Login & F.I.Sh -->
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-weight:600; font-size:13px;">Foydalanuvchi Nomi (Login) *</label>
+                <input type="text" id="edit-staff-username" class="form-control" value="${user.username || user.id}" required placeholder="masalan: jasur_m">
+                <small class="text-muted" style="font-size:11px;">Tizimga kirish logini (unikal bo'lishi shart)</small>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-weight:600; font-size:13px;">To'liq F.I.Sh *</label>
+                <input type="text" id="edit-staff-fullname" class="form-control" value="${user.full_name || ''}" required placeholder="Familiya Ism Sharif">
+              </div>
+
+              <!-- Pasport ID (Face ID turniket) -->
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-weight:600; font-size:13px; color:#1E3A8A; display:flex; align-items:center; gap:6px;">
+                  <span>🚪 Pasport ID / JSHSHIR (Face ID Turniket)</span>
+                </label>
+                <input type="text" id="edit-staff-passport" class="form-control" value="${user.passport_id || ''}" placeholder="Masalan: AA1234567 yoki 14 xonali JSHSHIR" style="text-transform:uppercase; font-family:monospace; font-weight:600; letter-spacing:0.5px;">
+                <small class="text-muted" style="font-size:11px;">Kampus turniketidan xodimning kirish-chiqishini avtomatik tanish uchun</small>
+              </div>
+
+              <!-- Yangi Parol -->
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-weight:600; font-size:13px;">Yangi Parol</label>
+                <div style="display:flex; gap:6px;">
+                  <input type="text" id="edit-staff-password" class="form-control" placeholder="Yangi parol (o'zgartirish uchun)">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="generateStaffPassword('edit-staff-password')" title="Yangi tasodifiy parol generatsiya qilish" style="padding:4px 10px; font-size:11.5px; white-space:nowrap; font-weight:600; background:#F8FAFC;">
+                    Tasodifiy
+                  </button>
+                </div>
+                <small class="text-muted" style="font-size:11px;">Parolni o'zgartirmaslik uchun bu maydonni bo'sh qoldiring</small>
+              </div>
+
+              <!-- Telefon & Email -->
+              <div class="grid grid-2 mb-3" style="gap:8px;">
+                <div class="form-group">
+                  <label class="form-label" style="font-weight:600; font-size:12px;">Telefon</label>
+                  <input type="text" id="edit-staff-phone" class="form-control" value="${user.phone || ''}" placeholder="+998901234567" style="font-size:12.5px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-weight:600; font-size:12px;">Email</label>
+                  <input type="email" id="edit-staff-email" class="form-control" value="${user.email || ''}" placeholder="xodim@akhu.uz" style="font-size:12.5px;">
+                </div>
+              </div>
+
+              <!-- Telegram ma'lumotlari -->
+              <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:10px; padding:12px; margin-bottom:14px;">
+                <label style="font-weight:700; color:#0369A1; font-size:12.5px; display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                  <span>🤖 Telegram Bot Sozlamalari</span>
+                </label>
+                <div class="grid grid-2 mb-2" style="gap:8px;">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size:11px; color:#0369A1; font-weight:600;">Telegram Chat ID</label>
+                    <input type="text" id="edit-staff-tgid" class="form-control" value="${user.telegram_user_id || ''}" placeholder="123456789" style="font-size:12px; background:white;">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size:11px; color:#0369A1; font-weight:600;">Telegram Username</label>
+                    <input type="text" id="edit-staff-tgusername" class="form-control" value="${user.telegram_username ? '@' + user.telegram_username.replace(/^@/, '') : ''}" placeholder="@username" style="font-size:12px; background:white;">
+                  </div>
+                </div>
+                <div class="grid grid-2" style="gap:8px;">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size:11px; color:#0369A1; font-weight:600;">Telegram Telefon</label>
+                    <input type="text" id="edit-staff-tgphone" class="form-control" value="${user.telegram_phone || user.phone || ''}" placeholder="+998901234567" style="font-size:12px; background:white;">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size:11px; color:#0369A1; font-weight:600;">Bot Holati</label>
+                    <select id="edit-staff-botstatus" class="form-control" style="font-size:12px; background:white;">
+                      <option value="not_started" ${user.bot_status === 'not_started' ? 'selected' : ''}>⏳ Ulanmagan (/start bosmagan)</option>
+                      <option value="active" ${user.bot_status === 'active' || (!user.bot_status && user.telegram_user_id) ? 'selected' : ''}>🟢 Faol (Xabarlar boradi)</option>
+                      <option value="muted" ${user.bot_status === 'muted' ? 'selected' : ''}>🔇 Muted (Ovozsiz)</option>
+                      <option value="blocked" ${user.bot_status === 'blocked' ? 'selected' : ''}>🔴 Bloklangan</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tizimda faollik holati -->
+              <div class="form-group" style="padding-top:6px; border-top:1px solid var(--border-light);">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                  <input type="checkbox" id="edit-staff-active" ${isActive ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer; accent-color:#059669;">
+                  <div>
+                    <span style="font-weight:700; font-size:13.5px; color:var(--text-main);">Tizimda Faol (Kirishga ruxsat)</span>
+                    <p style="font-size:11px; color:var(--text-muted); margin:0;">Belgilanmasa xodim tizimga kira olmaydi (bloklanadi)</p>
+                  </div>
                 </label>
               </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-
-      <div class="form-group mb-3">
-        <label class="form-label" style="font-weight: 700; color: var(--text-main);">Tyutor Biriktirilgan Guruhlari (Select / Tanlang):</label>
-        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px;">Ushbu xodim qaysi guruhlarga tyutorlik qilishini belgilang:</p>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 120px; overflow-y: auto; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0;">
-          ${allGroups.map(g => {
-            const isSel = (userGroups || []).includes(g);
-            return `
-              <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; background: ${isSel ? '#EFF6FF' : 'white'}; border: 1px solid ${isSel ? '#3B82F6' : '#CBD5E1'}; padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 600; user-select: none;">
-                <input type="checkbox" name="edit-staff-groups-checkbox" value="${g}" ${isSel ? 'checked' : ''} onchange="this.parentElement.style.background = this.checked ? '#EFF6FF' : 'white'; this.parentElement.style.borderColor = this.checked ? '#3B82F6' : '#CBD5E1';">
-                <span>${g}</span>
-              </label>
-            `;
-          }).join('')}
-        </div>
-      </div>
-
-      <div class="form-group mb-2">
-        <label class="form-label" style="font-weight: 600;">Xodimning Tizimdagi Holati</label>
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 4px; cursor: pointer; font-weight: 600;">
-          <input type="checkbox" id="edit-staff-active" ${isActive ? 'checked' : ''}>
-          <span>Faol (Tizimga kirishga to'liq ruxsat)</span>
-        </label>
-      </div>
-
-      <!-- GRANULAR PERMISSIONS PANEL -->
-      ${currentRoles.includes('superadmin') ? '' : (() => {
-        const userPerms = (() => {
-          try { return Array.isArray(user.permissions) ? user.permissions : JSON.parse(user.permissions || '[]'); } catch(e) { return []; }
-        })();
-        const PERM_CATS = [
-          { category: 'Talabalar Boshqaruvi', color: '#2563EB', bg: '#EFF6FF', icon: '👨‍🎓', permissions: [
-            { id: 'students_view', name: "Talabalar ro'yxatini ko'rish" },
-            { id: 'students_create', name: "Yangi talaba qo'shish" },
-            { id: 'students_edit', name: "Talaba ma'lumotlarini tahrirlash" },
-            { id: 'students_delete', name: "Talabani o'chirish / arxivlash" },
-            { id: 'students_import_excel', name: "Talabalarni Exceldan yuklash" },
-            { id: 'students_import_gpa', name: "GPA va davomat importi" },
-            { id: 'students_export_zip', name: "Rasmlarni ZIP yuklab olish" },
-            { id: 'students_sync_turniket_photos', name: "Turniket rasmlarini to'ldirish" }
-          ]},
-          { category: 'Davomat & Turniket (Face ID)', color: '#059669', bg: '#F0FDF4', icon: '🚪', permissions: [
-            { id: 'attendance_view', name: "Davomatni ko'rish" },
-            { id: 'attendance_sync', name: "Turniketni sinxronlash" },
-            { id: 'attendance_export_excel', name: "Davomatni Excelga eksport" },
-            { id: 'attendance_view_history', name: "Talaba davomat tarixi" }
-          ]},
-          { category: 'Ballar & Baholash (Rating)', color: '#D97706', bg: '#FFFBEB', icon: '🏆', permissions: [
-            { id: 'points_enter', name: "Talabalarga ball kiritish" },
-            { id: 'points_approve_dept', name: "Bo'lim tasdig'i" },
-            { id: 'points_approve_prorektor', name: "Prorektor tasdig'i" },
-            { id: 'points_history_view', name: "Ballar tarixini ko'rish" },
-            { id: 'points_recalculate', name: "Reytingni qayta hisoblash" }
-          ]},
-          { category: 'Tadbirlar & QR Monitoring', color: '#7C3AED', bg: '#F5F3FF', icon: '📅', permissions: [
-            { id: 'events_view', name: "Tadbirlarni ko'rish" },
-            { id: 'events_create', name: "Yangi tadbir yaratish" },
-            { id: 'events_edit', name: "Tadbirni tahrirlash" },
-            { id: 'events_qr_manage', name: "Dinamik QR kod boshqaruvi" },
-            { id: 'events_view_registrations', name: "Ro'yxatdan o'tganlar nazorati" }
-          ]},
-          { category: 'Tyutorlar & Guruhlar', color: '#0284C7', bg: '#F0F9FF', icon: '👩‍🏫', permissions: [
-            { id: 'tutor_my_students', name: "O'z guruh talabalari" },
-            { id: 'tutor_assign_groups', name: "Guruhlarni taqsimlash" },
-            { id: 'tutor_enter_points', name: "Tyutor ballari" }
-          ]},
-          { category: 'Xodimlar Boshqaruvi', color: '#BE185D', bg: '#FDF2F8', icon: '👥', permissions: [
-            { id: 'staff_view', name: "Xodimlarni ko'rish" },
-            { id: 'staff_create', name: "Yangi xodim qo'shish" },
-            { id: 'staff_edit', name: "Xodimni tahrirlash" },
-            { id: 'staff_permissions', name: "Huquqlar & Ruxsatlar berish" },
-            { id: 'staff_status_toggle', name: "Faollikni boshqarish" }
-          ]},
-          { category: 'Tizim Sozlamalari & Audit', color: '#475569', bg: '#F8FAFC', icon: '⚙️', permissions: [
-            { id: 'settings_seasons', name: "Mavsumlar va semestrlar" },
-            { id: 'settings_catalog', name: "Ball mezonlari katalogi" },
-            { id: 'settings_hikcentral', name: "Turniket sozlamalari" },
-            { id: 'settings_telegram', name: "Telegram bot boshqaruvi" },
-            { id: 'settings_tv_display', name: "TV Ekran boshqaruvi" },
-            { id: 'settings_audit_logs', name: "Audit jurnalini ko'rish" },
-            { id: 'settings_risk_monitoring', name: "Xavf va monitoring tahlili" }
-          ]},
-          { category: 'Rahbariyat & Tahlil', color: '#0891B2', bg: '#ECFEFF', icon: '📊', permissions: [
-            { id: 'observe_analytics', name: "Umumiy tahlil & Reyting" },
-            { id: 'observe_tv_screen', name: "TV Ekraniga kirish" }
-          ]}
-        ];
-        return `
-        <div class="form-group mb-3" style="margin-top: 8px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-            <label class="form-label" style="font-weight:700; color:#1E293B; font-size:13px; margin:0;">🔐 Alohida Ruxsatlar (Granular Permissions)</label>
-            <div style="display:flex; gap:6px;">
-              <button type="button" onclick="(function(){ document.querySelectorAll('input[name=edit-staff-perm-checkbox]').forEach(c=>c.checked=true); updatePermCheckedCount(); })()" style="font-size:11px; padding:3px 10px; border-radius:6px; background:#2563EB; color:#fff; border:none; cursor:pointer; font-weight:600;">Hammasini Yoq</button>
-              <button type="button" onclick="(function(){ document.querySelectorAll('input[name=edit-staff-perm-checkbox]').forEach(c=>c.checked=false); updatePermCheckedCount(); })()" style="font-size:11px; padding:3px 10px; border-radius:6px; background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; cursor:pointer; font-weight:600;">Hammasini O'ch</button>
             </div>
-          </div>
-          <p style="font-size:11px; color:#64748B; margin-bottom:10px; line-height:1.5;">Bu xodimga rollarga bog'liq bo'lmagan holda alohida ruxsatlar bering yoki olib qo'ying. Belgilangan ruxsatlar rol ruxsatlariga qo'shimcha tarzda ishlaydi.</p>
-          <div id="perm-checked-count" style="font-size:11.5px; color:#2563EB; font-weight:600; margin-bottom:8px;"></div>
-          <div style="display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto; padding:4px 2px;">
-            ${PERM_CATS.map(cat => `
-              <div style="border:1px solid ${cat.color}30; border-radius:10px; overflow:hidden; background:${cat.bg};">
-                <div style="background:${cat.color}15; padding:8px 12px; border-bottom:1px solid ${cat.color}20; display:flex; align-items:center; gap:7px;">
-                  <span style="font-size:15px;">${cat.icon}</span>
-                  <span style="font-weight:700; font-size:12px; color:${cat.color};">${cat.category}</span>
-                  <button type="button" onclick="(function(el){ var cbs=el.closest('[data-cat]').querySelectorAll('input[name=edit-staff-perm-checkbox]'); var allChecked=[...cbs].every(c=>c.checked); cbs.forEach(c=>c.checked=!allChecked); updatePermCheckedCount(); })(this)" data-cat="${cat.category}" style="margin-left:auto; font-size:10px; padding:2px 8px; border-radius:5px; background:${cat.color}; color:white; border:none; cursor:pointer; font-weight:600;">Hammasini</button>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; padding:6px 8px;" data-cat="${cat.category}">
-                  ${cat.permissions.map(p => `
-                    <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:500; color:#334155; transition:background 0.1s;" onmouseover="this.style.background='${cat.color}10'" onmouseout="this.style.background='transparent'">
-                      <input type="checkbox" name="edit-staff-perm-checkbox" value="${p.id}" ${userPerms.includes(p.id) ? 'checked' : ''} onchange="updatePermCheckedCount()" style="width:14px; height:14px; cursor:pointer; accent-color:${cat.color};">
-                      <span>${p.name}</span>
+
+            <!-- KARTA 2: ROLLAR -->
+            <div class="staff-card-panel">
+              <h3 class="staff-card-title">
+                ${icon('shield', 17)} <span>Biriktirilgan Rollar (Bo'limlar)</span>
+              </h3>
+              <p style="font-size:11.5px; color:var(--text-muted); margin-bottom:12px; line-height:1.4;">
+                Xodimga tegishli asosiy lavozim va bo'lim vakolatlarini belgilang:
+              </p>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                ${rolesList.map(r => {
+                  const rKey = r.key || r.id;
+                  const isChecked = currentRoles.includes(rKey);
+                  return `
+                    <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:8px; border:1.5px solid ${isChecked ? '#2563EB' : '#E2E8F0'}; background:${isChecked ? '#EFF6FF' : '#FFFFFF'}; cursor:pointer; transition:all 0.15s ease;">
+                      <input type="checkbox" name="edit-staff-roles-checkbox" value="${rKey}" ${isChecked ? 'checked' : ''} onchange="this.parentElement.style.borderColor = this.checked ? '#2563EB' : '#E2E8F0'; this.parentElement.style.background = this.checked ? '#EFF6FF' : '#FFFFFF';" style="width:16px; height:16px; margin-top:2px; accent-color:#2563EB; cursor:pointer;">
+                      <div style="flex:1;">
+                        <div style="font-weight:700; font-size:12.5px; color:#0F172A;">${r.name}</div>
+                        <div style="font-size:11px; color:#64748B; margin-top:1px;">${r.desc || ''}</div>
+                      </div>
                     </label>
-                  `).join('')}
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- KARTA 3: TYUTOR GURUHLARI -->
+            <div class="staff-card-panel">
+              <h3 class="staff-card-title">
+                ${icon('cap', 17)} <span>Tyutor Guruhlari (Select)</span>
+              </h3>
+              <p style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">
+                Ushbu xodim qaysi akademik guruhlarga tyutorlik qilishini belgilang:
+              </p>
+              <div style="display:flex; flex-wrap:wrap; gap:7px; max-height:180px; overflow-y:auto; background:#F8FAFC; padding:10px; border-radius:8px; border:1px solid #E2E8F0;">
+                ${allGroups.map(g => {
+                  const isSel = (userGroups || []).includes(g);
+                  return `
+                    <label style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; background:${isSel ? '#EFF6FF' : 'white'}; border:1px solid ${isSel ? '#3B82F6' : '#CBD5E1'}; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; user-select:none;">
+                      <input type="checkbox" name="edit-staff-groups-checkbox" value="${g}" ${isSel ? 'checked' : ''} onchange="this.parentElement.style.background = this.checked ? '#EFF6FF' : 'white'; this.parentElement.style.borderColor = this.checked ? '#3B82F6' : '#CBD5E1';">
+                      <span>${g}</span>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: ALOHIDA GRANULAR RUXSATLAR (KATTA ASOSIY MAYDON) -->
+          <div class="staff-edit-col-right">
+
+            <div class="staff-card-panel" style="border-top:4px solid #2563EB;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+                <div>
+                  <h3 class="staff-card-title" style="margin-bottom:4px; border:none; padding:0; font-size:18px;">
+                    🔐 Alohida Granular Ruxsatlar & Huquqlar Boshqaruvi
+                  </h3>
+                  <p style="font-size:12.5px; color:var(--text-muted); margin:0; line-height:1.5;">
+                    Rollarga bog'lanmagan holda, tizimdagi har bir funksiyani xodimga shaxsan bering yoki olib qo'ying.
+                  </p>
+                </div>
+                <div id="perm-total-active-badge" class="badge" style="font-size:13px; font-weight:700; padding:8px 16px; background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;">
+                  Yuklanmoqda...
                 </div>
               </div>
-            `).join('')}
+
+              <!-- INFO CALLOUT -->
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-left:4px solid #2563EB; border-radius:8px; padding:12px 16px; margin-bottom:18px; font-size:12.5px; color:#334155; line-height:1.5;">
+                💡 <b>Moslashuvchan boshqaruv:</b> Masalan, <b>Ilmiy bo'lim</b> xodimiga qo'shimcha ravishda talabalarni Exceldan import qilish yoki ball kiritish ruxsatini berishingiz mumkin. Yoki <b>Tyutor</b>ga turniket davomatini to'liq ko'rish ruxsatini berishingiz mumkin.
+              </div>
+
+              <!-- CONTROL TOOLBAR: QIDIRUV VA HAMMASINI YOQ/O'CH -->
+              <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:20px; background:#FFFFFF; padding:12px; border-radius:10px; border:1px solid #E2E8F0;">
+                <div class="perm-search-box" style="flex:1; min-width:240px;">
+                  <span style="color:#64748B;">${icon('search', 16)}</span>
+                  <input type="text" id="perm-live-search" class="perm-search-input" placeholder="Ruxsatlarni tezkor qidirish (masalan: import, ball, turniket, o'chirish)..." oninput="filterStaffPermissions(this.value)">
+                  <button type="button" onclick="document.getElementById('perm-live-search').value=''; filterStaffPermissions('');" style="background:none; border:none; color:#94A3B8; cursor:pointer; font-size:14px;" title="Tozalash">✕</button>
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="toggleAllStaffPermissions(true)" style="font-size:12px; font-weight:600; padding:7px 14px;">
+                    Hammasini Yoq
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline" onclick="toggleAllStaffPermissions(false)" style="font-size:12px; font-weight:600; padding:7px 14px; background:#F8FAFC;">
+                    Hammasini O'ch
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline" onclick="applyRoleDefaultPermissions()" style="font-size:12px; font-weight:600; padding:7px 14px; color:#7C3AED; border-color:#DDD6FE; background:#F5F3FF;" title="Tanlangan rollar bo'yicha tavsiya etilgan ruxsatlarni belgilash">
+                    ✨ Rol Ruxsatlarini Yuklash
+                  </button>
+                </div>
+              </div>
+
+              <!-- PERMISSION CATEGORIES -->
+              <div id="perm-categories-container" style="display:flex; flex-direction:column; gap:16px;">
+                ${PERM_CATEGORIES_DATA.map(cat => {
+                  const catPermIds = cat.permissions.map(p => p.id);
+                  const catActiveCount = catPermIds.filter(pid => userPerms.includes(pid)).length;
+
+                  return `
+                    <div class="perm-category-block" data-category-key="${cat.key}" style="border:1.5px solid ${cat.color}35;">
+                      <!-- CATEGORY HEADER -->
+                      <div class="perm-category-header" style="background:${cat.bg}; border-bottom:1px solid ${cat.color}25;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          <span style="font-size:20px;">${cat.icon}</span>
+                          <div>
+                            <span style="font-weight:700; font-size:14px; color:#0F172A;">${cat.category}</span>
+                            <span class="cat-counter-badge badge" id="cat-badge-${cat.key}" style="margin-left:8px; font-size:11px; font-weight:700; background:white; color:${cat.color}; border:1px solid ${cat.color}40;">
+                              ${catActiveCount} / ${cat.permissions.length} faol
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style="display:flex; gap:6px;">
+                          <button type="button" onclick="toggleCategoryPerms('${cat.key}')" class="btn btn-sm" style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:6px; background:${cat.color}; color:#FFFFFF; border:none; cursor:pointer;">
+                            Barchasi
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- PERMISSION ITEMS GRID -->
+                      <div class="perm-items-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:10px; padding:14px; background:#FAFAFA;">
+                        ${cat.permissions.map(p => {
+                          const isChecked = userPerms.includes(p.id);
+                          return `
+                            <div class="perm-item-card ${isChecked ? 'is-active' : ''}" data-perm-id="${p.id}" data-cat-key="${cat.key}" style="--card-accent:${cat.color}; --card-bg-active:${cat.bg};" onclick="togglePermCard(this, event)">
+                              <label class="perm-toggle-switch" onclick="event.stopPropagation()">
+                                <input type="checkbox" name="edit-staff-perm-checkbox" value="${p.id}" ${isChecked ? 'checked' : ''} data-cat="${cat.key}" onchange="onPermCheckboxChange(this)">
+                                <span class="perm-toggle-slider"></span>
+                              </label>
+                              <div class="perm-item-content">
+                                <div class="perm-title">${p.name}</div>
+                                <div class="perm-desc">${p.desc || ''}</div>
+                              </div>
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+            </div>
+
           </div>
-        </div>`;
-      })()}
-    </form>
+
+        </div>
+
+        <!-- STICKY ACTION FOOTER BAR -->
+        <div class="staff-sticky-footer">
+          <div id="sticky-perm-summary" style="font-size:13.5px; font-weight:600; color:#334155; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">🔐</span>
+            <span id="sticky-perm-text">Yuklanmoqda...</span>
+          </div>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <button type="button" class="btn btn-outline" onclick="navigateTo('admin-users-manage')" style="font-weight:600; padding:10px 20px;">
+              Bekor Qilish
+            </button>
+            <button type="submit" id="btn-save-staff-page" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:10px 26px; font-size:14px; font-weight:700; box-shadow:0 4px 14px rgba(37,99,235,0.35);">
+              💾 O'zgarishlarni Saqlash
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   `;
 
-  modalFooter.innerHTML = `
-    <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
-    <button class="btn btn-primary" onclick="handleEditStaffSubmit('${user.id}')" style="display:inline-flex; align-items:center; gap:6px;">
-      ${icon('check', 14)} Saqlash
-    </button>
-  `;
-
-  openModal();
-  // Boshlang'ich ruxsatlar sanagichini yangilash
-  setTimeout(() => updatePermCheckedCount(), 100);
+  // Sanagichlarni boshlang'ich holatda yangilash
+  setTimeout(() => updateStaffPermCounters(), 50);
 }
+window.renderStaffEditPage = renderStaffEditPage;
 
-function updatePermCheckedCount() {
-  const checked = document.querySelectorAll('input[name="edit-staff-perm-checkbox"]:checked').length;
-  const total = document.querySelectorAll('input[name="edit-staff-perm-checkbox"]').length;
-  const el = document.getElementById('perm-checked-count');
-  if (el && total > 0) {
-    el.textContent = checked === 0
-      ? '⬜ Hech qanday alohida ruxsat berilmagan'
-      : `✅ ${checked} ta alohida ruxsat berildi (jami ${total} ta)`;
+// Ruxsat kartasi ustiga bosilganda switchni almashish
+function togglePermCard(cardEl, event) {
+  if (event && event.target && event.target.tagName === 'INPUT') {
+    return; // checkbox o'zining onchange hodisasida ishlaydi
   }
+  const checkbox = cardEl.querySelector('input[type="checkbox"]');
+  if (!checkbox) return;
+  checkbox.checked = !checkbox.checked;
+  onPermCheckboxChange(checkbox);
 }
-window.updatePermCheckedCount = updatePermCheckedCount;
+window.togglePermCard = togglePermCard;
 
-function generateStaffPassword(targetId) {
-  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
-  let pass = 'akhu_';
-  for (let i = 0; i < 5; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
-  const inp = document.getElementById(targetId);
-  if (inp) {
-    inp.value = pass;
-    inp.focus();
-  }
-}
-
-async function handleAdminStaffPhotoUpload(fileInput, targetUrlId, previewId) {
-  const file = fileInput.files[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append('file', file);
-
-  try {
-    const res = await fetch('/api/files', {
-      method: 'POST',
-      headers: { 'x-user-id': AppState.user.id },
-      body: formData
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Faylni yuklashda xatolik yuz berdi');
-
-    const urlInput = document.getElementById(targetUrlId);
-    if (urlInput) {
-      urlInput.value = data.url;
-      updateAdminStaffPhotoPreview(data.url, previewId);
+function onPermCheckboxChange(checkbox) {
+  const card = checkbox.closest('.perm-item-card');
+  if (card) {
+    if (checkbox.checked) {
+      card.classList.add('is-active');
+    } else {
+      card.classList.remove('is-active');
     }
-    showToast('Rasm muvaffaqiyatli yuklandi!');
-  } catch (err) {
-    showToast(`Xatolik: ${err.message}`, 'error');
   }
+  updateStaffPermCounters();
 }
+window.onPermCheckboxChange = onPermCheckboxChange;
 
-function updateAdminStaffPhotoPreview(url, previewId) {
-  const preview = document.getElementById(previewId);
-  if (!preview) return;
-  if (url && url.trim()) {
-    preview.src = url.trim();
-    preview.style.display = 'block';
-  } else {
-    preview.style.display = 'none';
+// Kategoriya bo'yicha barcha ruxsatlarni yoqish yoki o'chirish
+function toggleCategoryPerms(catKey, forceState) {
+  const block = document.querySelector(`.perm-category-block[data-category-key="${catKey}"]`);
+  if (!block) return;
+  const checkboxes = Array.from(block.querySelectorAll('input[name="edit-staff-perm-checkbox"]'));
+  if (checkboxes.length === 0) return;
+
+  const targetState = forceState !== undefined ? forceState : !checkboxes.every(c => c.checked);
+  checkboxes.forEach(c => {
+    c.checked = targetState;
+    const card = c.closest('.perm-item-card');
+    if (card) {
+      if (targetState) card.classList.add('is-active');
+      else card.classList.remove('is-active');
+    }
+  });
+
+  updateStaffPermCounters();
+}
+window.toggleCategoryPerms = toggleCategoryPerms;
+
+// Barcha 34 ta ruxsatni bir vaqtda yoqish / o'chirish
+function toggleAllStaffPermissions(forceState) {
+  const checkboxes = Array.from(document.querySelectorAll('input[name="edit-staff-perm-checkbox"]'));
+  checkboxes.forEach(c => {
+    c.checked = Boolean(forceState);
+    const card = c.closest('.perm-item-card');
+    if (card) {
+      if (forceState) card.classList.add('is-active');
+      else card.classList.remove('is-active');
+    }
+  });
+
+  updateStaffPermCounters();
+}
+window.toggleAllStaffPermissions = toggleAllStaffPermissions;
+
+// Qidiruv bo'yicha ruxsatlarni jonli filtrlash
+function filterStaffPermissions(query) {
+  const q = (query || '').toLowerCase().trim();
+  const blocks = document.querySelectorAll('.perm-category-block');
+
+  blocks.forEach(block => {
+    const cards = Array.from(block.querySelectorAll('.perm-item-card'));
+    let matchedInBlock = 0;
+
+    cards.forEach(card => {
+      const text = card.textContent.toLowerCase();
+      if (!q || text.includes(q)) {
+        card.style.display = 'flex';
+        matchedInBlock++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    if (matchedInBlock > 0 || !q) {
+      block.style.display = 'block';
+    } else {
+      block.style.display = 'none';
+    }
+  });
+}
+window.filterStaffPermissions = filterStaffPermissions;
+
+// Chap tomonda tanlangan rollarga qarab tavsiya etilgan ruxsatlarni biriktirish
+function applyRoleDefaultPermissions() {
+  const selectedRoles = Array.from(document.querySelectorAll('input[name="edit-staff-roles-checkbox"]:checked')).map(c => c.value);
+  if (selectedRoles.length === 0) {
+    showToast("Oldin chap ustunda kamida bitta rol tanlang!", "warning");
+    return;
   }
-}
 
-async function handleEditStaffSubmit(userId) {
+  const recommendedPerms = new Set();
+  selectedRoles.forEach(r => {
+    if (ROLE_PERMISSIONS_PRESET[r]) {
+      ROLE_PERMISSIONS_PRESET[r].forEach(p => recommendedPerms.add(p));
+    }
+    // dep_ bo'limlari uchun standart
+    if (r && r.startsWith('dep_')) {
+      ['points_enter', 'points_approve_dept', 'events_view', 'events_create', 'events_edit', 'events_qr_manage', 'attendance_view'].forEach(p => recommendedPerms.add(p));
+    }
+  });
+
+  const checkboxes = Array.from(document.querySelectorAll('input[name="edit-staff-perm-checkbox"]'));
+  checkboxes.forEach(c => {
+    const shouldCheck = recommendedPerms.has(c.value);
+    c.checked = shouldCheck;
+    const card = c.closest('.perm-item-card');
+    if (card) {
+      if (shouldCheck) card.classList.add('is-active');
+      else card.classList.remove('is-active');
+    }
+  });
+
+  updateStaffPermCounters();
+  showToast(`Tanlangan rollar bo'yicha ${recommendedPerms.size} ta ruxsat belgilandi!`, "info");
+}
+window.applyRoleDefaultPermissions = applyRoleDefaultPermissions;
+
+// Sanagichlarni yangilash
+function updateStaffPermCounters() {
+  const allCheckboxes = Array.from(document.querySelectorAll('input[name="edit-staff-perm-checkbox"]'));
+  const total = allCheckboxes.length;
+  const checked = allCheckboxes.filter(c => c.checked).length;
+
+  const totalBadge = document.getElementById('perm-total-active-badge');
+  if (totalBadge) {
+    totalBadge.textContent = checked === 0
+      ? '0 / ' + total + ' ta ruxsat faol'
+      : checked + ' / ' + total + ' ta ruxsat faol';
+    totalBadge.style.background = checked > 0 ? '#EFF6FF' : '#F1F5F9';
+    totalBadge.style.color = checked > 0 ? '#2563EB' : '#64748B';
+    totalBadge.style.borderColor = checked > 0 ? '#BFDBFE' : '#CBD5E1';
+  }
+
+  const heroCount = document.getElementById('hero-perm-count');
+  if (heroCount) {
+    heroCount.textContent = `${checked} / ${total}`;
+  }
+
+  const stickyText = document.getElementById('sticky-perm-text');
+  if (stickyText) {
+    stickyText.textContent = checked === 0
+      ? 'Hech qanday alohida ruxsat yoqilmagan'
+      : `${checked} ta alohida granular ruxsat faol holatda (jami ${total} ta)`;
+  }
+
+  // Har bir kategoriya sonini yangilash
+  PERM_CATEGORIES_DATA.forEach(cat => {
+    const badge = document.getElementById(`cat-badge-${cat.key}`);
+    if (badge) {
+      const catCheckboxes = Array.from(document.querySelectorAll(`input[name="edit-staff-perm-checkbox"][data-cat="${cat.key}"]`));
+      const catChecked = catCheckboxes.filter(c => c.checked).length;
+      badge.textContent = `${catChecked} / ${catCheckboxes.length} faol`;
+    }
+  });
+}
+window.updateStaffPermCounters = updateStaffPermCounters;
+
+// Formani saqlash (Page yoki Modal uchun universal)
+async function submitStaffEditPage(userId) {
   const username = document.getElementById('edit-staff-username')?.value.trim();
   const full_name = document.getElementById('edit-staff-fullname')?.value.trim();
   const password = document.getElementById('edit-staff-password')?.value?.trim();
@@ -9643,18 +10063,16 @@ async function handleEditStaffSubmit(userId) {
     showToast("Foydalanuvchi nomi (login) kiritilishi shart!", "warning");
     return;
   }
-
   if (!full_name) {
     showToast("F.I.Sh kiritilishi shart!", "warning");
     return;
   }
-
   if (roles.length === 0) {
     showToast("Kamida bitta rol tanlanishi shart!", "warning");
     return;
   }
 
-  const submitBtn = document.querySelector('#common-modal .modal-footer .btn-primary');
+  const submitBtn = document.getElementById('btn-save-staff-page') || document.querySelector('#common-modal .modal-footer .btn-primary');
   const originalBtnHtml = submitBtn ? submitBtn.innerHTML : null;
   if (submitBtn) {
     submitBtn.disabled = true;
@@ -9713,12 +10131,14 @@ async function handleEditStaffSubmit(userId) {
       AppState.user.id = username;
       AppState.user.name = full_name;
       AppState.user.full_name = full_name;
+      AppState.user.roles = roles;
+      AppState.user.permissions = permissions;
       localStorage.setItem('akhu_auth_user', JSON.stringify(AppState.user));
     }
 
-    closeModal();
-    showToast(res?.message || "Xodim ma'lumotlari muvaffaqiyatli saqlandi!");
+    showToast(res?.message || "Xodim ma'lumotlari va ruxsatlari muvaffaqiyatli saqlandi!", "success");
     await loadStaffUsersList();
+    navigateTo('admin-users-manage');
   } catch (err) {
     if (submitBtn && originalBtnHtml) {
       submitBtn.disabled = false;
@@ -9727,6 +10147,62 @@ async function handleEditStaffSubmit(userId) {
     showToast(err.message, 'error');
   }
 }
+window.submitStaffEditPage = submitStaffEditPage;
+window.handleEditStaffSubmit = submitStaffEditPage;
+
+
+function generateStaffPassword(targetId) {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let pass = 'akhu_';
+  for (let i = 0; i < 5; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  const inp = document.getElementById(targetId);
+  if (inp) {
+    inp.value = pass;
+    inp.focus();
+  }
+}
+
+async function handleAdminStaffPhotoUpload(fileInput, targetUrlId, previewId) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'x-user-id': AppState.user.id },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Faylni yuklashda xatolik yuz berdi');
+
+    const urlInput = document.getElementById(targetUrlId);
+    if (urlInput) {
+      urlInput.value = data.url;
+      updateAdminStaffPhotoPreview(data.url, previewId);
+    }
+    showToast('Rasm muvaffaqiyatli yuklandi!');
+  } catch (err) {
+    showToast(`Xatolik: ${err.message}`, 'error');
+  }
+}
+
+function updateAdminStaffPhotoPreview(url, previewId) {
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  if (url && url.trim()) {
+    preview.src = url.trim();
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+// Universal xodim saqlash funksiyasi
+const handleEditStaffSubmit = submitStaffEditPage;
+window.handleEditStaffSubmit = handleEditStaffSubmit;
 
 async function toggleStaffStatus(userId, currentActive) {
   const newActive = currentActive ? 0 : 1;
@@ -10080,8 +10556,8 @@ async function showStaffMonitoringModal(userId) {
 
     modalFooter.innerHTML = `
       <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-        <button class="btn btn-primary btn-sm" onclick="showEditStaffModal('${user.id}')" style="display:inline-flex; align-items:center; gap:6px;">
-          ${icon('edit', 14)} <span>Tahrirlash / Rollar</span>
+        <button class="btn btn-primary btn-sm" onclick="openStaffEditPage('${user.id}')" style="display:inline-flex; align-items:center; gap:6px;">
+          ${icon('edit', 14)} <span>Tahrirlash & Huquqlar</span>
         </button>
         <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
       </div>

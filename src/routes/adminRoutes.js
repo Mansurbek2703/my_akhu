@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const xlsx = require('xlsx');
 const archiver = require('archiver');
+const { PERMISSION_CATEGORIES, ROLE_DEFAULT_PERMISSIONS, ALL_PERMISSIONS } = require('../utils/permissions');
 
 function sanitizeFilenamePart(s) {
   return String(s || '').replace(/[\/\\:*?"<>|]/g, '').trim();
@@ -1119,6 +1120,18 @@ router.get('/roles-list', authenticateSuperadmin, (req, res) => {
     { id: 'observer', key: 'observer', name: 'Universitet Kuzatuvchisi (Rektorat)', desc: 'Faqat monitoring va statistika ko\'rish, Katta ekran (TV) rejimi' }
   ];
   res.json({ roles });
+});
+
+/**
+ * GET /api/admin/permissions-list
+ * Tizimdagi barcha granular huquq va ruxsatlar katalogi hamda tavsiya etilgan rollar
+ */
+router.get('/permissions-list', authenticateSuperadmin, (req, res) => {
+  res.json({
+    categories: PERMISSION_CATEGORIES,
+    roleDefaults: ROLE_DEFAULT_PERMISSIONS,
+    allPermissions: ALL_PERMISSIONS
+  });
 });
 
 /**
