@@ -1169,12 +1169,19 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
     const notifsCount = db.prepare(`SELECT COUNT(*) as c FROM staff_notification_log WHERE staff_id = ?`).get(u.id)?.c || 0;
     const auditCount = db.prepare(`SELECT COUNT(*) as c FROM audit_log WHERE actor_id = ?`).get(u.id)?.c || 0;
 
+    // Granular permissions ni parse qilish
+    let parsedPermissions = [];
+    try {
+      parsedPermissions = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions || '[]');
+    } catch(e) { parsedPermissions = []; }
+
     return {
       ...u,
       is_active: u.active === 1,
       tutor_groups: groups,
       roles,
       groups,
+      permissions: parsedPermissions,
       notifications_count: notifsCount,
       audit_count: auditCount,
       password_hash: undefined // maxfiy
@@ -1765,7 +1772,8 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
       bot_status,
       active,
       is_active,
-      password
+      password,
+      permissions
     } = req.body;
 
     const rawTargetUsername = (username !== undefined ? username : (new_id !== undefined ? new_id : user.id));
@@ -1843,6 +1851,13 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
           updatedRoles = JSON.stringify(arr);
         }
 
+        // Granular permissions (rollarga bog'liq bo'lmagan alohida ruxsatlar)
+        let updatedPermissions = user.permissions || '[]';
+        if (permissions !== undefined) {
+          const permArr = Array.isArray(permissions) ? permissions : [];
+          updatedPermissions = JSON.stringify(permArr.filter(Boolean));
+        }
+
         // Agar ID (login) o'zgargan bo'lsa
         if (targetUsername !== user.id) {
           db.prepare(`UPDATE staff_user SET id = ? WHERE id = ?`).run(targetUsername, user.id);
@@ -1869,6 +1884,7 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
             passport_id = ?,
             photo_url = ?,
             roles = ?,
+            permissions = ?,
             telegram_user_id = ?,
             telegram_username = ?,
             telegram_phone = ?,
@@ -1883,6 +1899,7 @@ router.put('/users/:id', authenticateSuperadmin, async (req, res) => {
           newPassportId,
           newPhotoUrl,
           updatedRoles,
+          updatedPermissions,
           tgId,
           tgUsername,
           tgPhone,

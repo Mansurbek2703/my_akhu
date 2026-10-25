@@ -65,6 +65,7 @@ function initPostgresSchema() {
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS bot_status TEXT DEFAULT 'not_started';
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS last_active_at TEXT;
       ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS last_notification_at TEXT;
+      ALTER TABLE staff_user ADD COLUMN IF NOT EXISTS permissions TEXT DEFAULT '[]';
       UPDATE staff_user SET bot_status = 'active', bot_started_at = COALESCE(bot_started_at, TO_CHAR(NOW(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) WHERE id = 'superadmin' AND telegram_user_id IS NOT NULL;
     `);
 
@@ -176,6 +177,9 @@ function initSqliteSchema() {
     }
     if (!cols.includes('last_notification_at')) {
       db.exec('ALTER TABLE staff_user ADD COLUMN last_notification_at TEXT;');
+    }
+    if (!cols.includes('permissions')) {
+      db.exec("ALTER TABLE staff_user ADD COLUMN permissions TEXT DEFAULT '[]';");
     }
 
     db.exec("UPDATE staff_user SET bot_status = 'active', bot_started_at = COALESCE(bot_started_at, datetime('now')) WHERE id = 'superadmin' AND telegram_user_id IS NOT NULL;");

@@ -7184,11 +7184,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           <button id="btn-sync-students-photos" class="btn btn-outline" onclick="triggerHikPhotosSync(this)" style="display: inline-flex; align-items: center; gap: 6px; border-color: #CBD5E1; color: #1E293B;" title="Turniket serveridan rasmi yo'q talabalarning rasmlarini yuklab to'ldirish">
             📸 <span>Turniket Rasmlari</span>
           </button>
-          ${roleTitle === 'Superadmin' ? `
-            <button class="btn btn-outline" onclick="handleClearAllStudents()" style="color: #F87171; border-color: rgba(239, 68, 68, 0.5); display: inline-flex; align-items: center; gap: 6px;" title="Barcha talabalarni tozalash">
-              ${icon('trash', 14)} <span>Tozalash</span>
-            </button>
-          ` : ''}
+
         </div>
       </div>
     </div>
@@ -9446,6 +9442,101 @@ async function showEditStaffModal(userId) {
           <span>Faol (Tizimga kirishga to'liq ruxsat)</span>
         </label>
       </div>
+
+      <!-- GRANULAR PERMISSIONS PANEL -->
+      ${currentRoles.includes('superadmin') ? '' : (() => {
+        const userPerms = (() => {
+          try { return Array.isArray(user.permissions) ? user.permissions : JSON.parse(user.permissions || '[]'); } catch(e) { return []; }
+        })();
+        const PERM_CATS = [
+          { category: 'Talabalar Boshqaruvi', color: '#2563EB', bg: '#EFF6FF', icon: '👨‍🎓', permissions: [
+            { id: 'students_view', name: "Talabalar ro'yxatini ko'rish" },
+            { id: 'students_create', name: "Yangi talaba qo'shish" },
+            { id: 'students_edit', name: "Talaba ma'lumotlarini tahrirlash" },
+            { id: 'students_delete', name: "Talabani o'chirish / arxivlash" },
+            { id: 'students_import_excel', name: "Talabalarni Exceldan yuklash" },
+            { id: 'students_import_gpa', name: "GPA va davomat importi" },
+            { id: 'students_export_zip', name: "Rasmlarni ZIP yuklab olish" },
+            { id: 'students_sync_turniket_photos', name: "Turniket rasmlarini to'ldirish" }
+          ]},
+          { category: 'Davomat & Turniket (Face ID)', color: '#059669', bg: '#F0FDF4', icon: '🚪', permissions: [
+            { id: 'attendance_view', name: "Davomatni ko'rish" },
+            { id: 'attendance_sync', name: "Turniketni sinxronlash" },
+            { id: 'attendance_export_excel', name: "Davomatni Excelga eksport" },
+            { id: 'attendance_view_history', name: "Talaba davomat tarixi" }
+          ]},
+          { category: 'Ballar & Baholash (Rating)', color: '#D97706', bg: '#FFFBEB', icon: '🏆', permissions: [
+            { id: 'points_enter', name: "Talabalarga ball kiritish" },
+            { id: 'points_approve_dept', name: "Bo'lim tasdig'i" },
+            { id: 'points_approve_prorektor', name: "Prorektor tasdig'i" },
+            { id: 'points_history_view', name: "Ballar tarixini ko'rish" },
+            { id: 'points_recalculate', name: "Reytingni qayta hisoblash" }
+          ]},
+          { category: 'Tadbirlar & QR Monitoring', color: '#7C3AED', bg: '#F5F3FF', icon: '📅', permissions: [
+            { id: 'events_view', name: "Tadbirlarni ko'rish" },
+            { id: 'events_create', name: "Yangi tadbir yaratish" },
+            { id: 'events_edit', name: "Tadbirni tahrirlash" },
+            { id: 'events_qr_manage', name: "Dinamik QR kod boshqaruvi" },
+            { id: 'events_view_registrations', name: "Ro'yxatdan o'tganlar nazorati" }
+          ]},
+          { category: 'Tyutorlar & Guruhlar', color: '#0284C7', bg: '#F0F9FF', icon: '👩‍🏫', permissions: [
+            { id: 'tutor_my_students', name: "O'z guruh talabalari" },
+            { id: 'tutor_assign_groups', name: "Guruhlarni taqsimlash" },
+            { id: 'tutor_enter_points', name: "Tyutor ballari" }
+          ]},
+          { category: 'Xodimlar Boshqaruvi', color: '#BE185D', bg: '#FDF2F8', icon: '👥', permissions: [
+            { id: 'staff_view', name: "Xodimlarni ko'rish" },
+            { id: 'staff_create', name: "Yangi xodim qo'shish" },
+            { id: 'staff_edit', name: "Xodimni tahrirlash" },
+            { id: 'staff_permissions', name: "Huquqlar & Ruxsatlar berish" },
+            { id: 'staff_status_toggle', name: "Faollikni boshqarish" }
+          ]},
+          { category: 'Tizim Sozlamalari & Audit', color: '#475569', bg: '#F8FAFC', icon: '⚙️', permissions: [
+            { id: 'settings_seasons', name: "Mavsumlar va semestrlar" },
+            { id: 'settings_catalog', name: "Ball mezonlari katalogi" },
+            { id: 'settings_hikcentral', name: "Turniket sozlamalari" },
+            { id: 'settings_telegram', name: "Telegram bot boshqaruvi" },
+            { id: 'settings_tv_display', name: "TV Ekran boshqaruvi" },
+            { id: 'settings_audit_logs', name: "Audit jurnalini ko'rish" },
+            { id: 'settings_risk_monitoring', name: "Xavf va monitoring tahlili" }
+          ]},
+          { category: 'Rahbariyat & Tahlil', color: '#0891B2', bg: '#ECFEFF', icon: '📊', permissions: [
+            { id: 'observe_analytics', name: "Umumiy tahlil & Reyting" },
+            { id: 'observe_tv_screen', name: "TV Ekraniga kirish" }
+          ]}
+        ];
+        return `
+        <div class="form-group mb-3" style="margin-top: 8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <label class="form-label" style="font-weight:700; color:#1E293B; font-size:13px; margin:0;">🔐 Alohida Ruxsatlar (Granular Permissions)</label>
+            <div style="display:flex; gap:6px;">
+              <button type="button" onclick="(function(){ document.querySelectorAll('input[name=edit-staff-perm-checkbox]').forEach(c=>c.checked=true); updatePermCheckedCount(); })()" style="font-size:11px; padding:3px 10px; border-radius:6px; background:#2563EB; color:#fff; border:none; cursor:pointer; font-weight:600;">Hammasini Yoq</button>
+              <button type="button" onclick="(function(){ document.querySelectorAll('input[name=edit-staff-perm-checkbox]').forEach(c=>c.checked=false); updatePermCheckedCount(); })()" style="font-size:11px; padding:3px 10px; border-radius:6px; background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; cursor:pointer; font-weight:600;">Hammasini O'ch</button>
+            </div>
+          </div>
+          <p style="font-size:11px; color:#64748B; margin-bottom:10px; line-height:1.5;">Bu xodimga rollarga bog'liq bo'lmagan holda alohida ruxsatlar bering yoki olib qo'ying. Belgilangan ruxsatlar rol ruxsatlariga qo'shimcha tarzda ishlaydi.</p>
+          <div id="perm-checked-count" style="font-size:11.5px; color:#2563EB; font-weight:600; margin-bottom:8px;"></div>
+          <div style="display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto; padding:4px 2px;">
+            ${PERM_CATS.map(cat => `
+              <div style="border:1px solid ${cat.color}30; border-radius:10px; overflow:hidden; background:${cat.bg};">
+                <div style="background:${cat.color}15; padding:8px 12px; border-bottom:1px solid ${cat.color}20; display:flex; align-items:center; gap:7px;">
+                  <span style="font-size:15px;">${cat.icon}</span>
+                  <span style="font-weight:700; font-size:12px; color:${cat.color};">${cat.category}</span>
+                  <button type="button" onclick="(function(el){ var cbs=el.closest('[data-cat]').querySelectorAll('input[name=edit-staff-perm-checkbox]'); var allChecked=[...cbs].every(c=>c.checked); cbs.forEach(c=>c.checked=!allChecked); updatePermCheckedCount(); })(this)" data-cat="${cat.category}" style="margin-left:auto; font-size:10px; padding:2px 8px; border-radius:5px; background:${cat.color}; color:white; border:none; cursor:pointer; font-weight:600;">Hammasini</button>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; padding:6px 8px;" data-cat="${cat.category}">
+                  ${cat.permissions.map(p => `
+                    <label style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:500; color:#334155; transition:background 0.1s;" onmouseover="this.style.background='${cat.color}10'" onmouseout="this.style.background='transparent'">
+                      <input type="checkbox" name="edit-staff-perm-checkbox" value="${p.id}" ${userPerms.includes(p.id) ? 'checked' : ''} onchange="updatePermCheckedCount()" style="width:14px; height:14px; cursor:pointer; accent-color:${cat.color};">
+                      <span>${p.name}</span>
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+      })()}
     </form>
   `;
 
@@ -9457,7 +9548,21 @@ async function showEditStaffModal(userId) {
   `;
 
   openModal();
+  // Boshlang'ich ruxsatlar sanagichini yangilash
+  setTimeout(() => updatePermCheckedCount(), 100);
 }
+
+function updatePermCheckedCount() {
+  const checked = document.querySelectorAll('input[name="edit-staff-perm-checkbox"]:checked').length;
+  const total = document.querySelectorAll('input[name="edit-staff-perm-checkbox"]').length;
+  const el = document.getElementById('perm-checked-count');
+  if (el && total > 0) {
+    el.textContent = checked === 0
+      ? '⬜ Hech qanday alohida ruxsat berilmagan'
+      : `✅ ${checked} ta alohida ruxsat berildi (jami ${total} ta)`;
+  }
+}
+window.updatePermCheckedCount = updatePermCheckedCount;
 
 function generateStaffPassword(targetId) {
   const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
@@ -9530,6 +9635,10 @@ async function handleEditStaffSubmit(userId) {
     .map(cb => cb.value.trim())
     .filter(Boolean);
 
+  const permissions = Array.from(document.querySelectorAll(`input[name="edit-staff-perm-checkbox"]:checked`))
+    .map(cb => cb.value)
+    .filter(Boolean);
+
   if (!username) {
     showToast("Foydalanuvchi nomi (login) kiritilishi shart!", "warning");
     return;
@@ -9588,7 +9697,8 @@ async function handleEditStaffSubmit(userId) {
       is_active: is_active === 1,
       roles,
       tutor_groups,
-      groups: tutor_groups
+      groups: tutor_groups,
+      permissions
     };
     if (password && password.length > 0) {
       payload.password = password;

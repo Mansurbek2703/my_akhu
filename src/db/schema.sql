@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS staff_user (
     telegram_user_id TEXT,
     phone TEXT,
     photo_url TEXT,
+    permissions TEXT DEFAULT '[]',
     created_at TEXT NOT NULL
 );
 
