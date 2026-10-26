@@ -135,8 +135,8 @@ function isPagePermittedForUser(pageName, userRoles = []) {
   if (!userRoles || userRoles.length === 0) return false;
   if (userRoles.includes('superadmin')) return true;
 
-  // Barcha xodimlar shaxsiy profilini va davomatni ko'ra oladi
-  if (pageName === 'staff-my-profile' || pageName === 'campus-attendance-manage') return true;
+  // Barcha xodimlar shaxsiy profilini, davomatni va LMS monitoringni ko'ra oladi
+  if (pageName === 'staff-my-profile' || pageName === 'campus-attendance-manage' || pageName === 'lms-monitoring') return true;
 
   // Tyutor kabineti
   if (pageName.startsWith('tutor-')) {
@@ -517,7 +517,8 @@ const PAGE_SECTION_MAP = {
   'admin-bot-monitoring': 'admin-users-manage',
 
   'campus-attendance-manage': 'campus-attendance-manage',
-  'staff-my-profile': 'staff-my-profile'
+  'staff-my-profile': 'staff-my-profile',
+  'lms-monitoring': 'lms-monitoring'
 };
 
 function renderModuleSubNav(pageName) {
@@ -583,6 +584,17 @@ function renderModuleSubNav(pageName) {
     tabs = [
       { id: 'staff-my-profile', label: 'Shaxsiy Profil' }
     ];
+  } else if (sectionKey === 'lms-monitoring') {
+    tabs = [
+      { id: 'lms-monitoring', label: '📚 LMS Darslar & Davomat Monitoringi' }
+    ];
+    extraActions = `
+      <div class="module-nav-actions">
+        <button class="btn btn-primary btn-sm" onclick="syncLmsManually()" id="btn-sync-lms-main" style="display:inline-flex; align-items:center; gap:6px;">
+          ${icon('refresh', 14)} <span>🔄 LMS dan yangilash</span>
+        </button>
+      </div>
+    `;
   }
 
   if (tabs.length <= 1 && !extraActions) return '';
@@ -772,6 +784,11 @@ function navigateTo(pageName) {
       pageTitle.textContent = 'Davomat & Turniket (Face ID)';
       pageDesc.textContent = 'Talabalarning universitetga kelgan-kelmagani, qachon kirdi va qachon chiqdi monitoringi';
       renderCampusAttendance(targetContainer);
+      break;
+    case 'lms-monitoring':
+      pageTitle.textContent = 'Darslar & LMS Davomati (Moodle)';
+      pageDesc.textContent = 'Dars jadvallari, o\'qituvchilar, auditoriyalar va Moodle tizimidagi dars davomatlari monitoringi';
+      renderLmsMonitoring(targetContainer);
       break;
     default:
       targetContainer.innerHTML = `<div class="card"><p>Sahifa topilmadi: ${pageName}</p></div>`;
@@ -11668,5 +11685,529 @@ window.changeAttendancePage = changeAttendancePage;
 window.filterAttendanceByCard = filterAttendanceByCard;
 window.updateActiveKpiCard = updateActiveKpiCard;
 window.downloadAttendanceExcel = downloadAttendanceExcel;
+
+// ====================================================================
+// LMS (MOODLE) MONITORING VA DARSLAR BOSHQARUVI (WEB PORTAL)
+// ====================================================================
+
+let currentLmsSubTab = 'sessions';
+let cachedLmsOverview = null;
+let cachedLmsTimetable = null;
+let cachedLmsStudents = null;
+
+async function renderLmsMonitoring(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; min-height:280px;">
+      <div class="spinner"></div>
+      <span style="margin-left:12px; font-weight:600; color:#64748B;">LMS (Moodle) ma'lumotlari yuklanmoqda...</span>
+    </div>
+  `;
+
+  try {
+    const data = await apiFetch('/api/lms/overview');
+    cachedLmsOverview = data;
+    const kpis = data.kpis || {};
+    const today = data.today || {};
+    const recentSessions = data.recent_sessions || [];
+
+    const pRate = kpis.overall_rate || 0;
+    const rateColor = pRate >= 85 ? '#10B981' : (pRate >= 70 ? '#F59E0B' : '#EF4444');
+
+    container.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- YUQORI KPI KARTALARI -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px;">
+          <!-- 1. Jami rejalashtirilgan darslar -->
+          <div class="card" style="padding: 18px 20px; border-radius: 16px; border-left: 4px solid #3B82F6; background: #FFFFFF; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
+            <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">📅 Rejalashtirilgan Darslar</div>
+            <div style="font-size: 28px; font-weight: 800; color: #0F172A; margin: 4px 0 2px;">${kpis.total_timetable || 0} <span style="font-size: 14px; font-weight: 600; color: #64748B;">ta</span></div>
+            <div style="font-size: 12px; color: #64748B;">Semestr dars jadvali bo'yicha</div>
+          </div>
+
+          <!-- 2. O'tkazilgan darslar -->
+          <div class="card" style="padding: 18px 20px; border-radius: 16px; border-left: 4px solid #10B981; background: #FFFFFF; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
+            <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">🎓 O'tkazilgan Darslar</div>
+            <div style="font-size: 28px; font-weight: 800; color: #10B981; margin: 4px 0 2px;">${kpis.taken_sessions || 0} <span style="font-size: 14px; font-weight: 600; color: #64748B;">ta</span></div>
+            <div style="font-size: 12px; color: #64748B;">Moodle da davomati olingan</div>
+          </div>
+
+          <!-- 3. O'rtacha qatnashuv foizi -->
+          <div class="card" style="padding: 18px 20px; border-radius: 16px; border-left: 4px solid ${rateColor}; background: #FFFFFF; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
+            <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">📈 O'rtacha Davomat Foizi</div>
+            <div style="font-size: 28px; font-weight: 800; color: ${rateColor}; margin: 4px 0 2px;">${pRate}%</div>
+            <div style="font-size: 12px; color: #64748B;">🟢 ${kpis.present_count || 0} bor • 🔴 ${kpis.absent_count || 0} yo'q</div>
+          </div>
+
+          <!-- 4. Bugungi darslar -->
+          <div class="card" style="padding: 18px 20px; border-radius: 16px; border-left: 4px solid #8B5CF6; background: #FFFFFF; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
+            <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">🕒 Bugungi Darslar</div>
+            <div style="font-size: 28px; font-weight: 800; color: #8B5CF6; margin: 4px 0 2px;">${today.count || 0} <span style="font-size: 14px; font-weight: 600; color: #64748B;">ta</span></div>
+            <div style="font-size: 12px; color: #64748B;">Sana: ${today.date || ''}</div>
+          </div>
+        </div>
+
+        <!-- SUB-TABLAR: DARS JURNALI, DARS JADVALI, TALABALAR REYTINGI -->
+        <div class="card" style="padding: 0; border-radius: 16px; overflow: hidden; background: #FFFFFF; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
+          <div style="display: flex; gap: 8px; border-bottom: 1px solid #E2E8F0; padding: 12px 18px; background: #F8FAFC; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-sm ${currentLmsSubTab === 'sessions' ? 'btn-primary' : 'btn-outline'}" onclick="switchLmsSubTab('sessions')" id="tab-btn-lms-sessions" style="display: inline-flex; align-items: center; gap: 6px;">
+                <span>📊 Dars Jurnali & Davomat</span>
+              </button>
+              <button class="btn btn-sm ${currentLmsSubTab === 'timetable' ? 'btn-primary' : 'btn-outline'}" onclick="switchLmsSubTab('timetable')" id="tab-btn-lms-timetable" style="display: inline-flex; align-items: center; gap: 6px;">
+                <span>📅 Dars Jadvali (Timetable)</span>
+              </button>
+              <button class="btn btn-sm ${currentLmsSubTab === 'students' ? 'btn-primary' : 'btn-outline'}" onclick="switchLmsSubTab('students')" id="tab-btn-lms-students" style="display: inline-flex; align-items: center; gap: 6px;">
+                <span>👥 Talabalar Davomat Reytingi</span>
+              </button>
+            </div>
+
+            <div style="font-size: 12px; color: #64748B; display: inline-flex; align-items: center; gap: 6px;">
+              <span>🌐 Moodle lms.akhu.uz bilan bog'langan</span>
+            </div>
+          </div>
+
+          <!-- TAB KONTENTI MAYDONI -->
+          <div id="lms-subtab-content" style="padding: 20px;">
+            <!-- Dinamik kontent -->
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    renderLmsSubTabContent();
+  } catch (err) {
+    container.innerHTML = `<div class="card" style="padding: 30px; text-align: center; color: #EF4444;">Xatolik yuz berdi: ${err.message}</div>`;
+  }
+}
+
+function switchLmsSubTab(tab) {
+  currentLmsSubTab = tab;
+  ['sessions', 'timetable', 'students'].forEach(t => {
+    const btn = document.getElementById(`tab-btn-lms-${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-outline');
+      } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+      }
+    }
+  });
+  renderLmsSubTabContent();
+}
+
+async function renderLmsSubTabContent() {
+  const container = document.getElementById('lms-subtab-content');
+  if (!container) return;
+
+  if (currentLmsSubTab === 'sessions') {
+    renderLmsSessionsTab(container);
+  } else if (currentLmsSubTab === 'timetable') {
+    renderLmsTimetableTab(container);
+  } else if (currentLmsSubTab === 'students') {
+    renderLmsStudentsTab(container);
+  }
+}
+
+// 1. DARS JURNALI VA DAVOMAT TABI
+function renderLmsSessionsTab(container) {
+  const sessions = cachedLmsOverview?.recent_sessions || [];
+
+  container.innerHTML = `
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0;">
+          O'tkazilgan Dars Mashg'ulotlari Jurnali (So'nggi 25 ta)
+        </h3>
+        <span style="font-size: 12.5px; color: #64748B;">Batafsil talabalar ro'yxatini ko'rish uchun dars ustiga bosing</span>
+      </div>
+
+      <div class="table-responsive" style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
+        <table class="table" style="margin: 0; width: 100%; font-size: 13px;">
+          <thead style="background: #F8FAFC;">
+            <tr>
+              <th style="padding: 12px 14px;">Sana & Vaqt</th>
+              <th style="padding: 12px 14px;">Fan / Dars Mashg'uloti</th>
+              <th style="padding: 12px 14px; text-align: center;">Jami Talabalar</th>
+              <th style="padding: 12px 14px; text-align: center;">🟢 Bor</th>
+              <th style="padding: 12px 14px; text-align: center;">🟡 Kech</th>
+              <th style="padding: 12px 14px; text-align: center;">🔴 Kelmadi</th>
+              <th style="padding: 12px 14px; text-align: center;">Davomat Foizi</th>
+              <th style="padding: 12px 14px; text-align: right;">Amal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sessions.length === 0 ? `
+              <tr><td colspan="8" style="text-align: center; padding: 30px; color: #94A3B8;">Hozircha o'tkazilgan darslar topilmadi</td></tr>
+            ` : sessions.map(s => {
+              const dt = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '—';
+              const rate = s.attendance_rate || 0;
+              const badgeBg = rate >= 85 ? '#ECFDF5' : (rate >= 70 ? '#FFFBEB' : '#FEF2F2');
+              const badgeColor = rate >= 85 ? '#059669' : (rate >= 70 ? '#D97706' : '#DC2626');
+
+              return `
+                <tr style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s; cursor: pointer;" onclick="openLmsSessionModal(${s.session_id})">
+                  <td style="padding: 12px 14px; font-weight: 600; color: #1E293B; white-space: nowrap;">
+                    📅 ${dt}
+                  </td>
+                  <td style="padding: 12px 14px;">
+                    <strong style="color: #0F172A;">${s.course_name || `Kurs ${s.course_id}`}</strong>
+                    ${s.description ? `<div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">${s.description}</div>` : ''}
+                  </td>
+                  <td style="padding: 12px 14px; text-align: center; font-weight: 700; color: #334155;">
+                    ${s.total_enrolled} ta
+                  </td>
+                  <td style="padding: 12px 14px; text-align: center; font-weight: 700; color: #10B981;">
+                    ${s.present_count}
+                  </td>
+                  <td style="padding: 12px 14px; text-align: center; font-weight: 700; color: #F59E0B;">
+                    ${s.late_count}
+                  </td>
+                  <td style="padding: 12px 14px; text-align: center; font-weight: 700; color: #EF4444;">
+                    ${s.absent_count}
+                  </td>
+                  <td style="padding: 12px 14px; text-align: center;">
+                    <span style="background: ${badgeBg}; color: ${badgeColor}; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 8px;">
+                      ${rate}%
+                    </span>
+                  </td>
+                  <td style="padding: 12px 14px; text-align: right;">
+                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); openLmsSessionModal(${s.session_id});" style="font-size: 11.5px; padding: 4px 10px;">
+                      👁️ Tafsilot
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 2. DARS JADVALI TABI (TIMETABLE)
+async function renderLmsTimetableTab(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; padding:30px;">
+      <div class="spinner"></div>
+    </div>
+  `;
+
+  try {
+    const res = await apiFetch('/api/lms/timetable');
+    cachedLmsTimetable = res;
+    const grouped = res.grouped_by_weekday || [];
+
+    container.innerHTML = `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 4px;">
+              Universitet Haftalik Dars Jadvali (Timetable)
+            </h3>
+            <span style="font-size: 12.5px; color: #64748B;">Moodle tizimidagi barcha kurs va auditoriya jadvallari</span>
+          </div>
+
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="tt-weekday-buttons">
+            <button class="btn btn-sm btn-primary" onclick="filterTtDay(0, this)">Hafta (Barchasi)</button>
+            <button class="btn btn-sm btn-outline" onclick="filterTtDay(1, this)">Dush</button>
+            <button class="btn btn-sm btn-outline" onclick="filterTtDay(2, this)">Sesh</button>
+            <button class="btn btn-sm btn-outline" onclick="filterTtDay(3, this)">Chor</button>
+            <button class="btn btn-sm btn-outline" onclick="filterTtDay(4, this)">Pay</button>
+            <button class="btn btn-sm btn-outline" onclick="filterTtDay(5, this)">Juma</button>
+            <button class="btn btn-sm btn-outline" onclick="filterTtDay(6, this)">Shan</button>
+          </div>
+        </div>
+
+        <div id="tt-schedule-grid" style="display: flex; flex-direction: column; gap: 20px;">
+          ${grouped.map(day => `
+            <div class="tt-day-block" data-day="${day.weekday}" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #CBD5E1; padding-bottom: 8px;">
+                <h4 style="font-size: 15px; font-weight: 800; color: #1E293B; margin: 0;">
+                  📅 ${day.name}
+                </h4>
+                <span class="badge" style="background: #E2E8F0; color: #475569; font-weight: 700;">${day.lessons.length} ta dars</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;">
+                ${day.lessons.length === 0 ? `
+                  <div style="color: #94A3B8; font-size: 12.5px; padding: 10px;">Darslar yo'q</div>
+                ` : day.lessons.map(l => {
+                  const isLab = /lab|laboratoriya/i.test(l.subject_name);
+                  const isLecture = /lecture|ma'ruza/i.test(l.subject_name);
+                  const typeLabel = isLab ? '🔬 Lab' : (isLecture ? '🎓 Ma\'ruza' : '✏️ Amaliyot');
+
+                  return `
+                    <div style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 6px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="background: #0F172A; color: white; font-weight: 800; font-size: 11.5px; padding: 3px 8px; border-radius: 6px; font-family: monospace;">
+                          🕒 ${l.time_str}
+                        </span>
+                        <span style="font-size: 11px; font-weight: 700; color: #475569; background: #F1F5F9; padding: 2px 7px; border-radius: 6px;">
+                          ${typeLabel}
+                        </span>
+                      </div>
+                      <div style="font-size: 14px; font-weight: 700; color: #0F172A; line-height: 1.35; margin-top: 2px;">
+                        ${l.subject_name}
+                      </div>
+                      <div style="font-size: 12px; color: #64748B; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+                        <span>👨‍🏫 <b>O'qituvchi:</b> ${l.teacher_name || 'Ko\'rsatilmagan'}</span>
+                        <span>📍 <b>Auditoriya:</b> ${l.room || 'Ko\'rsatilmagan'}</span>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#EF4444; padding:20px; text-align:center;">Dars jadvalini yuklashda xatolik: ${err.message}</div>`;
+  }
+}
+
+function filterTtDay(dayNumber, btn) {
+  document.querySelectorAll('#tt-weekday-buttons button').forEach(b => {
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-outline');
+  });
+  if (btn) {
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-outline');
+  }
+
+  document.querySelectorAll('.tt-day-block').forEach(el => {
+    const d = Number(el.getAttribute('data-day'));
+    if (dayNumber === 0 || d === dayNumber) {
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+
+// 3. TALABALAR KESIMIDA DAVOMAT TABI
+async function renderLmsStudentsTab(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; padding:30px;">
+      <div class="spinner"></div>
+    </div>
+  `;
+
+  try {
+    const res = await apiFetch('/api/lms/students');
+    cachedLmsStudents = res.students || [];
+
+    container.innerHTML = `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 4px;">
+              Talabalar Dars Davomati Ko'rsatkichlari (Moodle)
+            </h3>
+            <span style="font-size: 12.5px; color: #64748B;">Barcha talabalarning semestr davomidagi darslarga qatnashish foizlari</span>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="lms-student-search-input" placeholder="Ism yoki pasport..." oninput="handleLmsStudentSearch()" style="padding: 7px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 12.5px; width: 220px;" />
+          </div>
+        </div>
+
+        <div class="table-responsive" style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
+          <table class="table" style="margin: 0; width: 100%; font-size: 13px;" id="lms-students-table">
+            <thead style="background: #F8FAFC;">
+              <tr>
+                <th style="padding: 10px 14px;">#</th>
+                <th style="padding: 10px 14px;">Talaba F.I.Sh</th>
+                <th style="padding: 10px 14px;">Guruh</th>
+                <th style="padding: 10px 14px;">Pasport ID</th>
+                <th style="padding: 10px 14px; text-align: center;">Jami Darslar</th>
+                <th style="padding: 10px 14px; text-align: center;">🟢 Bor</th>
+                <th style="padding: 10px 14px; text-align: center;">🟡 Kech</th>
+                <th style="padding: 10px 14px; text-align: center;">🔴 Kelmadi</th>
+                <th style="padding: 10px 14px; text-align: center;">Davomat Foizi</th>
+              </tr>
+            </thead>
+            <tbody id="lms-students-tbody">
+              <!-- To'ldiriladi -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    renderLmsStudentsTbody(cachedLmsStudents);
+  } catch (err) {
+    container.innerHTML = `<div style="color:#EF4444; padding:20px; text-align:center;">Talabalar ro'yxatini yuklashda xatolik: ${err.message}</div>`;
+  }
+}
+
+function renderLmsStudentsTbody(students) {
+  const tbody = document.getElementById('lms-students-tbody');
+  if (!tbody) return;
+
+  if (students.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 25px; color: #94A3B8;">Mos talabalar topilmadi</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = students.map((st, idx) => {
+    const rate = st.attendance_rate || 0;
+    const color = rate >= 85 ? '#10B981' : (rate >= 70 ? '#F59E0B' : '#EF4444');
+    const bg = rate >= 85 ? '#ECFDF5' : (rate >= 70 ? '#FFFBEB' : '#FEF2F2');
+
+    return `
+      <tr style="border-bottom: 1px solid #F1F5F9;">
+        <td style="padding: 10px 14px; color: #64748B; font-weight: 600;">${idx + 1}</td>
+        <td style="padding: 10px 14px; font-weight: 700; color: #0F172A;">${st.full_name}</td>
+        <td style="padding: 10px 14px;"><span class="badge" style="background:#EFF6FF; color:#2563EB;">${st.group_code || '—'}</span></td>
+        <td style="padding: 10px 14px; font-family: monospace; font-weight: 600; color: #475569;">${st.external_id || '—'}</td>
+        <td style="padding: 10px 14px; text-align: center; font-weight: 700;">${st.total_classes}</td>
+        <td style="padding: 10px 14px; text-align: center; font-weight: 700; color: #10B981;">${st.present_count}</td>
+        <td style="padding: 10px 14px; text-align: center; font-weight: 700; color: #F59E0B;">${st.late_count}</td>
+        <td style="padding: 10px 14px; text-align: center; font-weight: 700; color: #EF4444;">${st.absent_count}</td>
+        <td style="padding: 10px 14px; text-align: center;">
+          <span style="background: ${bg}; color: ${color}; font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 6px;">
+            ${rate}%
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function handleLmsStudentSearch() {
+  const query = (document.getElementById('lms-student-search-input')?.value || '').toLowerCase().trim();
+  if (!cachedLmsStudents) return;
+
+  const filtered = cachedLmsStudents.filter(st => {
+    const fn = (st.full_name || '').toLowerCase();
+    const id = (st.external_id || '').toLowerCase();
+    const gr = (st.group_code || '').toLowerCase();
+    return fn.includes(query) || id.includes(query) || gr.includes(query);
+  });
+  renderLmsStudentsTbody(filtered);
+}
+
+// 4. BITTA DARSNING TALABALAR RO'YXATI MODALI
+async function openLmsSessionModal(sessionId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.textContent = 'Dars Davomati Tafsilotlari';
+  modalBody.innerHTML = `
+    <div style="display:flex; justify-content:center; padding:30px;">
+      <div class="spinner"></div>
+    </div>
+  `;
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  openModal();
+
+  try {
+    const res = await apiFetch(`/api/lms/sessions/${sessionId}`);
+    const sess = res.session || {};
+    const students = res.students || [];
+
+    const dt = sess.sessdate_iso ? new Date(sess.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'long', day: 'numeric', weekday: 'long' }) : '';
+
+    modalBody.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- DARS INFO HADER -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:16px;">
+          <h3 style="font-size:16px; font-weight:800; color:#0F172A; margin:0 0 6px;">${sess.course_name || `Kurs ${sess.course_id}`}</h3>
+          <div style="font-size:12.5px; color:#64748B; display:flex; flex-wrap:wrap; gap:12px;">
+            <span>📅 <b>Sana:</b> ${dt}</span>
+            <span>⏱️ <b>Davomiyligi:</b> ${Math.round(sess.duration / 60)} daqiqa</span>
+            <span>👥 <b>Jami yozilgan:</b> ${sess.total_enrolled} ta talaba</span>
+          </div>
+          <div style="margin-top:10px; display:flex; gap:8px;">
+            <span class="badge" style="background:#ECFDF5; color:#059669; font-weight:700;">🟢 Bor: ${sess.present_count}</span>
+            <span class="badge" style="background:#FFFBEB; color:#D97706; font-weight:700;">🟡 Kech: ${sess.late_count}</span>
+            <span class="badge" style="background:#EFF6FF; color:#2563EB; font-weight:700;">🔵 Sababli: ${sess.excused_count}</span>
+            <span class="badge" style="background:#FEF2F2; color:#DC2626; font-weight:700;">🔴 Kelmadi: ${sess.absent_count}</span>
+          </div>
+        </div>
+
+        <!-- TALABALAR RO'YXATI -->
+        <h4 style="font-size:14px; font-weight:700; margin:0;">Talabalar davomati ro'yxati (${students.length} nafar):</h4>
+        <div style="max-height:360px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:12px;">
+          <table class="table" style="margin:0; width:100%; font-size:12.5px;">
+            <thead style="background:#F1F5F9; position:sticky; top:0;">
+              <tr>
+                <th style="padding:8px 12px;">#</th>
+                <th style="padding:8px 12px;">Talaba</th>
+                <th style="padding:8px 12px;">Guruh</th>
+                <th style="padding:8px 12px; text-align:center;">Holat</th>
+                <th style="padding:8px 12px;">Izoh</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${students.map((st, i) => {
+                let badge = '';
+                if (st.status === 'P') badge = '<span style="background:#ECFDF5; color:#059669; font-weight:700; padding:2px 8px; border-radius:6px;">🟢 Bor</span>';
+                else if (st.status === 'L') badge = '<span style="background:#FFFBEB; color:#D97706; font-weight:700; padding:2px 8px; border-radius:6px;">🟡 Kech</span>';
+                else if (st.status === 'E') badge = '<span style="background:#EFF6FF; color:#2563EB; font-weight:700; padding:2px 8px; border-radius:6px;">🔵 Sababli</span>';
+                else badge = '<span style="background:#FEF2F2; color:#DC2626; font-weight:700; padding:2px 8px; border-radius:6px;">🔴 Kelmadi</span>';
+
+                return `
+                  <tr style="border-bottom:1px solid #F1F5F9;">
+                    <td style="padding:8px 12px; color:#64748B;">${i + 1}</td>
+                    <td style="padding:8px 12px; font-weight:700; color:#0F172A;">${st.student_name}</td>
+                    <td style="padding:8px 12px;"><span class="badge" style="background:#EFF6FF; color:#2563EB;">${st.group_code || '—'}</span></td>
+                    <td style="padding:8px 12px; text-align:center;">${badge}</td>
+                    <td style="padding:8px 12px; font-size:11px; color:#64748B;">${st.remarks || '—'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    modalBody.innerHTML = `<div style="color:#EF4444; padding:20px; text-align:center;">Xatolik: ${err.message}</div>`;
+  }
+}
+
+// 5. QO'LDA SINXRONLASH
+async function syncLmsManually() {
+  const btn = document.getElementById('btn-sync-lms-main');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner spinner-sm" style="width:14px; height:14px; border-width:2px;"></div> <span>Sinxronlanmoqda...</span>`;
+  }
+
+  try {
+    const res = await apiFetch('/api/lms/sync', { method: 'POST' });
+    if (res.success) {
+      alert(`Moodle dan ma'lumotlar muvaffaqiyatli sinxronlandi!\n\n📅 Jadvallar: ${res.timetable?.count || 0} ta\n🎓 Darslar: ${res.attendance?.sessions || 0} ta\n👥 Talabalar yozuvlari: ${res.attendance?.attendanceRecords || 0} ta`);
+      renderLmsMonitoring(document.getElementById('module-page-container'));
+    } else {
+      alert(`Sinxronlashda xatolik: ${res.message || res.error || 'Noma\'lum xatolik'}`);
+    }
+  } catch (err) {
+    alert(`Xatolik: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `${icon('refresh', 14)} <span>🔄 LMS dan yangilash</span>`;
+    }
+  }
+}
+
+window.renderLmsMonitoring = renderLmsMonitoring;
+window.switchLmsSubTab = switchLmsSubTab;
+window.filterTtDay = filterTtDay;
+window.handleLmsStudentSearch = handleLmsStudentSearch;
+window.openLmsSessionModal = openLmsSessionModal;
+window.syncLmsManually = syncLmsManually;
+
 
 

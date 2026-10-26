@@ -29,6 +29,7 @@ app.use('/api/observe', require('./routes/observeRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/lms', require('./routes/lmsRoutes'));
 app.use(['/api/integration/events', '/api/v1/integration/events'], require('./routes/integrationRoutes'));
 
 // Telegram Bot Webhook endpoint
@@ -68,6 +69,10 @@ app.use((req, res) => {
 
 // Start Background Jobs (recalculate scores, cron)
 initBackgroundJobs();
+
+// LMS (Moodle) dars jadvali va davomatini avtomatik sinxronlash croni
+const { startLmsSyncCron } = require('./services/lmsService');
+startLmsSyncCron();
 
 // KPI dan tadbirlarni tortish to'xtatildi (tadbirlar bevosita tizimda yaratiladi va boshqariladi)
 // startKpiEventSyncCron();

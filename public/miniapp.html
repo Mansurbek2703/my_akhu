@@ -71,6 +71,21 @@
       </div>
     </div>
 
+    <!-- LMS DARSLAR BANNER -->
+    <div onclick="switchTab('classes')" style="background: linear-gradient(135deg, #1E40AF, #2563EB); border-radius: 16px; padding: 13px 15px; color: white; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 14px rgba(37,99,235,0.22); transition: transform 0.15s;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="font-size: 24px; background: rgba(255,255,255,0.2); width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">📚</div>
+        <div>
+          <div style="font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            Dars Jadvali & LMS Davomat
+            <span style="background: #34D399; color: #064E3B; font-size: 9.5px; font-weight: 800; padding: 1px 6px; border-radius: 6px; text-transform: uppercase;">Moodle</span>
+          </div>
+          <div style="font-size: 11.5px; color: #BFDBFE; margin-top: 2px;" id="home-lms-quick-stat">Haftalik jadvalingiz va davomat foizingiz</div>
+        </div>
+      </div>
+      <span style="font-size: 17px; color: #DBEAFE; font-weight: 700;">→</span>
+    </div>
+
     <!-- SOHALAR KESIMIDA BALLAR -->
     <div class="section-title">
       <span>Sohalar Bo'yicha Ballar</span>
@@ -141,7 +156,100 @@
     </div>
   </div>
 
-  <!-- 4. MENING QR KODIM TAB -->
+  <!-- 4. DARSLAR VA MOODLE DAVOMATI TAB -->
+  <div class="tab-content" id="tab-classes">
+    <div class="section-title">
+      <span>Dars Jarayonlari (Moodle LMS)</span>
+      <span id="lms-last-sync-badge" style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 700; padding: 3px 8px; border-radius: 6px;">LMS Jonli</span>
+    </div>
+
+    <!-- SUB-TABS: Dars Jadvali vs Davomat -->
+    <div style="display: flex; background: #E2E8F0; padding: 3px; border-radius: 12px; margin-bottom: 16px;">
+      <button id="subtab-btn-timetable" onclick="switchClassesSubTab('timetable')" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: none; background: white; color: #0F172A; font-weight: 700; font-size: 12.5px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+        📅 Dars Jadvali
+      </button>
+      <button id="subtab-btn-attendance" onclick="switchClassesSubTab('attendance')" style="flex: 1; padding: 8px 12px; border-radius: 10px; border: none; background: transparent; color: #64748B; font-weight: 600; font-size: 12.5px; cursor: pointer; transition: all 0.2s;">
+        📊 Dars Davomati
+      </button>
+    </div>
+
+    <!-- 1-KO'RINISH: DARS JADVALI (TIMETABLE) -->
+    <div id="classes-view-timetable">
+      <!-- Hafta kunlari tugmalari -->
+      <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px;" id="weekday-pills-row">
+        <button class="weekday-pill" data-day="1" onclick="selectWeekday(1)" style="flex: 1; min-width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; text-align: center;">Dush</button>
+        <button class="weekday-pill" data-day="2" onclick="selectWeekday(2)" style="flex: 1; min-width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; text-align: center;">Sesh</button>
+        <button class="weekday-pill" data-day="3" onclick="selectWeekday(3)" style="flex: 1; min-width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; text-align: center;">Chor</button>
+        <button class="weekday-pill" data-day="4" onclick="selectWeekday(4)" style="flex: 1; min-width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; text-align: center;">Pay</button>
+        <button class="weekday-pill" data-day="5" onclick="selectWeekday(5)" style="flex: 1; min-width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; text-align: center;">Juma</button>
+        <button class="weekday-pill" data-day="6" onclick="selectWeekday(6)" style="flex: 1; min-width: 48px; padding: 8px 4px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; text-align: center;">Shan</button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span style="font-size: 13px; font-weight: 700; color: #1E293B;" id="selected-day-title">Tanlangan kun darslari</span>
+        <span id="selected-day-badge" style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Bugun</span>
+      </div>
+
+      <!-- Darslar kartochkalari ro'yxati -->
+      <div id="timetable-lessons-container" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="text-align: center; padding: 25px; color: #94A3B8; font-size: 13px;">Dars jadvali yuklanmoqda...</div>
+      </div>
+    </div>
+
+    <!-- 2-KO'RINISH: DARS DAVOMATI (ATTENDANCE) -->
+    <div id="classes-view-attendance" style="display: none;">
+      <!-- Hero Davomat Kartasi -->
+      <div style="background: linear-gradient(135deg, #1E3A8A, #2563EB); border-radius: 18px; padding: 18px 16px; color: white; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(37,99,235,0.25);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <div>
+            <div style="font-size: 11.5px; text-transform: uppercase; color: #BFDBFE; font-weight: 700; letter-spacing: 0.5px;">Semestr Dars Davomati</div>
+            <div style="font-size: 32px; font-weight: 800; color: #FFFFFF;" id="lms-overall-rate">0%</div>
+          </div>
+          <div style="text-align: right; background: rgba(255,255,255,0.15); padding: 8px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2);">
+            <div style="font-size: 11px; color: #BFDBFE; font-weight: 600;">Jami Darslar</div>
+            <div style="font-size: 20px; font-weight: 800;" id="lms-total-sessions">0 ta</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;">
+          <div style="background: rgba(16,185,129,0.2); border: 1px solid rgba(52,211,153,0.3); border-radius: 10px; padding: 6px 2px;">
+            <div style="font-size: 10.5px; color: #A7F3D0; font-weight: 700;">🟢 Bor</div>
+            <div style="font-size: 15px; font-weight: 800; color: #FFFFFF;" id="lms-present-count">0</div>
+          </div>
+          <div style="background: rgba(245,158,11,0.2); border: 1px solid rgba(251,191,36,0.3); border-radius: 10px; padding: 6px 2px;">
+            <div style="font-size: 10.5px; color: #FDE68A; font-weight: 700;">🟡 Kech</div>
+            <div style="font-size: 15px; font-weight: 800; color: #FFFFFF;" id="lms-late-count">0</div>
+          </div>
+          <div style="background: rgba(59,130,246,0.2); border: 1px solid rgba(147,197,253,0.3); border-radius: 10px; padding: 6px 2px;">
+            <div style="font-size: 10.5px; color: #BFDBFE; font-weight: 700;">🔵 Sababli</div>
+            <div style="font-size: 15px; font-weight: 800; color: #FFFFFF;" id="lms-excused-count">0</div>
+          </div>
+          <div style="background: rgba(239,68,68,0.2); border: 1px solid rgba(248,113,113,0.3); border-radius: 10px; padding: 6px 2px;">
+            <div style="font-size: 10.5px; color: #FECACA; font-weight: 700;">🔴 Kelmadi</div>
+            <div style="font-size: 15px; font-weight: 800; color: #FFFFFF;" id="lms-absent-count">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FANLAR KESIMIDA DAVOMAT -->
+      <div class="section-title">
+        <span>Fanlar Kesimida Davomat</span>
+      </div>
+      <div id="lms-subjects-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+        <div style="text-align: center; padding: 15px; color: #94A3B8; font-size: 12.5px;">Fanlar davomati yuklanmoqda...</div>
+      </div>
+
+      <!-- SO'NGGI DARSLAR JURNALI -->
+      <div class="section-title">
+        <span>So'nggi Darslar Jurnali</span>
+      </div>
+      <div id="lms-recent-sessions-container" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="text-align: center; padding: 15px; color: #94A3B8; font-size: 12.5px;">Darslar jurnali yuklanmoqda...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. MENING QR KODIM TAB -->
   <div class="tab-content" id="tab-qr" style="text-align: center;">
     <div class="section-title" style="justify-content: center;">
       <span>Shaxsiy Talaba QR Kodi</span>
@@ -214,9 +322,9 @@
       <span class="nav-icon">🏠</span>
       <span>Asosiy</span>
     </button>
-    <button class="nav-tab-btn" onclick="switchTab('history')">
-      <span class="nav-icon">📝</span>
-      <span>Tarix</span>
+    <button class="nav-tab-btn" onclick="switchTab('classes')">
+      <span class="nav-icon">📚</span>
+      <span>Darslar</span>
     </button>
     <button class="nav-tab-btn" onclick="switchTab('events')">
       <span class="nav-icon">🎯</span>
@@ -770,15 +878,276 @@
       const targetTab = document.getElementById(`tab-${tabName}`);
       if (targetTab) targetTab.classList.add('active');
 
-      const btnIndex = { home: 0, history: 1, events: 2, qr: 3, profile: 4 }[tabName];
-      if (btnIndex !== undefined) {
+      const btnIndex = { home: 0, classes: 1, events: 2, qr: 3, profile: 4, history: 0 }[tabName];
+      if (btnIndex !== undefined && document.querySelectorAll('.nav-tab-btn')[btnIndex]) {
         document.querySelectorAll('.nav-tab-btn')[btnIndex].classList.add('active');
       }
 
+      if (tabName === 'classes') loadClassesTab();
       if (tabName === 'history') loadHistoryTab();
       if (tabName === 'events') loadEventsTab();
       if (tabName === 'qr') loadStudentQr();
       if (tabName === 'home') loadStudentDashboard();
+    }
+
+    // ====================================================================
+    // LMS (MOODLE) DARSLAR VA DAVOMAT FUNKSIYALARI
+    // ====================================================================
+    let classesTimetableData = null;
+    let classesAttendanceData = null;
+    let selectedClassesSubTab = 'timetable';
+    let currentSelectedWeekday = 1;
+
+    function switchClassesSubTab(subTab) {
+      selectedClassesSubTab = subTab;
+      const btnTt = document.getElementById('subtab-btn-timetable');
+      const btnAtt = document.getElementById('subtab-btn-attendance');
+      const viewTt = document.getElementById('classes-view-timetable');
+      const viewAtt = document.getElementById('classes-view-attendance');
+
+      if (subTab === 'attendance') {
+        if (btnTt) { btnTt.style.background = 'transparent'; btnTt.style.color = '#64748B'; btnTt.style.fontWeight = '600'; btnTt.style.boxShadow = 'none'; }
+        if (btnAtt) { btnAtt.style.background = 'white'; btnAtt.style.color = '#0F172A'; btnAtt.style.fontWeight = '700'; btnAtt.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'; }
+        if (viewTt) viewTt.style.display = 'none';
+        if (viewAtt) viewAtt.style.display = 'block';
+        if (!classesAttendanceData) loadClassesAttendance();
+        else renderClassesAttendance();
+      } else {
+        if (btnTt) { btnTt.style.background = 'white'; btnTt.style.color = '#0F172A'; btnTt.style.fontWeight = '700'; btnTt.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'; }
+        if (btnAtt) { btnAtt.style.background = 'transparent'; btnAtt.style.color = '#64748B'; btnAtt.style.fontWeight = '600'; btnAtt.style.boxShadow = 'none'; }
+        if (viewTt) viewTt.style.display = 'block';
+        if (viewAtt) viewAtt.style.display = 'none';
+        if (!classesTimetableData) loadClassesTimetable();
+        else renderTimetableForWeekday(currentSelectedWeekday);
+      }
+    }
+
+    async function loadClassesTab() {
+      // Bir vaqtning o'zida ikkalasini ham yuklash
+      loadClassesTimetable();
+      loadClassesAttendance();
+    }
+
+    async function loadClassesTimetable() {
+      const container = document.getElementById('timetable-lessons-container');
+      try {
+        const res = await fetch('/api/app/lms/timetable', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        classesTimetableData = data;
+
+        // Bugungi kunni avtomatik aniqlash
+        const todayDay = data.current_weekday || 1;
+        currentSelectedWeekday = (todayDay >= 1 && todayDay <= 6) ? todayDay : 1;
+        selectWeekday(currentSelectedWeekday);
+      } catch (err) {
+        console.error('Timetable load error:', err);
+        if (container) container.innerHTML = `<div style="text-align:center; padding:20px; color:#EF4444; font-size:13px;">Dars jadvalini yuklashda xatolik: ${err.message}</div>`;
+      }
+    }
+
+    function selectWeekday(day) {
+      currentSelectedWeekday = day;
+      const todayDay = classesTimetableData?.current_weekday || new Date().getDay() || 1;
+
+      // Tugmalarni aktivlashtirish
+      document.querySelectorAll('.weekday-pill').forEach(btn => {
+        const d = Number(btn.getAttribute('data-day'));
+        if (d === day) {
+          btn.style.background = '#2563EB';
+          btn.style.color = '#FFFFFF';
+          btn.style.borderColor = '#2563EB';
+          btn.style.boxShadow = '0 2px 8px rgba(37,99,235,0.25)';
+        } else {
+          btn.style.background = '#FFFFFF';
+          btn.style.color = '#475569';
+          btn.style.borderColor = '#E2E8F0';
+          btn.style.boxShadow = 'none';
+        }
+      });
+
+      const dayNames = { 1: 'Dushanba', 2: 'Seshanba', 3: 'Chorshanba', 4: 'Payshanba', 5: 'Juma', 6: 'Shanba' };
+      const titleEl = document.getElementById('selected-day-title');
+      const badgeEl = document.getElementById('selected-day-badge');
+
+      if (titleEl) titleEl.textContent = `${dayNames[day]} darslari`;
+      if (badgeEl) {
+        if (day === todayDay) {
+          badgeEl.style.display = 'inline-block';
+          badgeEl.textContent = 'Bugun';
+          badgeEl.style.background = '#DBEAFE';
+          badgeEl.style.color = '#1E40AF';
+        } else {
+          badgeEl.style.display = 'none';
+        }
+      }
+
+      renderTimetableForWeekday(day);
+    }
+
+    function renderTimetableForWeekday(day) {
+      const container = document.getElementById('timetable-lessons-container');
+      if (!container || !classesTimetableData) return;
+
+      const schedule = classesTimetableData.weekly_schedule || [];
+      const dayData = schedule.find(d => d.day === day);
+      const lessons = dayData ? dayData.lessons : [];
+
+      if (!lessons || lessons.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 35px 20px; background: white; border-radius: 16px; border: 1px solid #E2E8F0; color: #94A3B8;">
+            <div style="font-size: 34px; margin-bottom: 8px;">🛋️</div>
+            <div style="font-size: 13.5px; font-weight: 700; color: #475569;">Ushbu kunda darslar rejalashtirilmagan</div>
+            <div style="font-size: 11.5px; margin-top: 4px;">Talaba ushbu kun mustaqil ta'lim yoki dam olish kuni</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = lessons.map(lesson => {
+        const isLecture = /lecture|ma'ruza/i.test(lesson.subject_name);
+        const isLab = /lab|laboratoriya/i.test(lesson.subject_name);
+        const typeBadge = isLab ? '🔬 Lab' : (isLecture ? '🎓 Ma\'ruza' : '✏️ Amaliyot');
+        const typeColor = isLab ? '#7C3AED' : (isLecture ? '#2563EB' : '#059669');
+        const typeBg = isLab ? '#F5F3FF' : (isLecture ? '#EFF6FF' : '#ECFDF5');
+
+        return `
+          <div style="background: white; border-radius: 16px; border: 1.5px solid #E2E8F0; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="background: #0F172A; color: #FFFFFF; font-weight: 800; font-size: 11.5px; padding: 4px 10px; border-radius: 8px; font-family: monospace; letter-spacing: 0.5px;">
+                🕒 ${lesson.time_str}
+              </span>
+              <span style="background: ${typeBg}; color: ${typeColor}; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid ${typeColor}30;">
+                ${typeBadge}
+              </span>
+            </div>
+
+            <div style="font-size: 15px; font-weight: 700; color: #0F172A; line-height: 1.35;">
+              ${lesson.subject_name}
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #64748B; margin-top: 2px;">
+              <span style="display: inline-flex; align-items: center; gap: 4px;">
+                👨‍🏫 <b>O'qituvchi:</b> ${lesson.teacher_name}
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 4px;">
+                📍 <b>Xona:</b> ${lesson.room}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadClassesAttendance() {
+      try {
+        const res = await fetch('/api/app/lms/attendance', {
+          headers: { 'Authorization': `Bearer ${currentAuthToken}` }
+        });
+        const data = await res.json();
+        classesAttendanceData = data;
+        renderClassesAttendance();
+      } catch (err) {
+        console.error('Attendance load error:', err);
+      }
+    }
+
+    function renderClassesAttendance() {
+      if (!classesAttendanceData) return;
+      const { summary, subjects, recent_sessions } = classesAttendanceData;
+
+      // Hero statistika
+      if (summary) {
+        const rateEl = document.getElementById('lms-overall-rate');
+        const totalEl = document.getElementById('lms-total-sessions');
+        const pEl = document.getElementById('lms-present-count');
+        const lEl = document.getElementById('lms-late-count');
+        const eEl = document.getElementById('lms-excused-count');
+        const aEl = document.getElementById('lms-absent-count');
+
+        if (rateEl) rateEl.textContent = `${summary.overall_rate || 0}%`;
+        if (totalEl) totalEl.textContent = `${summary.total_sessions || 0} ta`;
+        if (pEl) pEl.textContent = summary.present_count || 0;
+        if (lEl) lEl.textContent = summary.late_count || 0;
+        if (eEl) eEl.textContent = summary.excused_count || 0;
+        if (aEl) aEl.textContent = summary.absent_count || 0;
+
+        // Bosh sahifadagi qisqa statistikani ham yangilash
+        const homeStatEl = document.getElementById('home-lms-quick-stat');
+        if (homeStatEl) {
+          homeStatEl.textContent = `Semestr davomati: ${summary.overall_rate || 0}% (${summary.present_count || 0} bor, ${summary.absent_count || 0} yo'q)`;
+        }
+      }
+
+      // Fanlar kesimida
+      const subContainer = document.getElementById('lms-subjects-container');
+      if (subContainer) {
+        if (!subjects || subjects.length === 0) {
+          subContainer.innerHTML = '<div style="text-align:center; padding:15px; color:#94A3B8; font-size:12px;">Hozircha davomat qayd etilgan fanlar mavjud emas</div>';
+        } else {
+          subContainer.innerHTML = subjects.map(sb => {
+            const color = sb.rate >= 85 ? '#10B981' : (sb.rate >= 70 ? '#F59E0B' : '#EF4444');
+            const bgLight = sb.rate >= 85 ? '#ECFDF5' : (sb.rate >= 70 ? '#FFFBEB' : '#FEF2F2');
+            return `
+              <div style="background: white; border-radius: 14px; border: 1px solid #E2E8F0; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 13.5px; font-weight: 700; color: #0F172A; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${sb.course_name}
+                  </span>
+                  <span style="font-size: 13px; font-weight: 800; color: ${color}; background: ${bgLight}; padding: 2px 8px; border-radius: 6px;">
+                    ${sb.rate}%
+                  </span>
+                </div>
+                <div style="height: 6px; background: #F1F5F9; border-radius: 4px; overflow: hidden; margin-bottom: 6px;">
+                  <div style="width: ${Math.min(sb.rate, 100)}%; height: 100%; background: ${color}; border-radius: 4px; transition: width 0.3s;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #64748B;">
+                  <span>🟢 Bor: <b>${sb.present}</b> | 🔴 Yo'q: <b>${sb.absent}</b></span>
+                  <span>Jami: <b>${sb.total} dars</b></span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // So'nggi darslar jurnali
+      const recContainer = document.getElementById('lms-recent-sessions-container');
+      if (recContainer) {
+        if (!recent_sessions || recent_sessions.length === 0) {
+          recContainer.innerHTML = '<div style="text-align:center; padding:15px; color:#94A3B8; font-size:12px;">Hozircha o\'tkazilgan darslar tarixi yo\'q</div>';
+        } else {
+          recContainer.innerHTML = recent_sessions.map(s => {
+            let statusBadge = '';
+            if (s.status === 'P') {
+              statusBadge = '<span style="background: #ECFDF5; color: #059669; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #A7F3D0;">🟢 Bor</span>';
+            } else if (s.status === 'L') {
+              statusBadge = '<span style="background: #FFFBEB; color: #D97706; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #FDE68A;">🟡 Kech</span>';
+            } else if (s.status === 'E') {
+              statusBadge = '<span style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">🔵 Sababli</span>';
+            } else {
+              statusBadge = '<span style="background: #FEF2F2; color: #DC2626; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #FECACA;">🔴 Kelmadi</span>';
+            }
+
+            const dateStr = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '';
+
+            return `
+              <div style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div style="max-width: 72%;">
+                  <div style="font-size: 13px; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${s.course_name}
+                  </div>
+                  <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
+                    📅 ${dateStr} ${s.remarks ? `• <i>${s.remarks}</i>` : ''}
+                  </div>
+                </div>
+                <div>${statusBadge}</div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
     }
 
     let miniAppQrScanner = null;

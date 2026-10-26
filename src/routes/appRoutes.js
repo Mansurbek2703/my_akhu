@@ -552,4 +552,36 @@ router.get('/export', authenticateStudent, (req, res) => {
   });
 });
 
+/**
+ * GET /api/app/lms/timetable
+ * Talabaning LMS Dars Jadvali (Mini App)
+ */
+router.get('/lms/timetable', authenticateStudent, (req, res) => {
+  try {
+    const { getStudentTimetable } = require('../services/lmsService');
+    const data = getStudentTimetable(req.studentId);
+    if (data.error) return res.status(404).json(data);
+    res.json(data);
+  } catch (err) {
+    console.error('Student timetable error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/app/lms/attendance
+ * Talabaning LMS Dars Davomati (Mini App)
+ */
+router.get('/lms/attendance', authenticateStudent, (req, res) => {
+  try {
+    const { getStudentAttendance } = require('../services/lmsService');
+    const data = getStudentAttendance(req.studentId);
+    if (data.error) return res.status(404).json(data);
+    res.json(data);
+  } catch (err) {
+    console.error('Student LMS attendance error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

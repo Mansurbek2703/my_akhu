@@ -135,6 +135,96 @@ function initPostgresSchema() {
       CREATE INDEX IF NOT EXISTS idx_access_log_passport ON access_control_log(passport_id, event_time);
       CREATE INDEX IF NOT EXISTS idx_access_log_student ON access_control_log(student_id, event_time);
       CREATE INDEX IF NOT EXISTS idx_access_log_time ON access_control_log(event_time);
+
+      -- LMS (Moodle) Integratsiyasi
+      ALTER TABLE student ADD COLUMN IF NOT EXISTS moodle_id INTEGER;
+      CREATE INDEX IF NOT EXISTS idx_student_moodle_id ON student(moodle_id);
+
+      CREATE TABLE IF NOT EXISTS lms_course (
+          id INTEGER PRIMARY KEY,
+          code TEXT,
+          name TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS lms_timetable (
+          id TEXT PRIMARY KEY,
+          event_id INTEGER NOT NULL UNIQUE,
+          course_id INTEGER NOT NULL,
+          subject_code TEXT,
+          subject_name TEXT NOT NULL,
+          teacher_name TEXT,
+          room TEXT,
+          timestart INTEGER NOT NULL,
+          timeduration INTEGER NOT NULL,
+          timestart_iso TEXT NOT NULL,
+          timeend_iso TEXT NOT NULL,
+          weekday INTEGER NOT NULL,
+          time_str TEXT NOT NULL,
+          event_type TEXT DEFAULT 'course',
+          created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_lms_tt_course ON lms_timetable(course_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_tt_weekday ON lms_timetable(weekday);
+      CREATE INDEX IF NOT EXISTS idx_lms_tt_timestart ON lms_timetable(timestart);
+
+      CREATE TABLE IF NOT EXISTS lms_attendance_session (
+          id TEXT PRIMARY KEY,
+          session_id INTEGER NOT NULL UNIQUE,
+          attendance_id INTEGER NOT NULL,
+          course_id INTEGER NOT NULL,
+          course_name TEXT,
+          sessdate INTEGER NOT NULL,
+          sessdate_iso TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          lasttaken INTEGER,
+          lasttaken_iso TEXT,
+          description TEXT,
+          total_enrolled INTEGER NOT NULL DEFAULT 0,
+          present_count INTEGER NOT NULL DEFAULT 0,
+          late_count INTEGER NOT NULL DEFAULT 0,
+          excused_count INTEGER NOT NULL DEFAULT 0,
+          absent_count INTEGER NOT NULL DEFAULT 0,
+          attendance_rate REAL NOT NULL DEFAULT 0.0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_lms_sess_course ON lms_attendance_session(course_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_sess_date ON lms_attendance_session(sessdate);
+
+      CREATE TABLE IF NOT EXISTS lms_student_attendance (
+          id TEXT PRIMARY KEY,
+          session_id INTEGER NOT NULL,
+          attendance_id INTEGER NOT NULL,
+          course_id INTEGER NOT NULL,
+          course_name TEXT,
+          moodle_student_id INTEGER NOT NULL,
+          student_id TEXT,
+          student_name TEXT NOT NULL,
+          status TEXT NOT NULL,
+          status_label TEXT NOT NULL,
+          points INTEGER NOT NULL DEFAULT 0,
+          remarks TEXT,
+          sessdate INTEGER NOT NULL,
+          sessdate_iso TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          UNIQUE(session_id, moodle_student_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_lms_sa_student ON lms_student_attendance(student_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_sa_moodle_student ON lms_student_attendance(moodle_student_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_sa_session ON lms_student_attendance(session_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_sa_course ON lms_student_attendance(course_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_sa_date ON lms_student_attendance(sessdate);
+
+      CREATE TABLE IF NOT EXISTS lms_course_enrollment (
+          course_id INTEGER NOT NULL,
+          moodle_student_id INTEGER NOT NULL,
+          student_id TEXT,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(course_id, moodle_student_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_lms_ce_student ON lms_course_enrollment(student_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_ce_course ON lms_course_enrollment(course_id);
     `);
   } catch (err) {
     console.error('[DB] PostgreSQL initSchema warning:', err.message);
@@ -284,6 +374,91 @@ function initSqliteSchema() {
             SELECT tg.group_code FROM tutor_group tg WHERE tg.tutor_id = student.tutor_id
           )
         );
+    `);
+  } catch (e) {}
+
+  // Migration: ensure LMS tables exist in SQLite
+  try {
+    const sCols = db.pragma('table_info(student)').map(c => c.name);
+    if (!sCols.includes('moodle_id')) {
+      db.exec('ALTER TABLE student ADD COLUMN moodle_id INTEGER;');
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lms_course (
+          id INTEGER PRIMARY KEY,
+          code TEXT,
+          name TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS lms_timetable (
+          id TEXT PRIMARY KEY,
+          event_id INTEGER NOT NULL UNIQUE,
+          course_id INTEGER NOT NULL,
+          subject_code TEXT,
+          subject_name TEXT NOT NULL,
+          teacher_name TEXT,
+          room TEXT,
+          timestart INTEGER NOT NULL,
+          timeduration INTEGER NOT NULL,
+          timestart_iso TEXT NOT NULL,
+          timeend_iso TEXT NOT NULL,
+          weekday INTEGER NOT NULL,
+          time_str TEXT NOT NULL,
+          event_type TEXT DEFAULT 'course',
+          created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_lms_tt_course ON lms_timetable(course_id);
+      CREATE INDEX IF NOT EXISTS idx_lms_tt_weekday ON lms_timetable(weekday);
+
+      CREATE TABLE IF NOT EXISTS lms_attendance_session (
+          id TEXT PRIMARY KEY,
+          session_id INTEGER NOT NULL UNIQUE,
+          attendance_id INTEGER NOT NULL,
+          course_id INTEGER NOT NULL,
+          course_name TEXT,
+          sessdate INTEGER NOT NULL,
+          sessdate_iso TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          lasttaken INTEGER,
+          lasttaken_iso TEXT,
+          description TEXT,
+          total_enrolled INTEGER NOT NULL DEFAULT 0,
+          present_count INTEGER NOT NULL DEFAULT 0,
+          late_count INTEGER NOT NULL DEFAULT 0,
+          excused_count INTEGER NOT NULL DEFAULT 0,
+          absent_count INTEGER NOT NULL DEFAULT 0,
+          attendance_rate REAL NOT NULL DEFAULT 0.0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS lms_student_attendance (
+          id TEXT PRIMARY KEY,
+          session_id INTEGER NOT NULL,
+          attendance_id INTEGER NOT NULL,
+          course_id INTEGER NOT NULL,
+          course_name TEXT,
+          moodle_student_id INTEGER NOT NULL,
+          student_id TEXT,
+          student_name TEXT NOT NULL,
+          status TEXT NOT NULL,
+          status_label TEXT NOT NULL,
+          points INTEGER NOT NULL DEFAULT 0,
+          remarks TEXT,
+          sessdate INTEGER NOT NULL,
+          sessdate_iso TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          UNIQUE(session_id, moodle_student_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS lms_course_enrollment (
+          course_id INTEGER NOT NULL,
+          moodle_student_id INTEGER NOT NULL,
+          student_id TEXT,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(course_id, moodle_student_id)
+      );
     `);
   } catch (e) {}
 }
