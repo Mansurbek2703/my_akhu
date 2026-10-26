@@ -33,14 +33,16 @@ function authenticateStaffOrTv(req, res, next) {
     return next();
   }
 
-  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  const user = db.prepare(`SELECT * FROM staff_user WHERE (LOWER(id) = LOWER(?) OR LOWER(COALESCE(passport_id, '')) = LOWER(?)) AND active = 1`).get(userId, userId);
   if (!user) {
     return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas." });
   }
 
   let roles = [];
   try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
-  req.staffUser = { ...user, roles };
+  let permissions = [];
+  try { permissions = JSON.parse(user.permissions || '[]'); } catch (e) { permissions = []; }
+  req.staffUser = { ...user, roles, permissions };
   next();
 }
 
@@ -68,25 +70,104 @@ router.get('/', (req, res) => {
 
 /**
  * POST /api/events
- * Tadbir yaratish kpi.akhu.uz hodimlar platformasiga o'tkazilgan!
+ * Yangi tadbir yaratish (Tizimning o'zida yaratiladi va boshqariladi)
  */
 router.post('/', (req, res) => {
-  return res.status(403).json({
-    error: "Tadbirlar faqat kpi.akhu.uz platformasi orqali yaratiladi! Tizimga tadbirlar har daqiqada avtomatik sinxronlanadi."
-  });
-});
-
-/**
- * POST /api/events/sync-kpi
- * KPI tizimidan qo'lda sinxronlash
- */
-router.post('/sync-kpi', async (req, res) => {
   try {
-    const { syncEventsFromKpi } = require('../services/kpiEventService');
-    const result = await syncEventsFromKpi();
-    res.json(result);
+    const {
+      title,
+      starts_at,
+      ends_at,
+      place,
+      organizer_unit,
+      category_id,
+      level,
+      capacity,
+      requires_registration
+    } = req.body;
+
+    if (!title || !starts_at || !ends_at || !place || !category_id || !level) {
+      return res.status(400).json({ error: 'Majburiy maydonlar to\'ldirilishi shart' });
+    }
+
+    const now = new Date();
+    const startsDate = new Date(starts_at);
+    const endsDate = new Date(ends_at);
+
+    if (endsDate <= startsDate) {
+      return res.status(400).json({
+        error: 'Tadbir tugash vaqti boshlanish vaqtidan keyin bo\'lishi shart!'
+      });
+    }
+
+    const points = LEVEL_POINTS[level] || 5;
+    const eventId = 'ev_' + crypto.randomBytes(6).toString('hex');
+    const qrSecret = 'sec_' + crypto.randomBytes(12).toString('hex');
+    const nowIso = now.toISOString();
+    const createdBy = req.staffUser.id;
+    const photoUrl = (req.body.photo_url || req.body.image_url) ? String(req.body.photo_url || req.body.image_url).trim() : null;
+
+    db.prepare(`
+      INSERT INTO event (
+        id, title, starts_at, ends_at, place, photo_url, image_url, organizer_unit, category_id,
+        level, points, capacity, requires_registration, status, qr_secret,
+        qr_refresh_seconds, attendance_open_minutes_before, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, 60, 0, ?, ?)
+    `).run(
+      eventId,
+      title,
+      starts_at,
+      ends_at,
+      place,
+      photoUrl,
+      photoUrl,
+      organizer_unit || req.staffUser.full_name || 'AKHU',
+      category_id,
+      level,
+      points,
+      capacity ? Number(capacity) : null,
+      requires_registration ? 1 : 0,
+      qrSecret,
+      createdBy,
+      nowIso
+    );
+
+    logAudit({
+      actor_id: createdBy,
+      actor_role: (req.staffUser.roles && req.staffUser.roles[0]) || 'staff',
+      action: 'CREATE_EVENT',
+      object_type: 'event',
+      object_id: eventId,
+      after: { title, level, points, qr_refresh_seconds: 60 },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    // Barcha talabalarga Telegram bot orqali xabar yuborish
+    try {
+      const { broadcastNewEventToStudents } = require('../services/telegramService');
+      broadcastNewEventToStudents({
+        id: eventId,
+        title,
+        starts_at,
+        ends_at,
+        place,
+        photo_url: photoUrl,
+        image_url: photoUrl,
+        points,
+        attendance_open_minutes_before: 0
+      });
+    } catch (e) {
+      console.error('Broadcast notification error:', e.message);
+    }
+
+    res.json({
+      success: true,
+      event_id: eventId,
+      points,
+      message: `Tadbir muvaffaqiyatli yaratildi (${points} ball, 60s dinamik QR).`
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 

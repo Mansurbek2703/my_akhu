@@ -69,8 +69,8 @@ app.use((req, res) => {
 // Start Background Jobs (recalculate scores, cron)
 initBackgroundJobs();
 
-// Start KPI Event Sync Cron (syncs events from kpi.akhu.uz every 60s)
-startKpiEventSyncCron();
+// KPI dan tadbirlarni tortish to'xtatildi (tadbirlar bevosita tizimda yaratiladi va boshqariladi)
+// startKpiEventSyncCron();
 
 // Start Telegram Polling (ensures bot responds immediately to all users)
 startTelegramPolling();

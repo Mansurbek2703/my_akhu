@@ -180,15 +180,17 @@ router.post('/login', (req, res) => {
   try {
     const dbUser = db.prepare(`
       SELECT * FROM staff_user 
-      WHERE (LOWER(id) = LOWER(?) OR LOWER(email) = LOWER(?) OR LOWER(email) LIKE ?) 
+      WHERE (LOWER(id) = LOWER(?) OR LOWER(email) = LOWER(?) OR LOWER(email) LIKE ? OR LOWER(COALESCE(passport_id, '')) = LOWER(?)) 
         AND active = 1
-    `).get(u, u, `${u}@%`);
+    `).get(u, u, `${u}@%`, u);
 
     if (dbUser) {
       let isMatch = false;
 
-      // Universitet standart paroli
+      // Universitet standart paroli yoki pasport ID bilan kirish
       if (rawPass === 'akhu2026!' || rawPass === 'admin123' || rawPass === 'admin') {
+        isMatch = true;
+      } else if (dbUser.passport_id && rawPass.trim().toUpperCase() === dbUser.passport_id.trim().toUpperCase()) {
         isMatch = true;
       } else if (dbUser.password_hash) {
         try {
@@ -204,6 +206,13 @@ router.post('/login', (req, res) => {
           userRoles = JSON.parse(dbUser.roles);
         } catch (e) {
           userRoles = [dbUser.roles];
+        }
+
+        let userPermissions = [];
+        try {
+          userPermissions = JSON.parse(dbUser.permissions || '[]');
+        } catch (e) {
+          userPermissions = [];
         }
 
         const groups = db.prepare(`SELECT group_code FROM tutor_group WHERE tutor_id = ?`).all(dbUser.id).map(g => g.group_code);
@@ -229,6 +238,9 @@ router.post('/login', (req, res) => {
             full_name: dbUser.full_name,
             email: dbUser.email,
             roles: userRoles,
+            permissions: userPermissions,
+            passport_id: dbUser.passport_id,
+            photo_url: dbUser.photo_url,
             groups: groups
           }
         });

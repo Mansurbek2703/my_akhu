@@ -23,14 +23,16 @@ function authenticateStaffOrTv(req, res, next) {
     return next();
   }
 
-  const user = db.prepare(`SELECT * FROM staff_user WHERE id = ? AND active = 1`).get(userId);
+  const user = db.prepare(`SELECT * FROM staff_user WHERE (LOWER(id) = LOWER(?) OR LOWER(COALESCE(passport_id, '')) = LOWER(?)) AND active = 1`).get(userId, userId);
   if (!user) {
     return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas." });
   }
 
   let roles = [];
   try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
-  req.staffUser = { ...user, roles };
+  let permissions = [];
+  try { permissions = JSON.parse(user.permissions || '[]'); } catch (e) { permissions = []; }
+  req.staffUser = { ...user, roles, permissions };
   next();
 }
 
