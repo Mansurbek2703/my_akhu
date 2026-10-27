@@ -1165,7 +1165,23 @@ router.get('/groups-list', (req, res) => {
     `).all().map(r => r.group_code.trim());
 
     const allGroups = Array.from(new Set([...studentGroups, ...tutorGroups])).filter(Boolean).sort();
-    res.json({ groups: allGroups });
+
+    const groupsSummary = db.prepare(`
+      SELECT 
+        s.group_code,
+        COUNT(*) as total_students,
+        SUM(CASE WHEN s.photo_url IS NOT NULL AND s.photo_url != '' THEN 1 ELSE 0 END) as photo_count,
+        MAX(s.level) as level,
+        MAX(s.course) as course,
+        MAX(su.full_name) as tutor_name
+      FROM student s
+      LEFT JOIN staff_user su ON s.tutor_id = su.id
+      WHERE s.group_code IS NOT NULL AND TRIM(s.group_code) != ''
+      GROUP BY s.group_code
+      ORDER BY s.group_code ASC
+    `).all();
+
+    res.json({ groups: allGroups, groups_summary: groupsSummary });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

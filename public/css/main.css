@@ -1930,23 +1930,29 @@ body {
 .student-card-photo-wrap {
   position: relative;
   width: 100%;
-  height: 230px;
+  height: 260px;
   background: #F8FAFC;
   overflow: hidden;
-  border-bottom: 1px solid #F1F5F9;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .student-card-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center top;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
   display: block;
-  transition: transform 0.35s ease;
+  transition: transform 0.25s ease;
+  background-color: #F8FAFC;
 }
 
 .student-photo-card:hover .student-card-img {
-  transform: scale(1.04);
+  transform: scale(1.03);
 }
 
 .student-card-no-photo {
@@ -2801,3 +2807,152 @@ body {
   gap: 14px;
   margin-top: 24px;
 }
+
+/* ==================================================================== */
+/* TALABALAR BOSHQARUVI: KOMPAKT METRIKALAR, PAGINATION VA RASM FREYMI */
+/* ==================================================================== */
+
+/* Mini Kompakt Metrikalar Burchagi */
+.compact-metrics-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  padding: 6px 14px;
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  flex-wrap: wrap;
+}
+
+.compact-metric-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: #E2E8F0;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.compact-metric-item:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+.compact-metric-val {
+  font-weight: 700;
+  color: #FFFFFF;
+  font-size: 13.5px;
+}
+
+.btn-groups-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(59, 130, 246, 0.35);
+  border: 1px solid #93C5FD;
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-groups-summary:hover {
+  background: rgba(37, 99, 235, 0.7);
+  border-color: #BFDBFE;
+  transform: translateY(-1px);
+}
+
+/* Katta va Aniq Pagination Tugmalari */
+.btn-pagination-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
+}
+
+.btn-pagination-nav:hover:not(:disabled) {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+.btn-pagination-page {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-pagination-page:hover:not(.active) {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+}
+
+/* Yagona Standart Freymdagi Katta Fotosurat Ko'rinishi */
+.student-photo-frame-container {
+  width: 100%;
+  height: 520px;
+  max-height: 70vh;
+  border-radius: 12px;
+  background: radial-gradient(circle at center, #1E293B 0%, #0B1120 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #334155;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.6);
+  margin-bottom: 14px;
+}
+
+.student-photo-frame-img {
+  max-width: 96%;
+  max-height: 96%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease;
+}
+
+/* Akademik Guruhlar Kartochkasi */
+.academic-group-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 14px;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.academic-group-card:hover {
+  border-color: #3B82F6;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.1);
+  transform: translateY(-2px);
+}
+

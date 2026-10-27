@@ -7129,32 +7129,122 @@ function setStudentsViewMode(mode) {
   }
 }
 
-function previewStudentPhoto(photoUrl, studentName, studentId, formattedName) {
+function previewStudentPhoto(photoUrl, studentName, studentId) {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
+
+  // Talabaning qo'shimcha ma'lumotlarini keshdan topish
+  const st = (adminStudentsState.items || []).find(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId)) || {};
+
   modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('image', 18)} Talaba Fotosurati</span>`;
   modalBody.innerHTML = `
-    <div style="text-align: center; padding: 6px;">
-      <div style="max-height: 480px; overflow: hidden; border-radius: 12px; border: 1px solid #CBD5E1; background: #0F172A; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-        <img src="${photoUrl}" alt="${studentName}" style="max-height: 460px; max-width: 100%; object-fit: contain; border-radius: 8px;">
+    <div style="text-align: center; padding: 4px;">
+      <!-- Katta va bir xil standart freymda kesilmasdan ochiladigan rasm -->
+      <div class="student-photo-frame-container">
+        <img src="${photoUrl}" alt="${studentName}" class="student-photo-frame-img" loading="eager">
       </div>
-      <h4 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">${studentName}</h4>
-      <div style="display: inline-flex; align-items: center; gap: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 5px 12px; font-family: monospace; font-size: 12px; font-weight: 600; color: #1E293B; margin-bottom: 8px;">
-        <span>📁 ${formattedName}</span>
-        <button class="btn-copy-filename" onclick="copyStudentPhotoName('${formattedName}')" title="Nomdan nusxa olish">
-          ${icon('copy', 13)}
-        </button>
+
+      <!-- Talaba ma'lumotlari (Rasm fayl nomi butunlay olib tashlandi!) -->
+      <div style="margin-top: 10px; margin-bottom: 4px;">
+        <h3 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">${studentName}</h3>
+        <div style="display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap;">
+          <span class="badge badge-group" style="font-size: 12px; padding: 4px 10px; font-weight: 700;">ID: ${st.external_id || studentId}</span>
+          ${st.group_code ? `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:12px; padding:4px 10px;">Guruh: ${st.group_code}</span>` : ''}
+          ${st.course ? `<span class="badge badge-course" style="font-size:12px; padding:4px 10px;">${st.course}-kurs</span>` : ''}
+          ${st.level ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-size:12px; padding:4px 10px; font-weight:700;">${st.level === 'mag' ? 'Magistratura' : 'Bakalavriat'}</span>` : ''}
+        </div>
       </div>
     </div>
   `;
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+    <button class="btn btn-outline" onclick="showStudentDetailsModal('${studentId}')" style="display: inline-flex; align-items: center; gap: 6px;">
+      ${icon('user', 14)} Talaba Profili
+    </button>
     <button class="btn btn-primary" onclick="downloadSingleStudentPhoto('${studentId}')" style="display: inline-flex; align-items: center; gap: 6px;">
-      ${icon('download', 14)} Rasmni Yuklab Olish (.${pathExt(formattedName)})
+      ${icon('download', 14)} Fotosuratni Yuklab Olish
     </button>
   `;
   openModal();
+}
+
+/**
+ * Akademik Guruhlar Ro'yxati Modali (12 ta guruh monitoringi)
+ */
+async function openAcademicGroupsModal() {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('building', 18)} Universitet Akademik Guruhlari</span>`;
+  modalBody.innerHTML = `<div style="text-align:center; padding:36px;"><div class="spinner"></div><p style="margin-top:10px; color:#64748B;">Guruhlar ma'lumotlari yuklanmoqda...</p></div>`;
+  modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
+  openModal();
+
+  try {
+    const res = await apiFetch('/api/admin/groups-list');
+    const groups = res.groups_summary || [];
+
+    if (groups.length === 0) {
+      modalBody.innerHTML = `<p style="text-align:center; padding:24px; color:#64748B;">Akademik guruhlar topilmadi.</p>`;
+      return;
+    }
+
+    modalBody.innerHTML = `
+      <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 2px 4px;">
+        <span style="font-size: 13.5px; color: #475569; font-weight: 700;">Jami: <span style="color:#2563EB;">${groups.length} ta</span> akademik guruh</span>
+        <button class="btn btn-sm btn-outline" onclick="filterByAcademicGroup('')" style="display: inline-flex; align-items: center; gap: 5px; font-weight: 600;">
+          ${icon('refresh', 13)} Barcha Talabalarni Ko'rsatish
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; max-height: 60vh; overflow-y: auto; padding: 4px;">
+        ${groups.map(g => {
+          const total = Number(g.total_students) || 0;
+          const photos = Number(g.photo_count) || 0;
+          const percent = total > 0 ? Math.round((photos / total) * 100) : 0;
+          const isMag = g.level === 'mag';
+          return `
+            <div class="academic-group-card">
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <h4 style="font-size: 16px; font-weight: 800; color: #1E3A8A; margin: 0; letter-spacing: 0.5px;">${g.group_code}</h4>
+                  <span class="badge" style="background:${isMag ? '#F5F3FF' : '#EFF6FF'}; color:${isMag ? '#7C3AED' : '#2563EB'}; border:1px solid ${isMag ? '#DDD6FE' : '#BFDBFE'}; font-size:11px; font-weight:700;">
+                    ${isMag ? 'Magistratura' : 'Bakalavriat'} • ${g.course || 1}-kurs
+                  </span>
+                </div>
+                <div style="font-size: 12.5px; color: #475569; margin-bottom: 4px;">
+                  Talabalar soni: <strong style="color: #0F172A;">${total} nafar</strong>
+                </div>
+                <div style="font-size: 12px; color: #64748B; margin-bottom: 8px;">
+                  Rasmli: <strong style="color: #16A34A;">${photos} ta (${percent}%)</strong>
+                  ${g.tutor_name ? `<br><span style="font-size:11.5px; color:#6B7280; display:inline-block; margin-top:3px;">Tyutor: ${g.tutor_name}</span>` : ''}
+                </div>
+                <div style="height: 5px; background: #E2E8F0; border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+                  <div style="width: ${percent}%; height: 100%; background: #10B981; border-radius: 3px;"></div>
+                </div>
+              </div>
+              <button class="btn btn-sm btn-primary w-100" onclick="filterByAcademicGroup('${g.group_code}')" style="display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600;">
+                ${icon('search', 13)} <span>Guruh Talabalarini Ko'rish (${total})</span>
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } catch (err) {
+    modalBody.innerHTML = `<div class="alert alert-danger" style="margin:16px;">Guruhlar ro'yxatini yuklashda xatolik: ${err.message}</div>`;
+  }
+}
+
+function filterByAcademicGroup(groupCode) {
+  closeModal();
+  const searchInput = document.getElementById('filter-student-search');
+  if (searchInput) searchInput.value = groupCode;
+  adminStudentsState.search = groupCode;
+  adminStudentsState.offset = 0;
+  loadAdminStudentsList();
 }
 
 function downloadSingleStudentPhoto(studentId) {
@@ -7229,8 +7319,8 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
   container.innerHTML = `
     <!-- RASMIY SOHAVIY HERO BANNER -->
     <div class="admin-hero-card">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
-        <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="max-width: 550px;">
           <div class="admin-hero-title">
             <span style="color: #60A5FA;">${icon('cap', 22)}</span>
             <span>Talabalar Reyestri & Boshqaruv Markazi</span>
@@ -7238,11 +7328,32 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
               ${roleTitle}
             </span>
           </div>
-          <p class="admin-hero-desc">
-            Al-Xorazmiy Universiteti talabalarining yagona rasmiy bazasi. Excel/CSV orqali ommaviy yuklash, 
-            yangi talabalarni ro'yxatga olish, kurs va guruh ma'lumotlarini boshqarish hamda ballar monitoringi.
+          <p class="admin-hero-desc" style="margin-bottom: 0;">
+            Al-Xorazmiy Universiteti talabalarining yagona rasmiy bazasi, fotosuratlari va akademik guruhlar monitoringi.
           </p>
         </div>
+
+        <!-- JUDA KICHIK QILIB BIR BURCHAKKA JOYLASHTIRILGAN MINI METRIKALAR -->
+        <div class="compact-metrics-box" id="students-compact-metrics-corner" title="Asosiy ko'rsatkichlar">
+          <div class="compact-metric-item" title="Jami ro'yxatdagi talabalar">
+            <span style="color: #93C5FD;">👥 Jami:</span>
+            <strong id="stat-total-students" class="compact-metric-val">202</strong>
+          </div>
+          <div class="compact-metric-item" title="Ta'lim jarayonidagi faol talabalar">
+            <span style="color: #86EFAC;">✅ Faol:</span>
+            <strong id="stat-active-students" class="compact-metric-val">202</strong>
+          </div>
+          <div class="compact-metric-item" title="Fotosurati tizimda mavjud talabalar">
+            <span style="color: #FDE047;">🖼️ Rasmli:</span>
+            <strong id="stat-photos-students" class="compact-metric-val">202</strong>
+          </div>
+          <button class="btn-groups-summary" onclick="openAcademicGroupsModal()" title="Barcha 12 ta guruh ro'yxatini ko'rish uchun bosing">
+            <span>🏢 Guruhlar:</span>
+            <strong id="stat-groups-count">12 ta</strong>
+            <span style="font-size: 10px; opacity: 0.85;">👁️</span>
+          </button>
+        </div>
+
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
           <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: background 0.15s ease;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#FFFFFF'" title="Excel import uchun namunaviy shablon faylini yuklab olish">
             <span style="color: #2563EB; display: inline-flex; align-items: center;">${icon('download', 15)}</span>
@@ -7257,7 +7368,6 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           <button id="btn-sync-students-photos" class="btn btn-outline" onclick="triggerHikPhotosSync(this)" style="display: inline-flex; align-items: center; gap: 6px; border-color: #CBD5E1; color: #1E293B;" title="Turniket serveridan rasmi yo'q talabalarning rasmlarini yuklab to'ldirish">
             📸 <span>Turniket Rasmlari</span>
           </button>
-
         </div>
       </div>
     </div>
@@ -7306,42 +7416,6 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
             </button>
             <div id="import-result-box" style="margin-top: 14px; display: none;"></div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- METRIKA STATISTIKALARI -->
-    <div id="students-metrics-cards" class="metrics-grid mb-4">
-      <div class="stat-card">
-        <div class="stat-icon" style="background:#EFF6FF; color:#2563EB;">${icon('users', 20)}</div>
-        <div class="stat-data">
-          <span class="stat-label">Jami Ro'yxatdagi</span>
-          <h3 class="stat-val" id="stat-total-students">-</h3>
-          <span class="stat-sub">Barcha talabalar</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:#ECFDF5; color:#059669;">${icon('checkCircle', 20)}</div>
-        <div class="stat-data">
-          <span class="stat-label">Faol Talabalar</span>
-          <h3 class="stat-val" id="stat-active-students">-</h3>
-          <span class="stat-sub">Ta'lim jarayonida</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:#F0FDF4; color:#16A34A;">${icon('image', 20)}</div>
-        <div class="stat-data">
-          <span class="stat-label">Rasmli Talabalar</span>
-          <h3 class="stat-val" id="stat-photos-students" style="color:#16A34A;">-</h3>
-          <span class="stat-sub">Fotosurati mavjud</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:#FEF3C7; color:#D97706;">${icon('building', 20)}</div>
-        <div class="stat-data">
-          <span class="stat-label">Guruhlar Soni</span>
-          <h3 class="stat-val" id="stat-groups-count">-</h3>
-          <span class="stat-sub">Akademik guruhlar</span>
         </div>
       </div>
     </div>
@@ -7455,16 +7529,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     </div>
 
     <!-- PAGINATION (CARD VA LIST VIEW UCHUN UMUMIY) -->
-    <div class="card" style="margin-top: 12px;">
-      <div class="pagination-bar" id="students-pagination-bar" style="margin: 0; padding: 12px 18px;">
-        <span id="students-pagination-info">0 ta ma'lumot</span>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="btn btn-outline btn-sm" id="btn-prev-page" onclick="prevStudentPage()" disabled>Oldingi</button>
-          <span id="students-page-number" style="font-weight: 600; padding: 0 6px;">1</span>
-          <button class="btn btn-outline btn-sm" id="btn-next-page" onclick="nextStudentPage()" disabled>Keyingi</button>
-        </div>
-      </div>
-    </div>
+    <div id="students-pagination-bar-wrap" class="card" style="margin-top: 14px;"></div>
   `;
 
   // Filter hodisalarini ulash
@@ -7645,22 +7710,12 @@ async function loadAdminStudentsList() {
       summaryText.textContent = `Jami: ${adminStudentsState.total} ta talaba (${totalPhotos} ta rasm)`;
     }
 
-    // Pagination update
-    const pageInfo = document.getElementById('students-pagination-info');
-    const pageNum = document.getElementById('students-page-number');
-    const btnPrev = document.getElementById('btn-prev-page');
-    const btnNext = document.getElementById('btn-next-page');
-
-    const startIdx = adminStudentsState.total === 0 ? 0 : adminStudentsState.offset + 1;
-    const endIdx = Math.min(adminStudentsState.offset + students.length, adminStudentsState.total);
-    if (pageInfo) pageInfo.textContent = `${startIdx}-${endIdx} dan ${adminStudentsState.total} ta`;
-    if (pageNum) pageNum.textContent = Math.floor(adminStudentsState.offset / adminStudentsState.limit) + 1;
-    if (btnPrev) btnPrev.disabled = adminStudentsState.offset <= 0;
-    if (btnNext) btnNext.disabled = endIdx >= adminStudentsState.total;
-
     // Render Cards va Table
     renderAdminStudentsCards(students);
     renderAdminStudentsTable(students);
+
+    // Katta va qulay sahifalash (Pagination)
+    renderStudentsPagination();
 
   } catch (err) {
     if (tbody) {
@@ -7680,6 +7735,115 @@ async function loadAdminStudentsList() {
       `;
     }
   }
+}
+
+/**
+ * Aniq, katta va qulay sahifalash (Pagination) komponenti
+ */
+function renderStudentsPagination() {
+  const container = document.getElementById('students-pagination-bar-wrap');
+  if (!container) return;
+
+  const total = Number(adminStudentsState.total) || 0;
+  const limit = Number(adminStudentsState.limit) || 48;
+  const offset = Number(adminStudentsState.offset) || 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.min(totalPages, Math.floor(offset / limit) + 1);
+
+  const startIdx = total === 0 ? 0 : offset + 1;
+  const endIdx = Math.min(offset + limit, total);
+
+  let pageButtonsHtml = '';
+  const pages = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (currentPage > 3) pages.push('...');
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+  }
+
+  pageButtonsHtml = pages.map(p => {
+    if (p === '...') {
+      return `<span style="padding: 6px 10px; color: #94A3B8; font-weight: 700;">...</span>`;
+    }
+    const isActive = p === currentPage;
+    return `
+      <button 
+        class="btn-pagination-page ${isActive ? 'active' : ''}" 
+        onclick="goToStudentPage(${p})"
+        style="${isActive ? 'background: #2563EB; color: #FFFFFF; font-weight: 700; border: 1px solid #2563EB; box-shadow: 0 2px 6px rgba(37,99,235,0.35);' : 'background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1;'}"
+      >
+        ${p}
+      </button>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; padding: 14px 20px;">
+      <!-- Chap: Ma'lumot va Sahifada nechta ko'rsatish tanlovi -->
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <span style="font-size: 13.5px; color: #475569; font-weight: 600;">
+          Ko'rsatilmoqda: <strong style="color: #0F172A;">${startIdx}-${endIdx}</strong> / jami <strong style="color: #2563EB;">${total}</strong> ta talaba
+        </span>
+        <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #64748B;">
+          <span>Sahifada:</span>
+          <select onchange="changeStudentsPerPage(this.value)" style="padding: 5px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-weight: 600; font-size: 12px; background: white; cursor: pointer;">
+            <option value="24" ${limit === 24 ? 'selected' : ''}>24 tadan</option>
+            <option value="48" ${limit === 48 ? 'selected' : ''}>48 tadan</option>
+            <option value="96" ${limit === 96 ? 'selected' : ''}>96 tadan</option>
+            <option value="200" ${limit >= 200 ? 'selected' : ''}>Barchasi (200+)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- O'ng: Sahifa raqamlari va Oldingi / Keyingi tugmalari -->
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 13px; font-weight: 700; color: #1E293B; margin-right: 6px; background: #F1F5F9; padding: 5px 12px; border-radius: 6px; border: 1px solid #E2E8F0;">
+          Sahifa <span style="color: #2563EB;">${currentPage}</span> / ${totalPages} (Jami ${totalPages} sahifa)
+        </span>
+
+        <button 
+          class="btn-pagination-nav" 
+          onclick="prevStudentPage()" 
+          ${currentPage <= 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''}
+          title="Oldingi sahifaga o'tish"
+        >
+          ◀ Oldingi
+        </button>
+
+        <div style="display: flex; gap: 4px; align-items: center;">
+          ${pageButtonsHtml}
+        </div>
+
+        <button 
+          class="btn-pagination-nav" 
+          onclick="nextStudentPage()" 
+          ${currentPage >= totalPages ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''}
+          title="Keyingi sahifaga o'tish"
+        >
+          Keyingi ▶
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function goToStudentPage(pageNum) {
+  const limit = adminStudentsState.limit || 48;
+  adminStudentsState.offset = (pageNum - 1) * limit;
+  loadAdminStudentsList();
+  window.scrollTo({ top: 220, behavior: 'smooth' });
+}
+
+function changeStudentsPerPage(perPage) {
+  adminStudentsState.limit = Number(perPage) || 48;
+  adminStudentsState.offset = 0;
+  loadAdminStudentsList();
 }
 
 function renderAdminStudentsCards(students) {
@@ -7706,15 +7870,13 @@ function renderAdminStudentsCards(students) {
       ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px;">Magistratura</span>`
       : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px;">Bakalavriat</span>`;
     
-    const formattedName = formatStudentPhotoFilename(st);
-    const ext = (st.photo_url ? pathExt(st.photo_url) : 'JPG').toUpperCase();
     const hasPhoto = Boolean(st.photo_url);
 
     return `
       <div class="student-photo-card" onclick="showStudentDetailsModal('${st.id}')">
         <div class="student-card-photo-wrap">
           ${hasPhoto ? `
-            <img src="${st.photo_url}" alt="${st.first_name} ${st.last_name}" class="student-card-img" loading="lazy" onclick="event.stopPropagation(); previewStudentPhoto('${st.photo_url}', '${st.first_name} ${st.last_name}', '${st.id}', '${formattedName}')" title="Kattalashtirib ko'rish uchun bosing">
+            <img src="${st.photo_url}" alt="${st.first_name} ${st.last_name}" class="student-card-img" loading="lazy" onclick="event.stopPropagation(); previewStudentPhoto('${st.photo_url}', '${st.first_name} ${st.last_name}', '${st.id}')" title="Kattalashtirib ko'rish uchun bosing">
           ` : `
             <div class="student-card-no-photo">
               <span class="no-photo-initials ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>
@@ -7740,17 +7902,6 @@ function renderAdminStudentsCards(students) {
             <span class="student-gender-pill ${isFemale ? 'female' : 'male'}">${isFemale ? 'Ayol' : 'Erkak'}</span>
           </div>
 
-          <!-- FORMATLANGAN RASM NOMI STANDARTI: "first name+last name_ID.ext" -->
-          <div class="student-photo-filename-box" title="Standart rasm fayl nomi: ${formattedName}">
-            <div class="filename-text-wrap">
-              <span class="filename-format-pill ${ext.toLowerCase()}">${ext}</span>
-              <span class="filename-code">${formattedName}</span>
-            </div>
-            <button class="btn-copy-filename" onclick="event.stopPropagation(); copyStudentPhotoName('${formattedName}')" title="Fayl nomidan nusxa olish">
-              ${icon('copy', 13)}
-            </button>
-          </div>
-
           <div class="student-card-meta">
             <div class="meta-item">
               <span class="meta-label">Tel:</span>
@@ -7764,15 +7915,15 @@ function renderAdminStudentsCards(students) {
 
           <div class="student-card-actions" onclick="event.stopPropagation()">
             ${hasPhoto ? `
-              <button class="btn-card-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Ushbu fotosuratni yuklab olish (${formattedName})">
+              <button class="btn-card-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Fotosuratni yuklab olish">
                 ${icon('download', 13)} <span>Yuklab olish</span>
               </button>
             ` : ''}
-            <button class="btn-card-action btn-action-primary" onclick="showStudentDetailsModal('${st.id}')" title="Fotosurat yuklash yoki almashtirish">
+            <button class="btn-card-action btn-action-primary" onclick="showStudentDetailsModal('${st.id}')" title="Talaba fotosurati va profili">
               ${icon('image', 13)} <span>${hasPhoto ? 'Rasm' : 'Rasm qo\'shish'}</span>
             </button>
-            <button class="btn-card-action" onclick="showEditStudentModal('${st.id}')" title="Talaba ma'lumotlarini tahrirlash" style="flex: 0 0 32px; padding: 6px;">
-              ${icon('edit', 13)}
+            <button class="btn-card-action" onclick="showEditStudentModal('${st.id}')" title="Talaba ma'lumotlarini tahrirlash" style="flex: 0 0 34px; padding: 6px; justify-content: center;">
+              ${icon('edit', 14)}
             </button>
           </div>
         </div>
@@ -8064,6 +8215,12 @@ async function showEditStudentModal(studentId) {
   openModal();
 
   try {
+    // 1. Birinchi navbatda talabani xotiradan (cached items) topamiz
+    let st = (adminStudentsState.items || []).find(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId));
+    if (!st && window.tutorStudentsCache) {
+      st = window.tutorStudentsCache.find(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId));
+    }
+
     const isSuperadmin = Boolean(
       AppState.user && (
         AppState.user.id === 'superadmin' ||
@@ -8076,20 +8233,36 @@ async function showEditStudentModal(studentId) {
       try {
         const tutRes = await apiFetch('/api/admin/tutors');
         tutors = tutRes.tutors || [];
-      } catch(e) {}
+      } catch(e) {
+        console.warn('Tutors fetch warning:', e);
+      }
     }
 
-    const data = await apiFetch(`/api/admin/students/${studentId}`);
-    const st = data.student;
+    // Serverdan yangilangan talaba ma'lumotlarini tortish
+    try {
+      const data = await apiFetch(`/api/admin/students/${encodeURIComponent(studentId)}`);
+      if (data && data.student) {
+        st = { ...(st || {}), ...data.student };
+      }
+    } catch (netErr) {
+      console.warn('Serverdan talaba profilini yuklashda xatolik, keshdan foydalanilmoqda:', netErr);
+      if (!st) {
+        throw new Error("Talaba ma'lumotlarini yuklab bo'lmadi (" + netErr.message + ")");
+      }
+    }
+
+    if (!st) {
+      throw new Error("Talaba tizimda topilmadi");
+    }
 
     const isFemale = st.gender === 'female' || st.gender === 'f';
     const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
     const avatarHtml = st.photo_url
-      ? `<img src="${st.photo_url}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="${st.first_name}">`
+      ? `<img src="${st.photo_url}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: contain; background:#F1F5F9; border: 2px solid #2563EB;" alt="${st.first_name}">`
       : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 56px; height: 56px; font-size: 20px;">${initials}</span>`;
 
     modalBody.innerHTML = `
-      <form id="edit-student-form">
+      <form id="edit-student-form" onsubmit="event.preventDefault(); handleEditStudentSubmit('${st.id}');">
         <!-- Fotosurat yuklash / almashtirish -->
         <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding: 12px; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border-light);">
           <div id="edit-std-photo-preview-wrap">
@@ -8206,7 +8379,17 @@ async function showEditStudentModal(studentId) {
     `;
 
   } catch (err) {
-    modalBody.innerHTML = `<p class="text-danger">${err.message}</p>`;
+    modalBody.innerHTML = `
+      <div style="padding: 24px; text-align: center;">
+        <div style="font-size: 32px; color: var(--danger); margin-bottom: 8px;">⚠️</div>
+        <p style="font-size: 14px; font-weight: 700; color: var(--danger); margin-bottom: 4px;">Talaba ma'lumotlarini yuklashda xatolik yuz berdi</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">${err.message}</p>
+        <button class="btn btn-primary btn-sm" onclick="showEditStudentModal('${studentId}')" style="display: inline-flex; align-items: center; gap: 6px;">
+          ${icon('refresh', 13)} Qayta Urinish
+        </button>
+      </div>
+    `;
+    modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">Yopish</button>`;
   }
 }
 
@@ -8218,9 +8401,9 @@ async function handleStudentEditPhotoSelect(studentId, input) {
   formData.append('photo', file);
 
   try {
-    const res = await fetch(`/api/admin/students/${studentId}/photo`, {
+    const res = await fetch(`/api/admin/students/${encodeURIComponent(studentId)}/photo`, {
       method: 'POST',
-      headers: { 'x-user-id': AppState.user.id },
+      headers: { 'x-user-id': (AppState.user && AppState.user.id) ? AppState.user.id : 'superadmin' },
       body: formData
     });
     const data = await res.json();
@@ -8228,23 +8411,23 @@ async function handleStudentEditPhotoSelect(studentId, input) {
 
     const previewWrap = document.getElementById('edit-std-photo-preview-wrap');
     if (previewWrap && data.photo_url) {
-      previewWrap.innerHTML = `<img src="${data.photo_url}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="Foto">`;
+      previewWrap.innerHTML = `<img src="${data.photo_url}" style="width: 56px; height: 56px; border-radius: 50%; object-fit: contain; background:#F1F5F9; border: 2px solid #2563EB;" alt="Foto">`;
     }
     const urlInp = document.getElementById('edit-std-photourl');
     if (urlInp) urlInp.value = data.photo_url;
 
-    // Rasm preview darhol yangilandi, alohida alert shart emas
+    showToast("Fotosurat muvaffaqiyatli yuklandi!", "success");
   } catch (err) {
-    alert("Xatolik: " + err.message);
+    showToast("Xatolik: " + err.message, "error");
   }
 }
 
 async function removeStudentPhotoInEdit(studentId) {
   if (!confirm("Talaba fotosuratini o'chirmoqchimisiz?")) return;
   try {
-    const res = await fetch(`/api/admin/students/${studentId}/photo`, {
+    const res = await fetch(`/api/admin/students/${encodeURIComponent(studentId)}/photo`, {
       method: 'DELETE',
-      headers: { 'x-user-id': AppState.user.id }
+      headers: { 'x-user-id': (AppState.user && AppState.user.id) ? AppState.user.id : 'superadmin' }
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Rasmni o'chirishda xatolik");
@@ -8255,9 +8438,9 @@ async function removeStudentPhotoInEdit(studentId) {
     }
     const urlInp = document.getElementById('edit-std-photourl');
     if (urlInp) urlInp.value = '';
-    // Rasm olib tashlandi, qo'shimcha alert shart emas
+    showToast("Fotosurat olib tashlandi!", "info");
   } catch (err) {
-    alert("Xatolik: " + err.message);
+    showToast("Xatolik: " + err.message, "error");
   }
 }
 
@@ -8294,12 +8477,27 @@ async function handleEditStudentSubmit(studentId) {
   }
 
   try {
-    await apiFetch(`/api/admin/students/${studentId}`, {
+    const res = await apiFetch(`/api/admin/students/${encodeURIComponent(studentId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
 
     closeModal();
+    showToast("Talaba ma'lumotlari muvaffaqiyatli saqlandi!", "success");
+
+    // Local items cache ni darhol yangilash
+    if (adminStudentsState.items) {
+      const idx = adminStudentsState.items.findIndex(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId));
+      if (idx !== -1) {
+        adminStudentsState.items[idx] = {
+          ...adminStudentsState.items[idx],
+          ...payload,
+          ...(res.student || {})
+        };
+        renderAdminStudentsCards(adminStudentsState.items);
+        renderAdminStudentsTable(adminStudentsState.items);
+      }
+    }
 
     // Tyutor kabinetidagi talabalar ro'yxati ochiq bo'lsa darhol yangilash
     const tutorTbody = document.getElementById('tutor-students-tbody');
@@ -8315,8 +8513,8 @@ async function handleEditStudentSubmit(studentId) {
       } catch (e) {}
     }
 
-    // Admin talabalar ro'yxati ochiq bo'lsa yangilash
-    if (typeof loadAdminStudentsList === 'function' && document.getElementById('admin-students-tbody')) {
+    // Admin talabalar ro'yxati ochiq bo'lsa ro'yxatni serverdan yangilash
+    if (typeof loadAdminStudentsList === 'function' && (document.getElementById('admin-students-cards-grid') || document.getElementById('admin-students-table-body'))) {
       try { await loadAdminStudentsList(); } catch (e) {}
     }
   } catch (err) {
@@ -8324,7 +8522,7 @@ async function handleEditStudentSubmit(studentId) {
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalBtnHtml;
     }
-    alert(err.message);
+    showToast("Xatolik: " + err.message, "error");
   }
 }
 
