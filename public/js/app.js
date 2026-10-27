@@ -7035,7 +7035,7 @@ let adminStudentsState = {
   gender: '',
   status: '',
   has_photo: '',
-  viewMode: localStorage.getItem('akhu_students_view_mode') || 'card',
+  viewMode: localStorage.getItem('akhu_students_view_mode') || 'list',
   limit: 48,
   offset: 0,
   total: 0,
@@ -7492,13 +7492,13 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     <!-- AMALLAR VA KO'RINISH REJIMI (CARD / LIST & ZIP YUKLAB OLISH) -->
     <div class="students-actions-row mb-3">
       <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <!-- KARTA / JADVAL REJIMI O'TKAZGICHI -->
+        <!-- JADVAL / KARTA REJIMI O'TKAZGICHI (JADVAL - DEFAULT, KARTA - IKKINCHI OPTION) -->
         <div class="view-mode-pill-box">
-          <button id="view-toggle-card" class="btn-view-toggle ${adminStudentsState.viewMode === 'card' ? 'active' : ''}" onclick="setStudentsViewMode('card')" title="Talabalar rasmlarini karta shaklida ko'rish">
-            ${icon('grid', 14)} <span>Karta</span>
-          </button>
           <button id="view-toggle-list" class="btn-view-toggle ${adminStudentsState.viewMode === 'list' ? 'active' : ''}" onclick="setStudentsViewMode('list')" title="Talabalar ro'yxatini jadval ko'rinishida ko'rish">
             ${icon('list', 14)} <span>Jadval</span>
+          </button>
+          <button id="view-toggle-card" class="btn-view-toggle ${adminStudentsState.viewMode === 'card' ? 'active' : ''}" onclick="setStudentsViewMode('card')" title="Talabalar rasmlarini karta shaklida ko'rish">
+            ${icon('grid', 14)} <span>Karta</span>
           </button>
         </div>
         <span id="students-filtered-summary" style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">
@@ -7516,17 +7516,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
       </div>
     </div>
 
-    <!-- 1. KARTA KO'RINISHI CONTAINER -->
-    <div id="students-cards-view" style="${adminStudentsState.viewMode === 'card' ? 'display: block;' : 'display: none;'}">
-      <div id="admin-students-cards-grid" class="students-cards-grid">
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
-          <div class="spinner" style="margin-bottom: 10px;"></div>
-          <p>Talabalar fotosuratlari yuklanmoqda...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. JADVAL KO'RINISHI CONTAINER -->
+    <!-- 1. JADVAL KO'RINISHI CONTAINER (ASOSIY / DEFAULT) -->
     <div id="students-table-view" class="card" style="${adminStudentsState.viewMode === 'list' ? 'display: block;' : 'display: none;'}">
       <div class="table-responsive">
         <table class="data-table">
@@ -7553,6 +7543,16 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- 2. KARTA KO'RINISHI CONTAINER (IKKINCHI OPTION) -->
+    <div id="students-cards-view" style="${adminStudentsState.viewMode === 'card' ? 'display: block;' : 'display: none;'}">
+      <div id="admin-students-cards-grid" class="students-cards-grid">
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+          <div class="spinner" style="margin-bottom: 10px;"></div>
+          <p>Talabalar fotosuratlari yuklanmoqda...</p>
+        </div>
       </div>
     </div>
 
