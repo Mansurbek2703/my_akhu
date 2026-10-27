@@ -144,7 +144,7 @@ function isPagePermittedForUser(pageName, userRoles = []) {
   }
 
   // Talabalar boshqaruvi (Registrator va Superadmin)
-  if (pageName === 'admin-students-manage' || pageName === 'dept-students-manage' || pageName === 'dept-gpa-import') {
+  if (pageName === 'admin-students-manage' || pageName === 'dept-students-manage') {
     return userRoles.includes('dep_ob') || userRoles.includes('superadmin');
   }
 
@@ -496,7 +496,6 @@ const PAGE_SECTION_MAP = {
 
   'admin-students-manage': 'admin-students-manage',
   'dept-students-manage': 'admin-students-manage',
-  'dept-gpa-import': 'admin-students-manage',
 
   'dept-events': 'dept-events',
   'observe-events': 'dept-events',
@@ -533,10 +532,7 @@ function renderModuleSubNav(pageName) {
       { id: 'observe-catalog', label: 'Ball Nizomi & Mezonlar' }
     ];
   } else if (sectionKey === 'admin-students-manage') {
-    tabs = [
-      { id: 'admin-students-manage', label: 'Talabalar Ro\'yxati' },
-      { id: 'dept-gpa-import', label: 'GPA va Davomat Importi' }
-    ];
+    tabs = [];
   } else if (sectionKey === 'dept-events') {
     tabs = [
       { id: 'dept-events', label: 'Barcha Tadbirlar' }
@@ -726,9 +722,7 @@ function navigateTo(pageName) {
       renderStudentsManagement(targetContainer, 'Registrator');
       break;
     case 'dept-gpa-import':
-      pageTitle.textContent = 'GPA & Davomat Import';
-      pageDesc.textContent = 'Semestr yakuni bo\'yicha avtomatik ballar importi (O\'quv bo\'limi)';
-      renderGpaImport(targetContainer);
+      navigateTo('admin-students-manage');
       break;
     case 'admin-students-manage':
       pageTitle.textContent = 'Talabalar Boshqaruvi & Import (Superadmin)';
