@@ -11117,96 +11117,76 @@ let attendanceState = {
 
 async function renderCampusAttendance(targetContainer) {
   targetContainer.innerHTML = `
-    <div class="attendance-container" style="display:flex; flex-direction:column; gap:20px;">
-      <!-- KPI STATISTIKA KARTALARI (BOSILADIGAN FILTRLAR) -->
-      <div id="att-summary-cards" style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:14px;">
+    <div class="attendance-container" style="display:flex; flex-direction:column; gap:16px;">
+      <!-- KPI STATISTIKA KARTALARI (IXCHAM VA ZAMONAVIY) -->
+      <div id="att-summary-cards" style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:12px;">
         <!-- 1. Jami Talabalar -->
-        <div id="kpi-card-all" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('')" style="background:#FFFFFF; border:2px solid #E2E8F0;" title="Barcha talabalar ro'yxatini ko'rish uchun bosing">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div id="kpi-card-all" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('')" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:10px; padding:12px 14px; cursor:pointer; transition:all 0.15s ease;" title="Barcha talabalar">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">Jami Talabalar</span>
-            <span class="kpi-active-pill" style="font-size:10px; font-weight:700; background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:8px;">Barchasi</span>
+            <span class="kpi-active-pill" style="font-size:10px; font-weight:700; background:#F1F5F9; color:#475569; padding:2px 7px; border-radius:6px;">Barchasi</span>
           </div>
-          <div id="kpi-total-students" style="font-size:32px; font-weight:800; color:#0F172A; line-height:1.1; margin:10px 0 8px 0;">...</div>
-          <div style="font-size:11px; color:#64748B; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #E2E8F0; padding-top:8px; margin-top:auto;">
-            <span>Faol talabalar</span>
-            <span style="color:#2563EB; font-weight:700;">Ro'yxat 👆</span>
-          </div>
+          <div id="kpi-total-students" style="font-size:26px; font-weight:800; color:#0F172A; line-height:1.1; margin-top:6px;">...</div>
         </div>
 
         <!-- 2. Kelganlar -->
-        <div id="kpi-card-present" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('present')" style="background:#F0FDF4; border:2px solid #BBF7D0;" title="Faqat universitetga kelgan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div id="kpi-card-present" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('present')" style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:12px 14px; cursor:pointer; transition:all 0.15s ease;" title="Universitetga kelganlar">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:11px; font-weight:700; color:#15803D; text-transform:uppercase; letter-spacing:0.5px;">Kelganlar</span>
-            <span id="kpi-att-rate" class="badge" style="background:#22C55E; color:white; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">0%</span>
+            <span id="kpi-att-rate" class="badge" style="background:#22C55E; color:white; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px;">0%</span>
           </div>
-          <div id="kpi-present-students" style="font-size:32px; font-weight:800; color:#166534; line-height:1.1; margin:10px 0 8px 0;">...</div>
-          <div style="font-size:11px; color:#15803D; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #BBF7D0; padding-top:8px; margin-top:auto;">
-            <span>Tashrif buyurgan</span>
-            <span style="color:#166534; font-weight:700;">Ro'yxat 👆</span>
-          </div>
+          <div id="kpi-present-students" style="font-size:26px; font-weight:800; color:#166534; line-height:1.1; margin-top:6px;">...</div>
         </div>
 
         <!-- 3. Kechikkanlar -->
-        <div id="kpi-card-late" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('late')" style="background:#FFFBEB; border:2px solid #FDE68A;" title="09:15 dan so'ng kelgan kechikkan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div id="kpi-card-late" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('late')" style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px 14px; cursor:pointer; transition:all 0.15s ease;" title="09:15 dan keyin kelganlar">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:11px; font-weight:700; color:#B45309; text-transform:uppercase; letter-spacing:0.5px;">Kechikkanlar</span>
             <span style="font-size:10px; font-weight:700; background:#FEF3C7; color:#92400E; padding:2px 6px; border-radius:6px;">> 09:15</span>
           </div>
-          <div id="kpi-late-students" style="font-size:32px; font-weight:800; color:#92400E; line-height:1.1; margin:10px 0 8px 0;">...</div>
-          <div style="font-size:11px; color:#B45309; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #FDE68A; padding-top:8px; margin-top:auto;">
-            <span>09:15 dan keyin</span>
-            <span style="color:#92400E; font-weight:700;">Ro'yxat 👆</span>
-          </div>
+          <div id="kpi-late-students" style="font-size:26px; font-weight:800; color:#92400E; line-height:1.1; margin-top:6px;">...</div>
         </div>
 
         <!-- 4. Hozir Binoda -->
-        <div id="kpi-card-in_campus" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('in_campus')" style="background:#EFF6FF; border:2px solid #BFDBFE;" title="Hozir universitet binosida bo'lib turgan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div id="kpi-card-in_campus" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('in_campus')" style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:12px 14px; cursor:pointer; transition:all 0.15s ease;" title="Hozir universitet binosida">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:11px; font-weight:700; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px;">Hozir Binoda</span>
             <span style="font-size:10px; font-weight:700; background:#DBEAFE; color:#1E40AF; padding:2px 6px; border-radius:6px;">Hududda</span>
           </div>
-          <div id="kpi-in-campus" style="font-size:32px; font-weight:800; color:#1E40AF; line-height:1.1; margin:10px 0 8px 0;">...</div>
-          <div style="font-size:11px; color:#1D4ED8; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #BFDBFE; padding-top:8px; margin-top:auto;">
-            <span>Chiqish qayd etilmagan</span>
-            <span style="color:#1E40AF; font-weight:700;">Ro'yxat 👆</span>
-          </div>
+          <div id="kpi-in-campus" style="font-size:26px; font-weight:800; color:#1E40AF; line-height:1.1; margin-top:6px;">...</div>
         </div>
 
         <!-- 5. Kelmaganlar -->
-        <div id="kpi-card-absent" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('absent')" style="background:#FEF2F2; border:2px solid #FECACA;" title="Turniketdan umuman o'tmagan kelmagan talabalar ro'yxatini ko'rish">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div id="kpi-card-absent" class="att-kpi-card kpi-filter-card" onclick="filterAttendanceByCard('absent')" style="background:#FEF2F2; border:1px solid #FECACA; border-radius:10px; padding:12px 14px; cursor:pointer; transition:all 0.15s ease;" title="Turniketdan o'tmaganlar">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:11px; font-weight:700; color:#B91C1C; text-transform:uppercase; letter-spacing:0.5px;">Kelmaganlar</span>
-            <span style="font-size:10px; font-weight:700; background:#FEE2E2; color:#991B1B; padding:2px 6px; border-radius:6px;">0 marta</span>
+            <span style="font-size:10px; font-weight:700; background:#FEE2E2; color:#991B1B; padding:2px 6px; border-radius:6px;">Kelmadi</span>
           </div>
-          <div id="kpi-absent-students" style="font-size:32px; font-weight:800; color:#991B1B; line-height:1.1; margin:10px 0 8px 0;">...</div>
-          <div style="font-size:11px; color:#DC2626; display:flex; justify-content:space-between; align-items:center; width:100%; border-top:1px dashed #FECACA; padding-top:8px; margin-top:auto;">
-            <span>Turniketdan o'tmagan</span>
-            <span style="color:#991B1B; font-weight:700;">Ro'yxat 👆</span>
-          </div>
+          <div id="kpi-absent-students" style="font-size:26px; font-weight:800; color:#991B1B; line-height:1.1; margin-top:6px;">...</div>
         </div>
       </div>
 
-      <!-- BOSHQARUV, FILTRLAR VA EXCEL EXPORT -->
-      <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:14px; margin-bottom:16px;">
+      <!-- BOSHQARUV, FILTRLAR VA AMALLAR -->
+      <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px;">
           <!-- Filtrlash mezonlari -->
-          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
-            <div>
-              <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">📅 Sana:</label>
-              <input type="date" id="att-date-input" value="${attendanceState.date}" class="form-control" style="font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid #CBD5E1; font-weight:600;">
+          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:12px; font-weight:700; color:#475569;">📅 Sana:</span>
+              <input type="date" id="att-date-input" value="${attendanceState.date}" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; border:1px solid #CBD5E1; font-weight:600; width:135px;">
             </div>
 
-            <div>
-              <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">🎓 Guruh:</label>
-              <select id="att-group-select" class="form-control" style="font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid #CBD5E1; min-width:140px;">
-                <option value="">Barcha guruhlar</option>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:12px; font-weight:700; color:#475569;">🎓 Guruh:</span>
+              <select id="att-group-select" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; border:1px solid #CBD5E1; min-width:130px;">
+                <option value="">Barchasi</option>
               </select>
             </div>
 
-            <div>
-              <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">🏷️ Holati bo'yicha:</label>
-              <select id="att-status-select" class="form-control" style="font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid #CBD5E1; min-width:150px;">
-                <option value="">Barchasi (Jami)</option>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:12px; font-weight:700; color:#475569;">🏷️ Holat:</span>
+              <select id="att-status-select" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; border:1px solid #CBD5E1; min-width:130px;">
+                <option value="">Barchasi</option>
                 <option value="present">Kelganlar</option>
                 <option value="late">Kechikkanlar</option>
                 <option value="in_campus">Hozir binoda</option>
@@ -11215,55 +11195,59 @@ async function renderCampusAttendance(targetContainer) {
             </div>
 
             <div>
-              <label style="font-size:11.5px; font-weight:600; color:#64748B; display:block; margin-bottom:4px;">🔍 Qidiruv:</label>
-              <input type="text" id="att-search-input" placeholder="F.I.SH. yoki Pasport ID..." class="form-control" style="font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid #CBD5E1; width:210px;">
+              <input type="text" id="att-search-input" placeholder="🔍 F.I.SH. yoki guruh bo'yicha..." class="form-control" style="font-size:12.5px; padding:5px 10px; border-radius:6px; border:1px solid #CBD5E1; width:200px;">
             </div>
           </div>
 
-          <!-- AMALLAR: EXCEL YUKLAB OLISH VA SINXRONIZATSIYA -->
-          <div style="display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px;">
+          <!-- AMALLAR TUGMALARI -->
+          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+            <!-- LMS VA TURNIKET AUDIT TAHLILI -->
+            <button class="btn btn-outline" onclick="openLmsTurniketAuditModal()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:700; color:#1D4ED8; border-color:#93C5FD; background:#EFF6FF;" title="LMS dars davomati va Turniket kirish mosligini tahlil qilish">
+              ${icon('activity', 13)} <span>LMS & Turniket Auditi</span>
+            </button>
+
             <!-- EXCEL YUKLAB OLISH TUGMASI -->
-            <button id="btn-export-excel" class="btn" onclick="downloadAttendanceExcel()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; font-weight:700; font-size:13px; color:#15803D; border:1px solid #86EFAC; background:#F0FDF4; box-shadow:0 1px 3px rgba(0,0,0,0.05); cursor:pointer;" title="Filtrlangan ro'yxatni Excel (.xlsx) formatida yuklab olish">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span id="btn-export-excel-label">Excel Yuklab Olish (.xlsx)</span>
+            <button id="btn-export-excel" class="btn" onclick="downloadAttendanceExcel()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-weight:700; font-size:12px; color:#15803D; border:1px solid #86EFAC; background:#F0FDF4; cursor:pointer;" title="Excel formatida yuklab olish">
+              ${icon('download', 13)}
+              <span id="btn-export-excel-label">Excel (.xlsx)</span>
             </button>
 
             <!-- HIKCENTRAL SINXRONLASH -->
-            <button id="btn-sync-hik" class="btn btn-primary" onclick="triggerHikCentralSync()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; box-shadow:0 2px 6px rgba(37,99,235,0.25);">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              <span>HikCentral Sinxronlash</span>
+            <button id="btn-sync-hik" class="btn btn-primary" onclick="triggerHikCentralSync()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-weight:600; font-size:12px;">
+              ${icon('refresh', 13)}
+              <span>Sinxronlash</span>
             </button>
 
             <!-- ALOQANI TEKSHIRISH -->
-            <button class="btn btn-outline" onclick="checkHikConnectionStatus()" title="HikCentral aloqasini tekshirish" style="font-size:13px; padding:8px 12px; border-radius:8px;">
-              📡 Tekshirish
+            <button class="btn btn-outline" onclick="checkHikConnectionStatus()" title="Turniket server aloqasini tekshirish" style="font-size:12px; padding:6px 10px; border-radius:6px;">
+              📡 Aloqa
             </button>
 
             <!-- RASMLARNI TURNIKETDAN YUKLAB OLISH -->
-            <button id="btn-sync-photos" class="btn" onclick="triggerHikPhotosSync(this)" title="Tizimda rasmi mavjud bo'lmagan talabalarning rasmlarini turniket serverdan yuklab to'ldirish" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px; border-radius:8px; background:#F8FAFC; border:1px solid #CBD5E1; color:#1E293B; font-weight:600; cursor:pointer;">
-              📸 <span>Rasmlarni To'ldirish</span>
+            <button id="btn-sync-photos" class="btn" onclick="triggerHikPhotosSync(this)" title="Rasmi yo'q talabalar rasmini turniketdan to'ldirish" style="display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:6px 10px; border-radius:6px; background:#F8FAFC; border:1px solid #CBD5E1; color:#1E293B; font-weight:600; cursor:pointer;">
+              📸 <span>Rasmlar</span>
             </button>
 
-            <!-- JONLI MONITORING STATUSI (HAR 1 DAQIQADA YANGILANADI) -->
-            <span id="att-live-status-badge" style="font-size:11.5px; font-weight:600; color:#15803D; background:#DCFCE7; border:1px solid #BBF7D0; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:6px;">
-              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22C55E;"></span>
-              <span id="att-last-refreshed-time">Har 1 minutda yangilanadi</span>
+            <!-- JONLI MONITORING STATUSI -->
+            <span id="att-live-status-badge" style="font-size:11px; font-weight:600; color:#15803D; background:#DCFCE7; border:1px solid #BBF7D0; padding:5px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:5px;">
+              <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#22C55E;"></span>
+              <span id="att-last-refreshed-time">Jonli</span>
             </span>
           </div>
         </div>
 
-        <!-- JADVAL QISMI (TAFSILLOT USTUNI OLIB TASHLANDI, SATRLAR BOSILADIGAN) -->
+        <!-- JADVAL QISMI (PASPORT ID OLIB TASHLANDI, DARS VAQTI BINODA BO'LGANMI TEKSHIRUVI QO'SHILDI) -->
         <div class="table-responsive" style="margin-top:12px; border-radius:10px; border:1px solid #E2E8F0; overflow:hidden;">
           <table class="table" style="margin-bottom:0; width:100%; border-collapse:collapse;">
             <thead style="background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
               <tr>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:left;">TALABA F.I.SH.</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">GURUH / KURS</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">PASPORT ID</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">KIRDI (VAQT)</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">CHIQDI (VAQT)</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">O'TISHLAR</th>
-                <th style="padding:12px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">HOLATI</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:left;">TALABA F.I.SH.</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">GURUH / KURS</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">KIRDI (VAQT)</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">CHIQDI (VAQT)</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">O'TISHLAR</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">DARS VAQTI BINODA BO'LGANMI (LMS TEKSHIRUVI)</th>
+                <th style="padding:10px 14px; font-size:12px; font-weight:700; color:#475569; text-align:center;">HOLATI</th>
               </tr>
             </thead>
             <tbody id="att-table-body">
@@ -11555,35 +11539,61 @@ async function loadAttendanceData(isSilent = false) {
         ? `<img src="${st.photo_url}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #E2E8F0;">`
         : `<div style="width:34px; height:34px; border-radius:50%; background:#E0F2FE; color:#0369A1; font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center;">${(st.first_name || 'T')[0]}</div>`;
 
-      // BUTUN SATR BOSILADIGAN QILINDI (TAFSILLOT USTUNI YO'Q)
+      // Timetable tekshiruvi (LMS dars vaqtida binoda bo'lganmi?)
+      const tt = st.timetable_info || {};
+      let ttBadgeHtml = `<span style="color:#94A3B8; font-size:11.5px;">Dars jadvalida yo'q</span>`;
+      if (tt.class_count > 0) {
+        if (tt.status === 'verified') {
+          ttBadgeHtml = `
+            <div style="display:inline-flex; flex-direction:column; align-items:center; gap:2px;">
+              <span class="badge" style="background:#DCFCE7; color:#15803D; font-weight:700; border:1px solid #BBF7D0; padding:3px 8px; border-radius:6px; font-size:11px;" title="Talaba dars jadvalidagi soatlarda bino hududida bo'lgan">
+                ✅ Binoda (${tt.class_count} ta dars)
+              </span>
+              <span style="font-size:10px; color:#166534; font-weight:600;">Dars vaqtida hududda</span>
+            </div>
+          `;
+        } else {
+          ttBadgeHtml = `
+            <div style="display:inline-flex; flex-direction:column; align-items:center; gap:2px;">
+              <span class="badge" style="background:#FEE2E2; color:#B91C1C; font-weight:700; border:1px solid #FECACA; padding:3px 8px; border-radius:6px; font-size:11px;" title="Bugun darsi bor edi, biroq turniketdan o'tmagan">
+                ❌ Turniketda yo'q (${tt.class_count} dars)
+              </span>
+              <span style="font-size:10px; color:#991B1B; font-weight:600;">Darsga kelmagan</span>
+            </div>
+          `;
+        }
+      } else if (st.first_in_at) {
+        ttBadgeHtml = `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-weight:600; border:1px solid #BFDBFE; padding:3px 8px; border-radius:6px; font-size:11px;">🏢 Binoda (Darsi yo'q)</span>`;
+      }
+
       rowsHtml += `
-        <tr onclick="showStudentAttendanceModal('${st.student_id}')" style="border-bottom:1px solid #F1F5F9; cursor:pointer; transition:background 0.15s ease;" onmouseenter="this.style.background='#F1F5F9'" onmouseleave="this.style.background='white'" title="Davomat tarixi va statistikasini ko'rish uchun bosing 👆">
-          <td style="padding:12px 14px;">
+        <tr onclick="showStudentAttendanceModal('${st.student_id}')" style="border-bottom:1px solid #F1F5F9; cursor:pointer; transition:background 0.15s ease;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='white'" title="Davomat va LMS dars jadvalini batafsil tekshirish uchun bosing">
+          <td style="padding:10px 14px;">
             <div style="display:flex; align-items:center; gap:10px;">
               ${avatarHtml}
               <div>
                 <div style="font-weight:700; font-size:13px; color:#0F172A;">${st.last_name || ''} ${st.first_name || ''}</div>
-                <div style="font-size:11px; color:#94A3B8;">${st.phone || ''}</div>
+                ${st.phone ? `<div style="font-size:11px; color:#64748B;">📞 ${st.phone}</div>` : ''}
               </div>
             </div>
           </td>
-          <td style="padding:12px 14px; text-align:center;">
+          <td style="padding:10px 14px; text-align:center;">
             <span style="font-weight:700; color:#1E40AF; background:#EFF6FF; padding:3px 8px; border-radius:6px; font-size:11.5px;">${st.group_code || '-'}</span>
-            <div style="font-size:11px; color:#64748B; margin-top:2px;">${st.course ? st.course + '-kurs' : ''}</div>
+            <div style="font-size:10.5px; color:#64748B; margin-top:2px;">${st.course ? st.course + '-kurs' : ''}</div>
           </td>
-          <td style="padding:12px 14px; text-align:center;">
-            <code style="background:#F1F5F9; color:#334155; padding:2px 6px; border-radius:4px; font-weight:700; font-size:12px;">${st.passport_id || '-'}</code>
-          </td>
-          <td style="padding:12px 14px; text-align:center; font-weight:700; color:#15803D;">
+          <td style="padding:10px 14px; text-align:center; font-weight:700; color:#15803D;">
             ${inTimeStr !== '-' ? `<span style="display:inline-flex; align-items:center; gap:4px;">🟢 ${inTimeStr}</span>` : '-'}
           </td>
-          <td style="padding:12px 14px; text-align:center; font-weight:600; color:#475569;">
+          <td style="padding:10px 14px; text-align:center; font-weight:600; color:#475569;">
             ${outTimeStr}
           </td>
-          <td style="padding:12px 14px; text-align:center; font-size:12px;">
+          <td style="padding:10px 14px; text-align:center; font-size:12px;">
             <span style="color:#16A34A; font-weight:700;">+${st.in_count}</span> / <span style="color:#EA580C; font-weight:700;">-${st.out_count}</span>
           </td>
-          <td style="padding:12px 14px; text-align:center;">
+          <td style="padding:10px 14px; text-align:center;">
+            ${ttBadgeHtml}
+          </td>
+          <td style="padding:10px 14px; text-align:center;">
             ${badgeHtml}
           </td>
         </tr>
@@ -11725,18 +11735,23 @@ async function showStudentAttendanceModal(studentId) {
   const body = document.getElementById('modal-body');
   if (!modal || !body) return;
 
-  title.textContent = "Talabaning Turniket Davomat Tarixi va Statistikasi";
-  body.innerHTML = `<div class="loading-state" style="padding:40px; text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div><p style="color:#64748B;">Davomat tarixi va statistikasi yuklanmoqda...</p></div>`;
+  title.textContent = "Talabaning Turniket Davomat Tarixi va LMS Tekshiruvi";
+  body.innerHTML = `<div class="loading-state" style="padding:40px; text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div><p style="color:#64748B;">Davomat tarixi va LMS dars jadvali tekshirilmoqda...</p></div>`;
   modal.classList.add('active');
 
   try {
-    const data = await apiFetch(`/api/attendance/student/${encodeURIComponent(studentId)}?days=30`);
+    const checkDate = attendanceState.date || new Date().toISOString().slice(0, 10);
+    const [data, crosscheckRes] = await Promise.all([
+      apiFetch(`/api/attendance/student/${encodeURIComponent(studentId)}?days=30`),
+      apiFetch(`/api/attendance/student-lms-crosscheck?student_id=${encodeURIComponent(studentId)}&date=${encodeURIComponent(checkDate)}`).catch(() => null)
+    ]);
     const st = data.student;
     const history = data.history || [];
     const logs = data.logs || [];
+    const crosscheck = (crosscheckRes && crosscheckRes.data) ? crosscheckRes.data : null;
 
     // Muhim statistikalarni hisoblash
-    const todayStr = attendanceState.date || new Date().toISOString().slice(0, 10);
+    const todayStr = checkDate;
     const todayRecord = history.find(h => h.date === todayStr) || history[0] || null;
 
     const totalDaysRecorded = history.length;
@@ -11767,6 +11782,93 @@ async function showStudentAttendanceModal(studentId) {
 
     const inTodayTime = todayRecord ? formatTimeOnly(todayRecord.first_in_at) : '-';
     const outTodayTime = todayRecord ? (todayRecord.is_in_campus ? 'Hozir binoda' : formatTimeOnly(todayRecord.last_out_at)) : '-';
+
+    // LMS Dars jadvali va Turniket moslik tahlili
+    let lmsTimetableHtml = '';
+    if (crosscheck && crosscheck.lessons && crosscheck.lessons.length > 0) {
+      let lessonRows = '';
+      crosscheck.lessons.forEach(ls => {
+        let verdictBadge = '';
+        if (ls.audit_verdict === 'VERIFIED') {
+          verdictBadge = '<span class="badge" style="background:#DCFCE7; color:#15803D; font-weight:700; border:1px solid #BBF7D0; padding:3px 8px; border-radius:6px;">✅ Mos keladi (Haqiqiy)</span>';
+        } else if (ls.audit_verdict === 'SUSPICIOUS') {
+          verdictBadge = '<span class="badge" style="background:#FEE2E2; color:#B91C1C; font-weight:800; border:1px solid #FECACA; padding:3px 8px; border-radius:6px;" title="LMS da \'Present\' belgilangan, lekin o\'sha paytda turniketdan kirmagan!">⚠️ Shubhali (Turniketda yo\'q)</span>';
+        } else if (ls.audit_verdict === 'ABSENT_CONFIRMED') {
+          verdictBadge = '<span class="badge" style="background:#F1F5F9; color:#475569; font-weight:600; padding:3px 8px; border-radius:6px;">❌ Kelmagan (Tasdiqlangan)</span>';
+        } else {
+          verdictBadge = '<span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-weight:600; padding:3px 8px; border-radius:6px;">🏢 Binoda (LMS belgilanmagan)</span>';
+        }
+
+        const lmsStatusBadge = ls.lms_status === 'Present'
+          ? '<span style="color:#16A34A; font-weight:700; background:#DCFCE7; padding:2px 8px; border-radius:6px;">Kelgan (Present)</span>'
+          : (ls.lms_status === 'Absent'
+            ? '<span style="color:#DC2626; font-weight:700; background:#FEE2E2; padding:2px 8px; border-radius:6px;">Kelmagan (Absent)</span>'
+            : `<span style="color:#64748B; font-weight:600;">${ls.lms_status || 'Kiritilmagan'}</span>`);
+
+        const turniketStatus = ls.in_building_during_class
+          ? '<span style="color:#15803D; font-weight:700;">🟢 Binoda bo\'lgan</span>'
+          : '<span style="color:#DC2626; font-weight:700;">🔴 Binoda bo\'lmagan</span>';
+
+        lessonRows += `
+          <tr style="border-bottom:1px solid #F1F5F9;">
+            <td style="padding:9px 12px; font-weight:700; color:#1E293B;">
+              ⏰ ${ls.time_str || '-'}
+              ${ls.room ? `<div style="font-size:11px; color:#64748B; font-weight:normal;">Xona: ${ls.room}</div>` : ''}
+            </td>
+            <td style="padding:9px 12px;">
+              <div style="font-weight:700; color:#0F172A; font-size:12.5px;">${ls.subject || ls.class_name || '-'}</div>
+              <div style="font-size:11px; color:#64748B;">${ls.teacher ? 'Ustoz: ' + ls.teacher : ''}</div>
+            </td>
+            <td style="padding:9px 12px; text-align:center;">
+              ${lmsStatusBadge}
+            </td>
+            <td style="padding:9px 12px; text-align:center;">
+              ${turniketStatus}
+            </td>
+            <td style="padding:9px 12px; text-align:center;">
+              ${verdictBadge}
+            </td>
+          </tr>
+        `;
+      });
+
+      lmsTimetableHtml = `
+        <div style="margin-bottom:18px; background:#FFFFFF; border:1.5px solid #BFDBFE; border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(37,99,235,0.06);">
+          <div style="background:#EFF6FF; padding:10px 14px; border-bottom:1px solid #BFDBFE; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:800; color:#1E40AF; font-size:13px; display:flex; align-items:center; gap:6px;">
+              <span>🎓 LMS Dars Jadvali va Turniket Moslik Tahlili</span>
+              <span style="font-size:11px; font-weight:600; color:#3B82F6;">(${crosscheck.date}, ${crosscheck.weekday})</span>
+            </div>
+            <span style="font-size:11px; font-weight:700; color:#1E40AF;">Jami darslar: ${crosscheck.total_classes} ta</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table" style="width:100%; font-size:12px; margin:0; border-collapse:collapse;">
+              <thead style="background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
+                <tr>
+                  <th style="padding:8px 12px; text-align:left;">Dars Vaqti</th>
+                  <th style="padding:8px 12px; text-align:left;">Fan va O'qituvchi</th>
+                  <th style="padding:8px 12px; text-align:center;">LMS Davomati</th>
+                  <th style="padding:8px 12px; text-align:center;">Turniket Nazorati</th>
+                  <th style="padding:8px 12px; text-align:center;">Moslik Xulosasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lessonRows}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } else if (crosscheck) {
+      lmsTimetableHtml = `
+        <div style="margin-bottom:18px; padding:12px 14px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px; display:flex; align-items:center; gap:10px;">
+          <span style="font-size:18px;">ℹ️</span>
+          <div style="font-size:12px; color:#64748B;">
+            <b>LMS Dars Jadvali (${crosscheck.date}):</b> Ushbu sanada talabaning guruhiga LMS tizimida dars biriktirilmagan yoki dam olish kuni.
+          </div>
+        </div>
+      `;
+    }
 
     let historyRows = '';
     if (history.length === 0) {
@@ -11809,8 +11911,6 @@ async function showStudentAttendanceModal(studentId) {
             <div style="font-size:12.5px; color:#64748B; margin-top:4px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
               <span style="background:#EFF6FF; color:#1E40AF; padding:2px 8px; border-radius:6px; font-weight:700;">${st.group_code || '-'}</span>
               <span>${st.course ? st.course + '-kurs' : ''}</span>
-              <span>•</span>
-              <span>Pasport: <code style="font-weight:700; color:#0F172A;">${st.external_id || '-'}</code></span>
               ${st.phone ? `<span>•</span> <span>📞 ${st.phone}</span>` : ''}
             </div>
           </div>
@@ -11821,15 +11921,15 @@ async function showStudentAttendanceModal(studentId) {
       </div>
 
       <!-- MUHIM STATISTIKALAR BLOKI (4 TA METRIKA KARTALARI) -->
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:20px;">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:18px;">
         <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; text-align:center;">
-          <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Bugungi Kirish</div>
+          <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Tanlangan Kun Kirish</div>
           <div style="font-size:17px; font-weight:800; color:#15803D; margin-top:4px;">${inTodayTime}</div>
           <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">Birinchi qayd</div>
         </div>
 
         <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; text-align:center;">
-          <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Bugungi Chiqish</div>
+          <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Tanlangan Kun Chiqish</div>
           <div style="font-size:17px; font-weight:800; color:#475569; margin-top:4px;">${outTodayTime}</div>
           <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">Oxirgi qayd</div>
         </div>
@@ -11847,13 +11947,16 @@ async function showStudentAttendanceModal(studentId) {
         </div>
       </div>
 
+      <!-- LMS VA TURNIKET MOSLIK BLOKI -->
+      ${lmsTimetableHtml}
+
       <!-- KUNLIK DAVOMAT TARIXI JADVALI -->
       <div style="margin-bottom:18px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <h4 style="font-size:13.5px; font-weight:800; color:#1E293B; margin:0;">📋 Kunlik Davomat Tarixi (Oxirgi 30 kun)</h4>
           <span style="font-size:11.5px; color:#64748B;">Jami o'tishlar: <b>${totalTurnstilePasses}</b> marta</span>
         </div>
-        <div class="table-responsive" style="max-height:220px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:10px;">
+        <div class="table-responsive" style="max-height:200px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:10px;">
           <table class="table" style="width:100%; font-size:12px; margin:0; border-collapse:collapse;">
             <thead style="background:#F8FAFC; position:sticky; top:0; z-index:2; border-bottom:1px solid #E2E8F0;">
               <tr>
@@ -11874,7 +11977,7 @@ async function showStudentAttendanceModal(studentId) {
       <!-- FACE ID VA TURNIKET O'TISH LOGLARI -->
       <div>
         <h4 style="font-size:13.5px; font-weight:800; color:#1E293B; margin:0 0 8px;">🚪 Face ID / Turniket O'tish Tafsilotlari (Jonli Loglar)</h4>
-        <div style="max-height:160px; overflow-y:auto; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px; font-size:11.5px; font-family:monospace;">
+        <div style="max-height:150px; overflow-y:auto; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px; font-size:11.5px; font-family:monospace;">
           ${logs.length === 0 ? '<div style="color:#94A3B8; text-align:center; padding:14px;">Ushbu talaba bo\'yicha turniket loglari mavjud emas</div>' : logs.map(l => {
             const isKirish = l.direction === 'in';
             const timeFormatted = l.event_time ? l.event_time.replace('T', ' ').slice(0, 19) : '';
@@ -11895,6 +11998,133 @@ async function showStudentAttendanceModal(studentId) {
   }
 }
 
+// UNIVERSITET MIQYOSIDA LMS VA TURNIKET AUDIT TAHLILI MODALI
+async function openLmsTurniketAuditModal() {
+  const modal = document.getElementById('common-modal');
+  const title = document.getElementById('modal-title');
+  const body = document.getElementById('modal-body');
+  if (!modal || !body) return;
+
+  const date = attendanceState.date || new Date().toISOString().slice(0, 10);
+  title.textContent = `LMS va Turniket Davomat Auditi (${date})`;
+  body.innerHTML = `
+    <div style="padding:40px; text-align:center;">
+      <div class="spinner" style="margin:0 auto 10px;"></div>
+      <p style="color:#64748B; font-weight:600;">LMS davomati va turniket o'tishlari solishtirilmoqda...</p>
+    </div>
+  `;
+  modal.classList.add('active');
+
+  try {
+    const res = await apiFetch(`/api/attendance/lms-turniket-audit?date=${encodeURIComponent(date)}`);
+    const data = res.data;
+    if (!data) throw new Error("Audit ma'lumotlari topilmadi");
+
+    const discrepancies = data.discrepancies || [];
+    let rowsHtml = '';
+    if (discrepancies.length === 0) {
+      rowsHtml = `
+        <tr>
+          <td colspan="5" style="text-align:center; padding:30px; color:#16A34A; font-weight:700;">
+            🎉 Ushbu kunda hech qanday shubhali nomuvofiqlik aniqlanmadi! LMS va Turniket ma'lumotlari to'liq mos keladi.
+          </td>
+        </tr>
+      `;
+    } else {
+      discrepancies.forEach(item => {
+        const isSuspicious = item.verdict === 'SUSPICIOUS_PRESENT';
+        rowsHtml += `
+          <tr style="border-bottom:1px solid #F1F5F9;">
+            <td style="padding:10px 12px;">
+              <div style="font-weight:700; color:#0F172A; font-size:12.5px;">${item.student_name}</div>
+              <div style="font-size:11px; color:#64748B;">Guruh: <b style="color:#1D4ED8;">${item.group_code}</b></div>
+            </td>
+            <td style="padding:10px 12px; font-size:12px;">
+              <div style="font-weight:700; color:#334155;">${item.subject}</div>
+              <div style="color:#64748B; font-size:11px;">⏰ ${item.time_str}</div>
+            </td>
+            <td style="padding:10px 12px; text-align:center;">
+              <span class="badge" style="background:${item.lms_status === 'Present' ? '#DCFCE7' : '#FEE2E2'}; color:${item.lms_status === 'Present' ? '#15803D' : '#B91C1C'}; font-weight:700; padding:3px 8px; border-radius:6px; font-size:11px;">
+                ${item.lms_status}
+              </span>
+            </td>
+            <td style="padding:10px 12px; text-align:center; font-size:11.5px;">
+              ${item.in_building_during_class 
+                ? '<span style="color:#15803D; font-weight:700;">🟢 Binoda bo\'lgan</span>' 
+                : '<span style="color:#DC2626; font-weight:700;">🔴 Turniketda yo\'q</span>'}
+            </td>
+            <td style="padding:10px 12px; text-align:center;">
+              ${isSuspicious 
+                ? '<span style="background:#FEE2E2; color:#B91C1C; font-weight:800; padding:4px 8px; border-radius:6px; font-size:11px; border:1px solid #FECACA;">⚠️ Shubhali (LMSda bor, Turniketda yo\'q)</span>'
+                : '<span style="background:#FEF3C7; color:#B45309; font-weight:700; padding:4px 8px; border-radius:6px; font-size:11px;">E\'tiborga molik</span>'}
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    body.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- AUDIT STATISTIKASI -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:11px; color:#64748B; font-weight:700;">Jami Talabalar</div>
+            <div style="font-size:18px; font-weight:800; color:#0F172A; margin-top:2px;">${data.total_students}</div>
+          </div>
+          <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:11px; color:#1E40AF; font-weight:700;">Turniketga Kelgan</div>
+            <div style="font-size:18px; font-weight:800; color:#1D4ED8; margin-top:2px;">${data.students_with_turniket}</div>
+          </div>
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:11px; color:#166534; font-weight:700;">LMS & Turniket Mos (Verified)</div>
+            <div style="font-size:18px; font-weight:800; color:#15803D; margin-top:2px;">${data.verified_matches}</div>
+          </div>
+          <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:11px; color:#991B1B; font-weight:700;">Shubhali Holatlar</div>
+            <div style="font-size:18px; font-weight:800; color:#DC2626; margin-top:2px;">${data.suspicious_count}</div>
+          </div>
+          <div style="background:#FAF5FF; border:1px solid #E9D5FF; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:11px; color:#7E22CE; font-weight:700;">LMS Ishonchliligi</div>
+            <div style="font-size:18px; font-weight:800; color:#6B21A8; margin-top:2px;">${data.reliability_rate}%</div>
+          </div>
+        </div>
+
+        <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:10px 14px; font-size:12px; color:#92400E; display:flex; align-items:center; gap:8px;">
+          <span>💡</span>
+          <div>
+            <b>Audit maqsadi:</b> O'qituvchilar tomonidan LMS (Moodle) ga kiritilgan davomat haqiqatan talabaning turniket orqali universitetga kirib-chiqqan vaqtlari bilan to'g'ri keladimi yoki soxta/noto'g'ri belgilanganligini avtomatik tekshirish.
+          </div>
+        </div>
+
+        <!-- SHUBHALI / MOS KELMAGAN RO'YXAT -->
+        <div>
+          <h4 style="font-size:13.5px; font-weight:800; color:#1E293B; margin:0 0 8px;">
+            ⚠️ Mos Kelmagan va Shubhali Davomat Qaydlari (${discrepancies.length} ta)
+          </h4>
+          <div class="table-responsive" style="max-height:300px; overflow-y:auto; border:1px solid #E2E8F0; border-radius:8px;">
+            <table class="table" style="width:100%; font-size:12px; margin:0; border-collapse:collapse;">
+              <thead style="background:#F8FAFC; position:sticky; top:0; z-index:2; border-bottom:1px solid #E2E8F0;">
+                <tr>
+                  <th style="padding:10px 12px; text-align:left;">Talaba / Guruh</th>
+                  <th style="padding:10px 12px; text-align:left;">Fan / Dars Vaqti</th>
+                  <th style="padding:10px 12px; text-align:center;">LMS Holati</th>
+                  <th style="padding:10px 12px; text-align:center;">Turniket Holati</th>
+                  <th style="padding:10px 12px; text-align:center;">Audit Xulosasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div style="color:#EF4444; padding:30px; text-align:center; font-weight:700;">Audit yuklashda xatolik: ${err.message}</div>`;
+  }
+}
+
 window.impersonateStaffUser = impersonateStaffUser;
 window.exitImpersonation = exitImpersonation;
 window.showEditStudentModal = showEditStudentModal;
@@ -11904,6 +12134,7 @@ window.showStudentDetailsModal = showStudentDetailsModal;
 window.triggerHikCentralSync = triggerHikCentralSync;
 window.checkHikConnectionStatus = checkHikConnectionStatus;
 window.showStudentAttendanceModal = showStudentAttendanceModal;
+window.openLmsTurniketAuditModal = openLmsTurniketAuditModal;
 window.changeAttendancePage = changeAttendancePage;
 window.filterAttendanceByCard = filterAttendanceByCard;
 window.updateActiveKpiCard = updateActiveKpiCard;

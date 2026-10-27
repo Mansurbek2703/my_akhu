@@ -9,7 +9,9 @@ const {
   syncMissingStudentPhotos,
   getCampusAttendanceSummary,
   getCampusAttendanceList,
-  getStudentAttendanceHistory
+  getStudentAttendanceHistory,
+  getStudentLmsCrosscheck,
+  getLmsTurniketAudit
 } = require('../services/hikcentralService');
 
 // Xodimlarni autentifikatsiya qilish
@@ -246,6 +248,40 @@ router.post('/sync-photos', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: `Rasmlarni sinxronlash xatosi: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/attendance/student-lms-crosscheck
+ * Bitta talaba uchun LMS dars jadvali va turniket moslik tahlili
+ */
+router.get('/student-lms-crosscheck', (req, res) => {
+  try {
+    const { student_id, date } = req.query;
+    if (!student_id) {
+      return res.status(400).json({ error: "student_id parametri talab qilinadi" });
+    }
+    const result = getStudentLmsCrosscheck(student_id, date);
+    if (!result) {
+      return res.status(404).json({ error: "Talaba topilmadi" });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/attendance/lms-turniket-audit
+ * Butun universitet bo'yicha LMS va Turniket moslik tahlili
+ */
+router.get('/lms-turniket-audit', (req, res) => {
+  try {
+    const { date } = req.query;
+    const result = getLmsTurniketAudit(date);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
