@@ -15,9 +15,11 @@ const MOODLE_CONFIG = {
   token: 'c7ece056fdfa85c667e92d943c0bfc94',
   baseUrl: 'https://lms.akhu.uz/webservice/rest/server.php',
   timeout: 15000,
-  knownCourses: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 39],
+  // Faqat joriy 2026-2027 o'quv yili (Fall 26/27) faol kurslari (2025 arxiv kurslari olib tashlangan)
+  knownCourses: [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 39],
   knownAttendanceIds: [50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 64, 65, 66, 67, 68, 69, 70, 71, 73, 74, 75, 77, 78, 79, 80, 81, 82, 83, 84, 88, 89, 90, 91, 93]
 };
+
 
 let isSyncing = false;
 let lastSyncResult = null;
@@ -164,6 +166,12 @@ async function syncTimetable() {
     db.prepare(`ALTER TABLE lms_timetable ADD COLUMN IF NOT EXISTS group_code VARCHAR(50)`).run();
   } catch (e) {}
 
+  // O'tgan 2025 o'quv yili yoki arxiv kurslari (2,3,4,5,6,9,11,12,14,15) yozuvlarini tozalash
+  try {
+    db.prepare(`DELETE FROM lms_timetable WHERE timestart < 1788220800 OR course_id IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)`).run();
+  } catch (e) {}
+
+  // Faqat joriy 2026-2027 o'quv yili semestri oylari
   const months = [
     { year: 2026, month: 9 },
     { year: 2026, month: 10 },
@@ -198,29 +206,11 @@ async function syncTimetable() {
     }
   }
 
-  // Fallback sifatida standart kalendar voqealari ro'yxatini ham birlashtirish
-  try {
-    const params = {
-      'options[timestart]': '1759000000',
-      'options[timeend]': '1800000000'
-    };
-    MOODLE_CONFIG.knownCourses.forEach((id, idx) => {
-      params[`events[courseids][${idx}]`] = id;
-    });
-    const resEvents = await callMoodle('core_calendar_get_calendar_events', params);
-    if (resEvents && resEvents.events && Array.isArray(resEvents.events)) {
-      for (const ev of resEvents.events) {
-        if (!allEventsMap.has(ev.id)) {
-          allEventsMap.set(ev.id, ev);
-        }
-      }
-    }
-  } catch (err) {}
-
   const allEvents = Array.from(allEventsMap.values());
   const nowIso = new Date().toISOString();
   let inserted = 0;
   const courseMap = {};
+
 
   const insertCourse = db.prepare(`
     INSERT INTO lms_course (id, code, name, updated_at)
@@ -284,11 +274,16 @@ async function syncTimetable() {
     const groupCode = extractGroupCode(groupName, rawName);
 
     const timestart = ev.timestart;
+    // Faqat joriy 2026-2027 o'quv yili (2026-09-01 dan keyingi) darslarni qabul qilish
+    if (timestart < 1788220800) continue;
+    if ([2, 3, 4, 5, 6, 9, 11, 12, 14, 15].includes(courseId)) continue;
+
     const timeduration = ev.timeduration || 7200;
     const timestartIso = new Date(timestart * 1000).toISOString();
     const timeendIso = new Date((timestart + timeduration) * 1000).toISOString();
     const weekday = getWeekdayNumber(timestart);
     const timeStr = formatTimeStr(timestart, timeduration);
+
 
     if (courseId && !courseMap[courseId]) {
       const cName = ev.course?.fullname ? cleanHtml(ev.course.fullname) : (subjectName || rawName);

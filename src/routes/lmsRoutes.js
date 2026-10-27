@@ -64,10 +64,17 @@ router.get('/overview', (req, res) => {
  */
 router.get('/timetable', (req, res) => {
   try {
-    const { weekday, course_id, group, search } = req.query;
-    let query = `SELECT * FROM lms_timetable WHERE 1=1`;
+    const { weekday, course_id, group, search, date } = req.query;
+    // Faqat joriy 2026-2027 o'quv yili (2026-09-01 dan keyin) va faol kurslar
+    let query = `SELECT * FROM lms_timetable WHERE timestart >= 1788220800 AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)`;
     const params = [];
 
+    if (date) {
+      const startOfDay = Math.floor(new Date(`${date}T00:00:00+05:00`).getTime() / 1000);
+      const endOfDay = Math.floor(new Date(`${date}T23:59:59+05:00`).getTime() / 1000);
+      query += ` AND timestart >= ? AND timestart <= ?`;
+      params.push(startOfDay, endOfDay);
+    }
     if (weekday) {
       query += ` AND weekday = ?`;
       params.push(Number(weekday));
@@ -110,20 +117,56 @@ router.get('/timetable', (req, res) => {
       }
     }
 
+    // Bugun va ertangi kunning aniq darslari (Asia/Tashkent vaqti)
+    const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
+    const tomorrowObj = new Date(Date.now() + 24 * 3600 * 1000);
+    const tomorrowDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(tomorrowObj);
+
+    const todayStart = Math.floor(new Date(`${todayDateStr}T00:00:00+05:00`).getTime() / 1000);
+    const todayEnd = Math.floor(new Date(`${todayDateStr}T23:59:59+05:00`).getTime() / 1000);
+    const tomorrowStart = Math.floor(new Date(`${tomorrowDateStr}T00:00:00+05:00`).getTime() / 1000);
+    const tomorrowEnd = Math.floor(new Date(`${tomorrowDateStr}T23:59:59+05:00`).getTime() / 1000);
+
+    const todayLessons = db.prepare(`
+      SELECT * FROM lms_timetable
+      WHERE timestart >= ? AND timestart <= ? AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
+      ORDER BY timestart ASC
+    `).all(todayStart, todayEnd);
+
+    const tomorrowLessons = db.prepare(`
+      SELECT * FROM lms_timetable
+      WHERE timestart >= ? AND timestart <= ? AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
+      ORDER BY timestart ASC
+    `).all(tomorrowStart, tomorrowEnd);
+
     res.json({
+      success: true,
+      current_academic_year: '2026-2027 (Fall 26/27)',
+      today: {
+        date: todayDateStr,
+        weekday: new Intl.DateTimeFormat('uz-UZ', { timeZone: 'Asia/Tashkent', weekday: 'long' }).format(new Date()),
+        count: todayLessons.length,
+        lessons: todayLessons
+      },
+      tomorrow: {
+        date: tomorrowDateStr,
+        weekday: new Intl.DateTimeFormat('uz-UZ', { timeZone: 'Asia/Tashkent', weekday: 'long' }).format(tomorrowObj),
+        count: tomorrowLessons.length,
+        lessons: tomorrowLessons
+      },
       timetable,
       grouped_by_weekday: Object.entries(weekdays).map(([day, val]) => ({
         weekday: Number(day),
         name: val.name,
         lessons: val.lessons
       }))
-
     });
   } catch (err) {
     console.error('LMS Timetable error:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 /**
  * GET /api/lms/sessions

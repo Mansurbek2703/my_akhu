@@ -533,7 +533,7 @@ function getCampusAttendanceList({ date = null, group_code = null, status = null
     const ttToday = db.prepare(`
       SELECT DISTINCT course_id, subject_code, subject_name, teacher_name, room, time_str, timestart_iso, timeend_iso
       FROM lms_timetable
-      WHERE weekday = ?
+      WHERE weekday = ? AND timestart >= 1788220800 AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
     `).all(weekday);
     for (const tt of ttToday) {
       if (!ttTodayMap[tt.course_id]) ttTodayMap[tt.course_id] = [];
@@ -688,7 +688,7 @@ function getStudentLmsCrosscheck(studentId, date = null) {
     rawLessons = db.prepare(`
       SELECT DISTINCT course_id, subject_code, subject_name, teacher_name, room, time_str, timestart_iso, timeend_iso
       FROM lms_timetable
-      WHERE course_id IN (${ph}) AND weekday = ?
+      WHERE course_id IN (${ph}) AND weekday = ? AND timestart >= 1788220800 AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
       ORDER BY timestart_iso ASC
     `).all(...courseIds, weekday);
   }
@@ -929,11 +929,11 @@ function getDeepCrossAudit(filters = {}) {
     if (r.moodle_student_id) lmsMap.set(`m_${r.moodle_student_id}`, r);
   }
 
-  // 4. Timetable on weekday (deduplicated by course_id and time_str)
+  // 4. Timetable on weekday (deduplicated by course_id and time_str) - faqat 2026/2027 o'quv yili
   const rawTimetable = db.prepare(`
     SELECT course_id, subject_code, subject_name, teacher_name, room, time_str, timestart_iso
     FROM lms_timetable
-    WHERE weekday = ?
+    WHERE weekday = ? AND timestart >= 1788220800 AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
   `).all(weekday);
 
   const ttMap = {};

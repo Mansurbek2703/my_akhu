@@ -11104,6 +11104,7 @@ function exitImpersonation() {
 // ====================================================================
 let unifiedAttState = {
   currentTab: 'timetable', // 'timetable' | 'lms_attendance' | 'group_ranking' | 'turniket' | 'cross_audit'
+  timetableMode: 'today', // 'today' | 'tomorrow' | 'week'
   period: 'day',
   date: new Date().toISOString().slice(0, 10),
   group: '',
@@ -11114,6 +11115,7 @@ let unifiedAttState = {
   search: '',
   timetableSearch: ''
 };
+
 
 async function renderUnifiedAttendance(targetContainer) {
   targetContainer.innerHTML = `
@@ -11213,8 +11215,6 @@ async function switchUnifiedAttTab(tabName) {
     await renderUnifiedTimetableTab(body);
   } else if (tabName === 'lms_attendance') {
     await renderUnifiedLmsOverviewTab(body);
-  } else if (tabName === 'group_ranking') {
-    await renderUnifiedGroupsRankingTab(body);
   } else if (tabName === 'turniket') {
     await renderCampusAttendance(body);
   } else if (tabName === 'cross_audit') {
@@ -11238,17 +11238,39 @@ async function renderUnifiedTimetableTab(container) {
     ]);
 
     cachedLmsTimetable = ttRes;
-    const grouped = ttRes.grouped_by_weekday || [];
     const groupsList = Array.isArray(grpRes.groups) ? grpRes.groups : [];
 
     const dayStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(new Date());
+
     const dayMap = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
     const currentWeekday = dayMap[dayStr] || 1;
 
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
-        <!-- FILTRLAR PANELI -->
-        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <!-- FILTRLAR VA REJIM TANLASH PANELI -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px 20px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          
+          <!-- YUQORI REJIM TUGMALARI (BUGUN, ERTAGA, HAFTALIK) -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid #F1F5F9;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">Tanlov:</span>
+              <button id="btn-mode-today" class="btn btn-sm ${unifiedAttState.timetableMode === 'today' ? 'btn-primary' : 'btn-outline'}" onclick="switchTimetableMode('today')">
+                ⚡ Bugungi darslar (${ttRes.today?.date ? ttRes.today.date.slice(8,10) + '-oktabr' : 'Bugun'}) <span class="badge" style="background:#22C55E; color:white; margin-left:4px;">${ttRes.today?.count || 0} ta</span>
+              </button>
+              <button id="btn-mode-tomorrow" class="btn btn-sm ${unifiedAttState.timetableMode === 'tomorrow' ? 'btn-primary' : 'btn-outline'}" onclick="switchTimetableMode('tomorrow')">
+                ⏩ Ertangi darslar (${ttRes.tomorrow?.date ? ttRes.tomorrow.date.slice(8,10) + '-oktabr' : 'Ertaga'}) <span class="badge" style="background:#3B82F6; color:white; margin-left:4px;">${ttRes.tomorrow?.count || 0} ta</span>
+              </button>
+              <button id="btn-mode-week" class="btn btn-sm ${unifiedAttState.timetableMode === 'week' ? 'btn-primary' : 'btn-outline'}" onclick="switchTimetableMode('week')">
+                🗓️ Haftalik umumiy jadval
+              </button>
+            </div>
+
+            <div style="font-size:11.5px; font-weight:700; background:#F8FAFC; color:#0369A1; border:1px solid #BAE6FD; padding:4px 10px; border-radius:6px;">
+              🎓 2026-2027 O'quv yili (Fall 26/27)
+            </div>
+          </div>
+
+          <!-- QUYI FILTRLAR (GURUH, HAFTA KUNI, QIDIRUV) -->
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
               <!-- Guruh tanlash -->
@@ -11260,8 +11282,8 @@ async function renderUnifiedTimetableTab(container) {
                 </select>
               </div>
 
-              <!-- Hafta kunlari tugmalari -->
-              <div style="display:flex; gap:4px; flex-wrap:wrap;" id="u-tt-weekday-buttons">
+              <!-- Hafta kunlari tugmalari (faqat Haftalik rejimda yoki ixtiyoriy kun tanlashda) -->
+              <div style="display:${unifiedAttState.timetableMode === 'week' ? 'flex' : 'none'}; gap:4px; flex-wrap:wrap;" id="u-tt-weekday-buttons">
                 <button class="btn btn-sm ${unifiedAttState.weekday === 0 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(0, this)">Hafta (Barchasi)</button>
                 <button class="btn btn-sm ${unifiedAttState.weekday === 1 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(1, this)">Dush ${currentWeekday === 1 ? '●' : ''}</button>
                 <button class="btn btn-sm ${unifiedAttState.weekday === 2 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(2, this)">Sesh ${currentWeekday === 2 ? '●' : ''}</button>
@@ -11286,31 +11308,83 @@ async function renderUnifiedTimetableTab(container) {
       </div>
     `;
 
-    renderUnifiedTimetableDays(grouped);
+    renderUnifiedTimetableDays(cachedLmsTimetable);
   } catch (err) {
     container.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:#EF4444;">Dars jadvali yuklanmadi: ${err.message}</div>`;
   }
 }
 
-function renderUnifiedTimetableDays(groupedDays) {
-  const container = document.getElementById('u-tt-grid');
-  if (!container) return;
+function switchTimetableMode(mode) {
+  unifiedAttState.timetableMode = mode;
+  ['today', 'tomorrow', 'week'].forEach(m => {
+    const btn = document.getElementById(`btn-mode-${m}`);
+    if (btn) {
+      if (m === mode) {
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-outline');
+      } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+      }
+    }
+  });
 
+  const weekdayPills = document.getElementById('u-tt-weekday-buttons');
+  if (weekdayPills) {
+    weekdayPills.style.display = (mode === 'week') ? 'flex' : 'none';
+  }
+
+  if (cachedLmsTimetable) {
+    renderUnifiedTimetableDays(cachedLmsTimetable);
+  }
+}
+
+function renderLessonCard(l) {
+  const isLab = /lab|laboratoriya/i.test(l.subject_name);
+  const isLecture = /lecture|ma'ruza/i.test(l.subject_name);
+  const typeLabel = isLab ? '🔬 Lab' : (isLecture ? '🎓 Ma\'ruza' : '✏️ Amaliyot');
+
+  return `
+    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="background:#0F172A; color:white; font-weight:800; font-size:11.5px; padding:3px 8px; border-radius:6px; font-family:monospace;">
+          🕒 ${l.time_str}
+        </span>
+        <div style="display:flex; align-items:center; gap:6px;">
+          ${l.group_code ? `<span style="font-size:10.5px; font-weight:800; background:#EEF2FF; color:#4F46E5; border:1px solid #C7D2FE; padding:2px 7px; border-radius:6px;" title="${l.group_name || ''}">👥 ${l.group_code}</span>` : ''}
+          <span style="font-size:11px; font-weight:700; color:#475569; background:#FFFFFF; border:1px solid #E2E8F0; padding:2px 7px; border-radius:6px;">
+            ${typeLabel}
+          </span>
+        </div>
+      </div>
+      <div style="font-size:13.5px; font-weight:700; color:#0F172A; line-height:1.35; margin-top:2px;">
+        ${l.subject_name}
+      </div>
+      <div style="font-size:12px; color:#475569; margin-top:3px; display:flex; flex-direction:column; gap:4px;">
+        <span>👨‍🏫 <b>Ustoz:</b> <span style="font-weight:600; color:#1E293B;">${l.teacher_name || 'Belgilanmagan'}</span></span>
+        <span style="display:flex; align-items:center; gap:5px;">
+          📍 <b>Xona:</b>
+          ${l.room ? `<span style="font-weight:700; background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0; padding:2px 8px; border-radius:6px;">🏢 ${l.room}</span>` : `<span style="color:#94A3B8; font-style:italic;">Ko'rsatilmagan</span>`}
+        </span>
+        ${l.group_name ? `<span>👥 <b>Guruh:</b> <span style="color:#4338CA; font-weight:600;">${l.group_name}</span></span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderUnifiedTimetableDays(ttData) {
+  const container = document.getElementById('u-tt-grid');
+  if (!container || !ttData) return;
+
+  const mode = unifiedAttState.timetableMode || 'today';
   const selectedDay = unifiedAttState.weekday || 0;
   const search = (unifiedAttState.timetableSearch || '').toLowerCase().trim();
   const group = (unifiedAttState.group || '').toLowerCase().trim();
-  const dayStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(new Date());
-  const dayMap = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
-  const currentWeekday = dayMap[dayStr] || 1;
 
-  let html = '';
-
-  groupedDays.forEach(day => {
-    if (selectedDay !== 0 && day.weekday !== selectedDay) return;
-
-    let lessons = day.lessons || [];
+  const filterList = (lessons) => {
+    let list = lessons || [];
     if (search) {
-      lessons = lessons.filter(l => 
+      list = list.filter(l => 
         (l.subject_name || '').toLowerCase().includes(search) ||
         (l.teacher_name || '').toLowerCase().includes(search) ||
         (l.room || '').toLowerCase().includes(search) ||
@@ -11319,14 +11393,84 @@ function renderUnifiedTimetableDays(groupedDays) {
       );
     }
     if (group) {
-      lessons = lessons.filter(l => 
+      list = list.filter(l => 
         (l.group_code || '').toLowerCase().includes(group) ||
         (l.group_name || '').toLowerCase().includes(group) ||
         (l.subject_code || '').toLowerCase().includes(group) ||
         (l.subject_name || '').toLowerCase().includes(group)
       );
     }
+    return list;
+  };
 
+  let html = '';
+
+  // 1. BUGUNGI DARSLAR REJIMI
+  if (mode === 'today') {
+    const today = ttData.today || { lessons: [] };
+    const lessons = filterList(today.lessons);
+
+    html = `
+      <div class="tt-day-card" style="background:#FFFFFF; border:2px solid #22C55E; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(34,197,94,0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #F1F5F9; padding-bottom:10px;">
+          <h4 style="font-size:16px; font-weight:800; color:#166534; margin:0; display:flex; align-items:center; gap:8px;">
+            <span>⚡ Bugungi Dars Jadvali (${today.date || ''} - ${today.weekday || 'Bugun'})</span>
+            <span class="badge" style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:800; padding:3px 8px;">Jonli Jadval</span>
+          </h4>
+          <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:12px;">${lessons.length} ta dars</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:12px;">
+          ${lessons.length === 0 ? `
+            <div style="color:#94A3B8; font-size:13px; padding:16px; text-align:center; grid-column: 1 / -1;">
+              Bugun uchun dars jadvali topilmadi yoki filtr bo'yicha dars yo'q.
+            </div>
+          ` : lessons.map(renderLessonCard).join('')}
+        </div>
+      </div>
+    `;
+    container.innerHTML = html;
+    return;
+  }
+
+  // 2. ERTANGI DARSLAR REJIMI
+  if (mode === 'tomorrow') {
+    const tomorrow = ttData.tomorrow || { lessons: [] };
+    const lessons = filterList(tomorrow.lessons);
+
+    html = `
+      <div class="tt-day-card" style="background:#FFFFFF; border:2px solid #3B82F6; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(59,130,246,0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #F1F5F9; padding-bottom:10px;">
+          <h4 style="font-size:16px; font-weight:800; color:#1D4ED8; margin:0; display:flex; align-items:center; gap:8px;">
+            <span>⏩ Ertangi Dars Jadvali (${tomorrow.date || ''} - ${tomorrow.weekday || 'Ertaga'})</span>
+            <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:11px; font-weight:800; padding:3px 8px;">Rejalashtirilgan</span>
+          </h4>
+          <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:12px;">${lessons.length} ta dars</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:12px;">
+          ${lessons.length === 0 ? `
+            <div style="color:#94A3B8; font-size:13px; padding:16px; text-align:center; grid-column: 1 / -1;">
+              Ertaga uchun dars jadvali topilmadi yoki filtr bo'yicha dars yo'q.
+            </div>
+          ` : lessons.map(renderLessonCard).join('')}
+        </div>
+      </div>
+    `;
+    container.innerHTML = html;
+    return;
+  }
+
+  // 3. HAFTALIK UMUMIY JADVAL REJIMI
+  const groupedDays = ttData.grouped_by_weekday || [];
+  const dayStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(new Date());
+  const dayMap = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
+  const currentWeekday = dayMap[dayStr] || 1;
+
+  groupedDays.forEach(day => {
+    if (selectedDay !== 0 && day.weekday !== selectedDay) return;
+
+    const lessons = filterList(day.lessons);
     const isToday = day.weekday === currentWeekday;
 
     html += `
@@ -11342,38 +11486,7 @@ function renderUnifiedTimetableDays(groupedDays) {
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:12px;">
           ${lessons.length === 0 ? `
             <div style="color:#94A3B8; font-size:12.5px; padding:10px;">Ushbu mezonlar bo'yicha darslar topilmadi</div>
-          ` : lessons.map(l => {
-            const isLab = /lab|laboratoriya/i.test(l.subject_name);
-            const isLecture = /lecture|ma'ruza/i.test(l.subject_name);
-            const typeLabel = isLab ? '🔬 Lab' : (isLecture ? '🎓 Ma\'ruza' : '✏️ Amaliyot');
-
-            return `
-              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <span style="background:#0F172A; color:white; font-weight:800; font-size:11.5px; padding:3px 8px; border-radius:6px; font-family:monospace;">
-                    🕒 ${l.time_str}
-                  </span>
-                  <div style="display:flex; align-items:center; gap:6px;">
-                    ${l.group_code ? `<span style="font-size:10.5px; font-weight:800; background:#EEF2FF; color:#4F46E5; border:1px solid #C7D2FE; padding:2px 7px; border-radius:6px;" title="${l.group_name || ''}">👥 ${l.group_code}</span>` : ''}
-                    <span style="font-size:11px; font-weight:700; color:#475569; background:#FFFFFF; border:1px solid #E2E8F0; padding:2px 7px; border-radius:6px;">
-                      ${typeLabel}
-                    </span>
-                  </div>
-                </div>
-                <div style="font-size:13.5px; font-weight:700; color:#0F172A; line-height:1.35; margin-top:2px;">
-                  ${l.subject_name}
-                </div>
-                <div style="font-size:12px; color:#475569; margin-top:3px; display:flex; flex-direction:column; gap:4px;">
-                  <span>👨‍🏫 <b>Ustoz:</b> <span style="font-weight:600; color:#1E293B;">${l.teacher_name || 'Belgilanmagan'}</span></span>
-                  <span style="display:flex; align-items:center; gap:5px;">
-                    📍 <b>Xona:</b>
-                    ${l.room ? `<span style="font-weight:700; background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0; padding:2px 8px; border-radius:6px;">🏢 ${l.room}</span>` : `<span style="color:#94A3B8; font-style:italic;">Ko'rsatilmagan</span>`}
-                  </span>
-                  ${l.group_name ? `<span>👥 <b>Guruh:</b> <span style="color:#4338CA; font-weight:600;">${l.group_name}</span></span>` : ''}
-                </div>
-              </div>
-            `;
-          }).join('')}
+          ` : lessons.map(renderLessonCard).join('')}
         </div>
       </div>
     `;
@@ -11381,7 +11494,6 @@ function renderUnifiedTimetableDays(groupedDays) {
 
   container.innerHTML = html;
 }
-
 
 function handleUnifiedTtDay(dayNumber, btn) {
   unifiedAttState.weekday = dayNumber;
@@ -11393,8 +11505,8 @@ function handleUnifiedTtDay(dayNumber, btn) {
     btn.classList.add('btn-primary');
     btn.classList.remove('btn-outline');
   }
-  if (cachedLmsTimetable && cachedLmsTimetable.grouped_by_weekday) {
-    renderUnifiedTimetableDays(cachedLmsTimetable.grouped_by_weekday);
+  if (cachedLmsTimetable) {
+    renderUnifiedTimetableDays(cachedLmsTimetable);
   }
 }
 
@@ -11403,12 +11515,13 @@ function handleUnifiedTimetableFilter() {
   const searchInput = document.getElementById('u-tt-search-input');
   if (grpSelect) unifiedAttState.group = grpSelect.value;
   if (searchInput) unifiedAttState.timetableSearch = searchInput.value;
-  if (cachedLmsTimetable && cachedLmsTimetable.grouped_by_weekday) {
-    renderUnifiedTimetableDays(cachedLmsTimetable.grouped_by_weekday);
+  if (cachedLmsTimetable) {
+    renderUnifiedTimetableDays(cachedLmsTimetable);
   }
 }
 
 // 2. LMS DAVOMATI TABI (KUNLIK / HAFTALIK / OYLIK)
+
 async function renderUnifiedLmsOverviewTab(container) {
   container.innerHTML = `
     <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
@@ -13588,6 +13701,7 @@ window.filterCrossAuditCategory = filterCrossAuditCategory;
 window.handleCrossAuditFilterChange = handleCrossAuditFilterChange;
 window.handleCrossAuditSearch = handleCrossAuditSearch;
 window.downloadCrossAuditExcel = downloadCrossAuditExcel;
+window.switchTimetableMode = switchTimetableMode;
 
 
 
