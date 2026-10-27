@@ -78,6 +78,28 @@ function normalizeName(str) {
 }
 
 /**
+ * HTML teglar va maxsus belgilarni tozalash
+ */
+function cleanHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Matndan guruh kodini ajratib olish (FMC01, SSE01, va h.k.)
+ */
+function extractGroupCode(groupName, subjectName) {
+  const text = `${groupName || ''} ${subjectName || ''}`;
+  const m = text.match(/\b(FMC\d{2}|FDT\d{2}|SDT\d{2}|SSE\d{2}|SAI\d{2}|MAI\d{2})\b/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/**
  * Dars izohidan o'qituvchi va xonani ajratib olish
  */
 function extractTeacherAndRoom(desc) {
@@ -101,48 +123,101 @@ function extractTeacherAndRoom(desc) {
 }
 
 /**
- * Timestampdan vaqt satrini olish (masalan "09:00 - 11:00")
+ * Timestampdan vaqt satrini olish — O'zbekiston (Asia/Tashkent UTC+5) vaqti bilan
+ * (masalan "09:00 - 11:00")
  */
 function formatTimeStr(timestart, duration) {
   const start = new Date(timestart * 1000);
-  const end = new Date((timestart + duration) * 1000);
+  const end = new Date((timestart + (duration || 7200)) * 1000);
 
-  const sh = String(start.getUTCHours()).padStart(2, '0');
-  const sm = String(start.getUTCMinutes()).padStart(2, '0');
-  const eh = String(end.getUTCHours()).padStart(2, '0');
-  const em = String(end.getUTCMinutes()).padStart(2, '0');
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tashkent',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 
-  return `${sh}:${sm} - ${eh}:${em}`;
+  return `${fmt.format(start)} - ${fmt.format(end)}`;
 }
 
 /**
- * Timestampdan hafta kunini olish (1 = Dushanba ... 7 = Yakshanba)
+ * Timestampdan hafta kunini olish — O'zbekiston (Asia/Tashkent UTC+5) vaqti bo'yicha
+ * (1 = Dushanba ... 7 = Yakshanba)
  */
 function getWeekdayNumber(timestart) {
   const d = new Date(timestart * 1000);
-  const day = d.getUTCDay();
-  return day === 0 ? 7 : day;
+  const dayStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(d);
+  const map = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
+  return map[dayStr] || 1;
 }
 
 /**
  * Barcha dars jadvallari va kalendar voqealarini sinxronlash
+ * (Moodle oylik kalendar ko'rinishidan xonalar, ustozlar, guruhlar va aniq dars vaqtlarini olish)
  */
 async function syncTimetable() {
-  console.log('[LMS] Dars jadvallari sinxronlanmoqda...');
-  const params = {
-    'options[timestart]': '1759000000', // 2025-yil sentyabrdan
-    'options[timeend]': '1800000000'    // 2027-yilgacha
-  };
-  MOODLE_CONFIG.knownCourses.forEach((id, idx) => {
-    params[`events[courseids][${idx}]`] = id;
-  });
+  console.log('[LMS] Dars jadvallari va xonalar to\'liq sinxronlanmoqda...');
 
-  const res = await callMoodle('core_calendar_get_calendar_events', params);
-  if (!res || !res.events || !Array.isArray(res.events)) {
-    console.warn('[LMS] Kalendar voqealari topilmadi yoki xatolik yuz berdi');
-    return { count: 0 };
+  // Jadval ustunlari mavjudligini kafolatlash
+  try {
+    db.prepare(`ALTER TABLE lms_timetable ADD COLUMN IF NOT EXISTS group_name VARCHAR(150)`).run();
+    db.prepare(`ALTER TABLE lms_timetable ADD COLUMN IF NOT EXISTS group_code VARCHAR(50)`).run();
+  } catch (e) {}
+
+  const months = [
+    { year: 2026, month: 9 },
+    { year: 2026, month: 10 },
+    { year: 2026, month: 11 },
+    { year: 2026, month: 12 },
+    { year: 2027, month: 1 }
+  ];
+
+  const courseList = [1, ...MOODLE_CONFIG.knownCourses];
+  const allEventsMap = new Map();
+
+  for (const m of months) {
+    const batchSize = 6;
+    for (let i = 0; i < courseList.length; i += batchSize) {
+      const batch = courseList.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (cid) => {
+        try {
+          const res = await callMoodle('core_calendar_get_calendar_monthly_view', {
+            courseid: cid,
+            year: m.year,
+            month: m.month
+          });
+          res?.weeks?.forEach(w => w.days?.forEach(d => {
+            d.events?.forEach(e => {
+              if (e.id && !allEventsMap.has(e.id)) {
+                allEventsMap.set(e.id, e);
+              }
+            });
+          }));
+        } catch (err) {}
+      }));
+    }
   }
 
+  // Fallback sifatida standart kalendar voqealari ro'yxatini ham birlashtirish
+  try {
+    const params = {
+      'options[timestart]': '1759000000',
+      'options[timeend]': '1800000000'
+    };
+    MOODLE_CONFIG.knownCourses.forEach((id, idx) => {
+      params[`events[courseids][${idx}]`] = id;
+    });
+    const resEvents = await callMoodle('core_calendar_get_calendar_events', params);
+    if (resEvents && resEvents.events && Array.isArray(resEvents.events)) {
+      for (const ev of resEvents.events) {
+        if (!allEventsMap.has(ev.id)) {
+          allEventsMap.set(ev.id, ev);
+        }
+      }
+    }
+  } catch (err) {}
+
+  const allEvents = Array.from(allEventsMap.values());
   const nowIso = new Date().toISOString();
   let inserted = 0;
   const courseMap = {};
@@ -160,8 +235,8 @@ async function syncTimetable() {
     INSERT INTO lms_timetable (
       id, event_id, course_id, subject_code, subject_name,
       teacher_name, room, timestart, timeduration, timestart_iso,
-      timeend_iso, weekday, time_str, event_type, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      timeend_iso, weekday, time_str, event_type, group_name, group_code, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (event_id) DO UPDATE SET
       course_id = EXCLUDED.course_id,
       subject_code = EXCLUDED.subject_code,
@@ -174,20 +249,40 @@ async function syncTimetable() {
       timeend_iso = EXCLUDED.timeend_iso,
       weekday = EXCLUDED.weekday,
       time_str = EXCLUDED.time_str,
-      event_type = EXCLUDED.event_type
+      event_type = EXCLUDED.event_type,
+      group_name = EXCLUDED.group_name,
+      group_code = EXCLUDED.group_code
   `);
 
-  for (const ev of res.events) {
-    if (ev.eventtype !== 'course') continue;
+  for (const ev of allEvents) {
+    if (ev.eventtype && ev.eventtype !== 'course') continue;
 
     const eventId = ev.id;
-    const courseId = ev.courseid;
-    const rawName = String(ev.name || '').trim();
+    const courseId = ev.course?.id || ev.courseid || 0;
+    const rawName = cleanHtml(ev.name || '');
+    if (!rawName) continue;
+
     const parts = rawName.split(/[-–—]/);
     const subjectCode = parts[0] ? parts[0].trim() : '';
     const subjectName = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rawName;
 
-    const { teacher, room } = extractTeacherAndRoom(ev.description);
+    // Xonani aniqlash (formattedlocation, location yoki description'dan)
+    let room = cleanHtml(ev.formattedlocation || ev.location);
+    const extracted = extractTeacherAndRoom(ev.description);
+    if (!room && extracted.room) {
+      room = cleanHtml(extracted.room);
+    }
+
+    // Ustozni aniqlash
+    let teacher = cleanHtml(ev.description);
+    if (!teacher || teacher.length > 100) {
+      teacher = extracted.teacher ? cleanHtml(extracted.teacher) : teacher;
+    }
+
+    // Guruhni aniqlash
+    const groupName = cleanHtml(ev.groupname);
+    const groupCode = extractGroupCode(groupName, rawName);
+
     const timestart = ev.timestart;
     const timeduration = ev.timeduration || 7200;
     const timestartIso = new Date(timestart * 1000).toISOString();
@@ -195,9 +290,12 @@ async function syncTimetable() {
     const weekday = getWeekdayNumber(timestart);
     const timeStr = formatTimeStr(timestart, timeduration);
 
-    if (!courseMap[courseId]) {
-      courseMap[courseId] = { code: subjectCode, name: subjectName || rawName };
-      insertCourse.run(courseId, subjectCode, subjectName || rawName, nowIso);
+    if (courseId && !courseMap[courseId]) {
+      const cName = ev.course?.fullname ? cleanHtml(ev.course.fullname) : (subjectName || rawName);
+      courseMap[courseId] = { code: subjectCode, name: cName };
+      try {
+        insertCourse.run(courseId, subjectCode, cName, nowIso);
+      } catch (e) {}
     }
 
     insertTt.run(
@@ -206,8 +304,8 @@ async function syncTimetable() {
       courseId,
       subjectCode,
       rawName,
-      teacher,
-      room,
+      teacher || 'Ustoz ko\'rsatilmagan',
+      room || null,
       timestart,
       timeduration,
       timestartIso,
@@ -215,6 +313,8 @@ async function syncTimetable() {
       weekday,
       timeStr,
       ev.eventtype || 'course',
+      groupName || null,
+      groupCode || null,
       nowIso
     );
     inserted++;
@@ -223,6 +323,7 @@ async function syncTimetable() {
   console.log(`[LMS] Jami ${inserted} ta dars jadvali yozuvi saqlandi.`);
   return { count: inserted, courses: Object.keys(courseMap).length };
 }
+
 
 /**
  * Moodle talabalarini mahalliy talabalar jadvali bilan moslashtirish

@@ -64,7 +64,7 @@ router.get('/overview', (req, res) => {
  */
 router.get('/timetable', (req, res) => {
   try {
-    const { weekday, course_id, search } = req.query;
+    const { weekday, course_id, group, search } = req.query;
     let query = `SELECT * FROM lms_timetable WHERE 1=1`;
     const params = [];
 
@@ -76,16 +76,20 @@ router.get('/timetable', (req, res) => {
       query += ` AND course_id = ?`;
       params.push(Number(course_id));
     }
+    if (group) {
+      query += ` AND (group_code = ? OR group_name ILIKE ?)`;
+      params.push(group, `%${group}%`);
+    }
     if (search) {
-      query += ` AND (subject_name ILIKE ? OR teacher_name ILIKE ? OR room ILIKE ?)`;
+      query += ` AND (subject_name ILIKE ? OR teacher_name ILIKE ? OR room ILIKE ? OR group_name ILIKE ?)`;
       const s = `%${search}%`;
-      params.push(s, s, s);
+      params.push(s, s, s, s);
     }
 
     query += ` ORDER BY weekday ASC, timestart ASC`;
     const timetable = db.prepare(query).all(...params);
 
-    // Hafta kunlari bo'yicha guruhlash
+    // Hafta kunlari bo'yicha guruhlash (har bir dars vaqti, fan, xona va guruhi bo'yicha takrorlanmas darslar)
     const weekdays = {
       1: { name: 'Dushanba', lessons: [] },
       2: { name: 'Seshanba', lessons: [] },
@@ -97,7 +101,7 @@ router.get('/timetable', (req, res) => {
 
     const distinctKeys = new Set();
     for (const item of timetable) {
-      const key = `${item.weekday}_${item.course_id}_${item.time_str}_${item.subject_name}`;
+      const key = `${item.weekday}_${item.time_str}_${item.subject_code}_${item.group_code || ''}_${item.room || ''}`;
       if (!distinctKeys.has(key)) {
         distinctKeys.add(key);
         if (weekdays[item.weekday]) {
@@ -113,6 +117,7 @@ router.get('/timetable', (req, res) => {
         name: val.name,
         lessons: val.lessons
       }))
+
     });
   } catch (err) {
     console.error('LMS Timetable error:', err);

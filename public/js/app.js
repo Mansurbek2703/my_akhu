@@ -11241,8 +11241,9 @@ async function renderUnifiedTimetableTab(container) {
     const grouped = ttRes.grouped_by_weekday || [];
     const groupsList = Array.isArray(grpRes.groups) ? grpRes.groups : [];
 
-    const now = new Date();
-    const currentWeekday = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+    const dayStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(new Date());
+    const dayMap = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
+    const currentWeekday = dayMap[dayStr] || 1;
 
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
@@ -11298,8 +11299,9 @@ function renderUnifiedTimetableDays(groupedDays) {
   const selectedDay = unifiedAttState.weekday || 0;
   const search = (unifiedAttState.timetableSearch || '').toLowerCase().trim();
   const group = (unifiedAttState.group || '').toLowerCase().trim();
-  const now = new Date();
-  const currentWeekday = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+  const dayStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tashkent', weekday: 'short' }).format(new Date());
+  const dayMap = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
+  const currentWeekday = dayMap[dayStr] || 1;
 
   let html = '';
 
@@ -11311,11 +11313,18 @@ function renderUnifiedTimetableDays(groupedDays) {
       lessons = lessons.filter(l => 
         (l.subject_name || '').toLowerCase().includes(search) ||
         (l.teacher_name || '').toLowerCase().includes(search) ||
-        (l.room || '').toLowerCase().includes(search)
+        (l.room || '').toLowerCase().includes(search) ||
+        (l.group_name || '').toLowerCase().includes(search) ||
+        (l.group_code || '').toLowerCase().includes(search)
       );
     }
     if (group) {
-      lessons = lessons.filter(l => (l.subject_code || '').toLowerCase().includes(group) || (l.subject_name || '').toLowerCase().includes(group));
+      lessons = lessons.filter(l => 
+        (l.group_code || '').toLowerCase().includes(group) ||
+        (l.group_name || '').toLowerCase().includes(group) ||
+        (l.subject_code || '').toLowerCase().includes(group) ||
+        (l.subject_name || '').toLowerCase().includes(group)
+      );
     }
 
     const isToday = day.weekday === currentWeekday;
@@ -11344,16 +11353,23 @@ function renderUnifiedTimetableDays(groupedDays) {
                   <span style="background:#0F172A; color:white; font-weight:800; font-size:11.5px; padding:3px 8px; border-radius:6px; font-family:monospace;">
                     🕒 ${l.time_str}
                   </span>
-                  <span style="font-size:11px; font-weight:700; color:#475569; background:#FFFFFF; border:1px solid #E2E8F0; padding:2px 7px; border-radius:6px;">
-                    ${typeLabel}
-                  </span>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    ${l.group_code ? `<span style="font-size:10.5px; font-weight:800; background:#EEF2FF; color:#4F46E5; border:1px solid #C7D2FE; padding:2px 7px; border-radius:6px;" title="${l.group_name || ''}">👥 ${l.group_code}</span>` : ''}
+                    <span style="font-size:11px; font-weight:700; color:#475569; background:#FFFFFF; border:1px solid #E2E8F0; padding:2px 7px; border-radius:6px;">
+                      ${typeLabel}
+                    </span>
+                  </div>
                 </div>
                 <div style="font-size:13.5px; font-weight:700; color:#0F172A; line-height:1.35; margin-top:2px;">
                   ${l.subject_name}
                 </div>
-                <div style="font-size:11.5px; color:#64748B; margin-top:2px; display:flex; flex-direction:column; gap:2px;">
-                  <span>👨‍🏫 <b>Ustoz:</b> ${l.teacher_name || 'Belgilanmagan'}</span>
-                  <span>📍 <b>Xona:</b> ${l.room || 'Ko\'rsatilmagan'}</span>
+                <div style="font-size:12px; color:#475569; margin-top:3px; display:flex; flex-direction:column; gap:4px;">
+                  <span>👨‍🏫 <b>Ustoz:</b> <span style="font-weight:600; color:#1E293B;">${l.teacher_name || 'Belgilanmagan'}</span></span>
+                  <span style="display:flex; align-items:center; gap:5px;">
+                    📍 <b>Xona:</b>
+                    ${l.room ? `<span style="font-weight:700; background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0; padding:2px 8px; border-radius:6px;">🏢 ${l.room}</span>` : `<span style="color:#94A3B8; font-style:italic;">Ko'rsatilmagan</span>`}
+                  </span>
+                  ${l.group_name ? `<span>👥 <b>Guruh:</b> <span style="color:#4338CA; font-weight:600;">${l.group_name}</span></span>` : ''}
                 </div>
               </div>
             `;
@@ -11365,6 +11381,7 @@ function renderUnifiedTimetableDays(groupedDays) {
 
   container.innerHTML = html;
 }
+
 
 function handleUnifiedTtDay(dayNumber, btn) {
   unifiedAttState.weekday = dayNumber;
