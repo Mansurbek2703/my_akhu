@@ -244,76 +244,79 @@ async function syncTimetable() {
       group_code = EXCLUDED.group_code
   `);
 
-  for (const ev of allEvents) {
-    if (ev.eventtype && ev.eventtype !== 'course') continue;
+  const saveTimetableTx = db.transaction((events) => {
+    for (const ev of events) {
+      if (ev.eventtype && ev.eventtype !== 'course') continue;
 
-    const eventId = ev.id;
-    const courseId = ev.course?.id || ev.courseid || 0;
-    const rawName = cleanHtml(ev.name || '');
-    if (!rawName) continue;
+      const eventId = ev.id;
+      const courseId = ev.course?.id || ev.courseid || 0;
+      const rawName = cleanHtml(ev.name || '');
+      if (!rawName) continue;
 
-    const parts = rawName.split(/[-–—]/);
-    const subjectCode = parts[0] ? parts[0].trim() : '';
-    const subjectName = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rawName;
+      const parts = rawName.split(/[-–—]/);
+      const subjectCode = parts[0] ? parts[0].trim() : '';
+      const subjectName = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rawName;
 
-    // Xonani aniqlash (formattedlocation, location yoki description'dan)
-    let room = cleanHtml(ev.formattedlocation || ev.location);
-    const extracted = extractTeacherAndRoom(ev.description);
-    if (!room && extracted.room) {
-      room = cleanHtml(extracted.room);
+      // Xonani aniqlash (formattedlocation, location yoki description'dan)
+      let room = cleanHtml(ev.formattedlocation || ev.location);
+      const extracted = extractTeacherAndRoom(ev.description);
+      if (!room && extracted.room) {
+        room = cleanHtml(extracted.room);
+      }
+
+      // Ustozni aniqlash
+      let teacher = cleanHtml(ev.description);
+      if (!teacher || teacher.length > 100) {
+        teacher = extracted.teacher ? cleanHtml(extracted.teacher) : teacher;
+      }
+
+      // Guruhni aniqlash
+      const groupName = cleanHtml(ev.groupname);
+      const groupCode = extractGroupCode(groupName, rawName);
+
+      const timestart = ev.timestart;
+      // Faqat joriy 2026-2027 o'quv yili (2026-09-01 dan keyingi) darslarni qabul qilish
+      if (timestart < 1788220800) continue;
+      if ([2, 3, 4, 5, 6, 9, 11, 12, 14, 15].includes(courseId)) continue;
+
+      const timeduration = ev.timeduration || 7200;
+      const timestartIso = new Date(timestart * 1000).toISOString();
+      const timeendIso = new Date((timestart + timeduration) * 1000).toISOString();
+      const weekday = getWeekdayNumber(timestart);
+      const timeStr = formatTimeStr(timestart, timeduration);
+
+      if (courseId && !courseMap[courseId]) {
+        const cName = ev.course?.fullname ? cleanHtml(ev.course.fullname) : (subjectName || rawName);
+        courseMap[courseId] = { code: subjectCode, name: cName };
+        try {
+          insertCourse.run(courseId, subjectCode, cName, nowIso);
+        } catch (e) {}
+      }
+
+      insertTt.run(
+        `tt_${eventId}`,
+        eventId,
+        courseId,
+        subjectCode,
+        rawName,
+        teacher || 'Ustoz ko\'rsatilmagan',
+        room || null,
+        timestart,
+        timeduration,
+        timestartIso,
+        timeendIso,
+        weekday,
+        timeStr,
+        ev.eventtype || 'course',
+        groupName || null,
+        groupCode || null,
+        nowIso
+      );
+      inserted++;
     }
+  });
 
-    // Ustozni aniqlash
-    let teacher = cleanHtml(ev.description);
-    if (!teacher || teacher.length > 100) {
-      teacher = extracted.teacher ? cleanHtml(extracted.teacher) : teacher;
-    }
-
-    // Guruhni aniqlash
-    const groupName = cleanHtml(ev.groupname);
-    const groupCode = extractGroupCode(groupName, rawName);
-
-    const timestart = ev.timestart;
-    // Faqat joriy 2026-2027 o'quv yili (2026-09-01 dan keyingi) darslarni qabul qilish
-    if (timestart < 1788220800) continue;
-    if ([2, 3, 4, 5, 6, 9, 11, 12, 14, 15].includes(courseId)) continue;
-
-    const timeduration = ev.timeduration || 7200;
-    const timestartIso = new Date(timestart * 1000).toISOString();
-    const timeendIso = new Date((timestart + timeduration) * 1000).toISOString();
-    const weekday = getWeekdayNumber(timestart);
-    const timeStr = formatTimeStr(timestart, timeduration);
-
-
-    if (courseId && !courseMap[courseId]) {
-      const cName = ev.course?.fullname ? cleanHtml(ev.course.fullname) : (subjectName || rawName);
-      courseMap[courseId] = { code: subjectCode, name: cName };
-      try {
-        insertCourse.run(courseId, subjectCode, cName, nowIso);
-      } catch (e) {}
-    }
-
-    insertTt.run(
-      `tt_${eventId}`,
-      eventId,
-      courseId,
-      subjectCode,
-      rawName,
-      teacher || 'Ustoz ko\'rsatilmagan',
-      room || null,
-      timestart,
-      timeduration,
-      timestartIso,
-      timeendIso,
-      weekday,
-      timeStr,
-      ev.eventtype || 'course',
-      groupName || null,
-      groupCode || null,
-      nowIso
-    );
-    inserted++;
-  }
+  saveTimetableTx(allEvents);
 
   console.log(`[LMS] Jami ${inserted} ta dars jadvali yozuvi saqlandi.`);
   return { count: inserted, courses: Object.keys(courseMap).length };
@@ -434,15 +437,20 @@ async function syncAttendance() {
   let totalStudentAttRecords = 0;
   let matchedStudentsCount = new Set();
 
-  for (const aid of MOODLE_CONFIG.knownAttendanceIds) {
-    const sessions = await callMoodle('mod_attendance_get_sessions', { attendanceid: aid });
-    if (!Array.isArray(sessions) || sessions.length === 0) continue;
+  // Barcha davomat sessiyalarini parallel tortib olish (1 martada to'liq ma'lumotlar bilan)
+  const sessionPromises = MOODLE_CONFIG.knownAttendanceIds.map(aid => 
+    callMoodle('mod_attendance_get_sessions', { attendanceid: aid })
+      .then(sessions => (Array.isArray(sessions) ? sessions.map(s => ({ ...s, aid })) : []))
+      .catch(() => [])
+  );
+  const sessionArrays = await Promise.all(sessionPromises);
+  const allSessions = sessionArrays.flat();
 
-    for (const sess of sessions) {
-      const sessionId = sess.id;
-      // Dars ma'lumotlarini olish
-      const sDetail = await callMoodle('mod_attendance_get_session', { sessionid: sessionId });
-      if (!sDetail) continue;
+  const saveAttendanceTx = db.transaction((sessionsList) => {
+    for (const sDetail of sessionsList) {
+      if (!sDetail || !sDetail.id) continue;
+      const sessionId = sDetail.id;
+      const aid = sDetail.aid;
 
       const courseId = sDetail.courseid || 0;
       const courseName = courseNameMap[courseId] || `Kurs ${courseId}`;
@@ -567,7 +575,9 @@ async function syncAttendance() {
       );
       totalSessionsSynced++;
     }
-  }
+  });
+
+  saveAttendanceTx(allSessions);
 
   console.log(`[LMS] Davomat sinxronlandi: ${totalSessionsSynced} ta dars, ${totalStudentAttRecords} ta talaba yozuvi, ${matchedStudentsCount.size} ta talaba moslashtirildi.`);
   return {

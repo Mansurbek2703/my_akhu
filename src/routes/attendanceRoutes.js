@@ -280,7 +280,7 @@ router.get('/lms-turniket-audit', (req, res) => {
   try {
     const { date } = req.query;
     const result = getLmsTurniketAudit(date);
-    res.json(result);
+    res.json({ success: true, data: result, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

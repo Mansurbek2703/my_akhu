@@ -62,7 +62,7 @@ function makeHikRequest(apiPath, payload = null, method = 'POST') {
         'X-Ca-Signature-Headers': 'x-ca-key,x-ca-timestamp',
         'Content-Length': Buffer.byteLength(bodyData)
       },
-      timeout: 10000,
+      timeout: 3000,
       rejectUnauthorized: cfg.verifySsl === true
     };
 
@@ -82,7 +82,7 @@ function makeHikRequest(apiPath, payload = null, method = 'POST') {
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error(`HikCentral serveriga ulanish vaqti tugadi (Timeout 10s: ${cfg.host})`));
+      reject(new Error(`HikCentral serveriga ulanish vaqti tugadi (Timeout 3s: ${cfg.host})`));
     });
 
     req.on('error', (err) => {
@@ -147,10 +147,18 @@ async function fetchDoorList() {
   }
 }
 
+let cachedPersonMapping = null;
+let lastPersonMappingFetch = 0;
+
 /**
  * Xodimlar va talabalar ro'yxatini xotiraga yuklash (personId -> personCode / Passport ID)
  */
-async function fetchHikPersonMapping() {
+async function fetchHikPersonMapping(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedPersonMapping && (now - lastPersonMappingFetch < 3600000)) {
+    return cachedPersonMapping;
+  }
+
   const personIdToPassport = new Map();
   const personIdToName = new Map();
   let pageNo = 1;
@@ -178,7 +186,9 @@ async function fetchHikPersonMapping() {
     }
   }
 
-  return { personIdToPassport, personIdToName };
+  cachedPersonMapping = { personIdToPassport, personIdToName };
+  lastPersonMappingFetch = now;
+  return cachedPersonMapping;
 }
 
 /**
@@ -249,13 +259,32 @@ async function syncCampusAttendance(targetDate = null) {
 
   console.log(`[HikCentral] Sinxronizatsiya boshlandi: sana ${dateStr} (${startTime} - ${endTime})`);
 
-  // 1. Turniketlar ro'yxatini aniqlash
-  const doors = await fetchDoorList();
-  const doorIndexCodes = doors.map(d => d.doorIndexCode.toString());
+  let doors = [];
+  let personIdToPassport = new Map();
+  let personIdToName = new Map();
 
-  // 2. HikCentral personId -> Pasport ID mappingini olish
-  const { personIdToPassport, personIdToName } = await fetchHikPersonMapping();
-  console.log(`[HikCentral] HikCentral xodimlar/talabalar xaritasi yuklandi: ${personIdToPassport.size} nafar`);
+  try {
+    // 1. Turniketlar ro'yxatini aniqlash
+    doors = await fetchDoorList();
+
+    // 2. HikCentral personId -> Pasport ID mappingini olish
+    const mapRes = await fetchHikPersonMapping();
+    personIdToPassport = mapRes.personIdToPassport;
+    personIdToName = mapRes.personIdToName;
+    console.log(`[HikCentral] HikCentral xodimlar/talabalar xaritasi yuklandi: ${personIdToPassport.size} nafar`);
+  } catch (netErr) {
+    console.warn(`[HikCentral] Serverga ulanib bo'lmadi (offline/timeout): ${netErr.message}`);
+    return {
+      success: false,
+      offline: true,
+      date: dateStr,
+      totalEvents: 0,
+      studentsPresent: 0,
+      message: `HikCentral serveri hozirda nofaol (${netErr.message}). Turniket serveri uchun VPN (Tailscale) yoqilgan bo'lishi kerak. Lokal davomat ma'lumotlari saqlandi.`
+    };
+  }
+
+  const doorIndexCodes = doors.map(d => d.doorIndexCode.toString());
 
   // 3. Bazadagi talabalarni pasport bo'yicha indekslash
   const students = db.prepare('SELECT id, external_id, first_name, last_name, group_code FROM student').all();
@@ -275,14 +304,15 @@ async function syncCampusAttendance(targetDate = null) {
 
   const dailyStudentEvents = new Map(); // studentId -> { student, passport, events: [] }
 
-  while (hasMore) {
-    const eventData = await fetchDoorEvents({
-      startTime,
-      endTime,
-      pageNo,
-      pageSize,
-      doorIndexCodes
-    });
+  try {
+    while (hasMore) {
+      const eventData = await fetchDoorEvents({
+        startTime,
+        endTime,
+        pageNo,
+        pageSize,
+        doorIndexCodes
+      });
 
     const list = eventData.list || [];
     if (list.length === 0) {
@@ -344,6 +374,19 @@ async function syncCampusAttendance(targetDate = null) {
       pageNo++;
     }
   }
+} catch (eventsErr) {
+  console.warn(`[HikCentral] Voqealarni tortib olishda xatolik: ${eventsErr.message}`);
+  if (totalProcessed === 0) {
+    return {
+      success: false,
+      offline: true,
+      date: dateStr,
+      totalEvents: 0,
+      studentsPresent: 0,
+      message: `HikCentral voqealari yuklanmadi (${eventsErr.message}). Lokal ma'lumotlar saqlandi.`
+    };
+  }
+}
 
   // 5. Har bir talabaning kunlik birinchi kirishi va oxirgi chiqishini hisoblab saqlash
   let updatedAttendanceCount = 0;

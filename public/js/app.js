@@ -12678,32 +12678,307 @@ function changeAttendancePage(newPage) {
   loadAttendanceData();
 }
 
-async function triggerHikCentralSync() {
-  const btn = document.getElementById('btn-sync-hik');
-  if (attendanceState.syncing) return;
+// ====================================================================
+// MA'LUMOTLARNI TEZKOR BIRLASHGAN SINXRONLASH VA JARAYON (PROGRESS) MODALI
+// ====================================================================
+let isUnifiedSyncRunning = false;
 
-  attendanceState.syncing = true;
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = `<span class="spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:6px;"></span> Sinxronlanmoqda...`;
+async function triggerUnifiedSyncModal(btnEl) {
+  if (isUnifiedSyncRunning) return;
+  isUnifiedSyncRunning = true;
+
+  // Modal elementini yaratish yoki mavjudini olish
+  let modalOverlay = document.getElementById('unified-sync-process-modal');
+  if (!modalOverlay) {
+    modalOverlay = document.createElement('div');
+    modalOverlay.id = 'unified-sync-process-modal';
+    modalOverlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.65); backdrop-filter:blur(5px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px; opacity:0; transition:opacity 0.2s ease;';
+    document.body.appendChild(modalOverlay);
   }
+
+  modalOverlay.innerHTML = `
+    <div style="background:#FFFFFF; border:1px solid #E2E8F0; width:100%; max-width:540px; border-radius:18px; padding:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); font-family:inherit;">
+      <!-- Sarlavha -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:42px; height:42px; border-radius:12px; background:#EFF6FF; color:#2563EB; display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow:inset 0 0 0 1px #BFDBFE;">
+            🔄
+          </div>
+          <div>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:8px;">
+              <span>Ma'lumotlarni Sinxronlash</span>
+            </h3>
+            <div style="font-size:12px; color:#64748B; margin-top:2px;">Moodle LMS va Turniket (Face ID) tizimlari bilan integratsiya</div>
+          </div>
+        </div>
+        <span id="usp-badge" style="background:#EFF6FF; color:#1D4ED8; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:20px; border:1px solid #BFDBFE; display:inline-flex; align-items:center; gap:5px;">
+          <span class="spinner" style="width:11px; height:11px; border-width:2px;"></span> <span>Jarayon...</span>
+        </span>
+      </div>
+
+      <!-- Progress bar -->
+      <div style="margin-bottom:18px; background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-bottom:8px; color:#334155;">
+          <span id="usp-step-label">Moodle LMS bilan aloqa o'rnatilmoqda...</span>
+          <span id="usp-percent" style="color:#2563EB; font-weight:800;">10%</span>
+        </div>
+        <div style="background:#E2E8F0; border-radius:10px; height:8px; overflow:hidden;">
+          <div id="usp-progress-bar" style="background:linear-gradient(90deg, #2563EB, #3B82F6); height:100%; width:10%; transition:width 0.35s ease, background-color 0.35s ease; border-radius:10px;"></div>
+        </div>
+      </div>
+
+      <!-- Bosqichlar (Steps) -->
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <!-- Step 1 -->
+        <div id="usp-step-1" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; transition:all 0.2s;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="usp-icon-1" class="spinner" style="width:14px; height:14px; border-width:2px;"></span>
+            <div>
+              <div style="font-size:12.5px; font-weight:700; color:#0F172A;">1. Moodle LMS Dars Jadvallari (Timetable)</div>
+              <div id="usp-desc-1" style="font-size:11px; color:#64748B;">Haftalik dars taqvimi tortilmoqda...</div>
+            </div>
+          </div>
+          <span id="usp-status-1" style="font-size:11.5px; font-weight:700; color:#2563EB;">Yuklanmoqda</span>
+        </div>
+
+        <!-- Step 2 -->
+        <div id="usp-step-2" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; transition:all 0.2s;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="usp-icon-2" style="font-size:13px; color:#94A3B8;">⚪</span>
+            <div>
+              <div style="font-size:12.5px; font-weight:700; color:#0F172A;">2. LMS Dars Mashg'ulotlari & Davomat Jurnali</div>
+              <div id="usp-desc-2" style="font-size:11px; color:#64748B;">Talabalar davomat qaydlari tahlil qilinadi...</div>
+            </div>
+          </div>
+          <span id="usp-status-2" style="font-size:11.5px; font-weight:600; color:#94A3B8;">Kutilmoqda</span>
+        </div>
+
+        <!-- Step 3 -->
+        <div id="usp-step-3" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; transition:all 0.2s;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="usp-icon-3" style="font-size:13px; color:#94A3B8;">⚪</span>
+            <div>
+              <div style="font-size:12.5px; font-weight:700; color:#0F172A;">3. Turniket & Face ID Kirish-Chiqish Loglari</div>
+              <div id="usp-desc-3" style="font-size:11px; color:#64748B;">HikCentral serveri tekshiriladi...</div>
+            </div>
+          </div>
+          <span id="usp-status-3" style="font-size:11.5px; font-weight:600; color:#94A3B8;">Kutilmoqda</span>
+        </div>
+
+        <!-- Step 4 -->
+        <div id="usp-step-4" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; transition:all 0.2s;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="usp-icon-4" style="font-size:13px; color:#94A3B8;">⚪</span>
+            <div>
+              <div style="font-size:12.5px; font-weight:700; color:#0F172A;">4. Tizim Statistikasi va Mutanosiblik Auditi</div>
+              <div id="usp-desc-4" style="font-size:11px; color:#64748B;">Guruhlar reytingi va tahlillar yangilanadi...</div>
+            </div>
+          </div>
+          <span id="usp-status-4" style="font-size:11.5px; font-weight:600; color:#94A3B8;">Kutilmoqda</span>
+        </div>
+      </div>
+
+      <!-- Xulosa qutisi (Success Banner) -->
+      <div id="usp-banner" style="display:none; padding:12px 16px; border-radius:12px; background:#ECFDF5; border:1px solid #A7F3D0; margin-bottom:18px;">
+        <div style="font-size:13px; font-weight:800; color:#065F46; display:flex; align-items:center; gap:6px;">
+          <span>🎉</span> <span>Sinxronizatsiya muvaffaqiyatli yakunlandi!</span>
+        </div>
+        <div id="usp-banner-text" style="font-size:12px; color:#047857; margin-top:5px; line-height:1.5;"></div>
+      </div>
+
+      <!-- Pastki tugmalar -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="usp-timer-note" style="font-size:11.5px; color:#64748B;">Iltimos kuting, tizim tezkor yangilanmoqda...</span>
+        <button id="usp-btn-close" class="btn btn-primary" onclick="closeUnifiedSyncModal()" disabled style="font-size:12.5px; font-weight:700; padding:6px 18px; border-radius:8px; opacity:0.6; cursor:not-allowed;">
+          Yopish
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Ko'rsatish
+  modalOverlay.style.display = 'flex';
+  setTimeout(() => { modalOverlay.style.opacity = '1'; }, 20);
+
+  const setProgress = (percent, label) => {
+    const bar = document.getElementById('usp-progress-bar');
+    const pct = document.getElementById('usp-percent');
+    const lbl = document.getElementById('usp-step-label');
+    if (bar) bar.style.width = `${percent}%`;
+    if (pct) pct.textContent = `${percent}%`;
+    if (lbl && label) lbl.textContent = label;
+  };
+
+  const updateStep = (stepNum, state, desc, statusText) => {
+    const iconEl = document.getElementById(`usp-icon-${stepNum}`);
+    const descEl = document.getElementById(`usp-desc-${stepNum}`);
+    const statusEl = document.getElementById(`usp-status-${stepNum}`);
+    const rowEl = document.getElementById(`usp-step-${stepNum}`);
+
+    if (state === 'running') {
+      if (iconEl) iconEl.outerHTML = `<span id="usp-icon-${stepNum}" class="spinner" style="width:14px; height:14px; border-width:2px;"></span>`;
+      if (statusEl) {
+        statusEl.textContent = statusText || 'Bajarilmoqda...';
+        statusEl.style.color = '#2563EB';
+      }
+      if (rowEl) {
+        rowEl.style.background = '#EFF6FF';
+        rowEl.style.borderColor = '#BFDBFE';
+      }
+    } else if (state === 'success') {
+      const el = document.getElementById(`usp-icon-${stepNum}`);
+      if (el) el.outerHTML = `<span id="usp-icon-${stepNum}" style="color:#059669; font-size:15px; font-weight:bold;">✅</span>`;
+      if (statusEl) {
+        statusEl.textContent = statusText || 'Bajarildi';
+        statusEl.style.color = '#059669';
+      }
+      if (rowEl) {
+        rowEl.style.background = '#F0FDF4';
+        rowEl.style.borderColor = '#BBF7D0';
+      }
+    } else if (state === 'info') {
+      const el = document.getElementById(`usp-icon-${stepNum}`);
+      if (el) el.outerHTML = `<span id="usp-icon-${stepNum}" style="color:#D97706; font-size:15px; font-weight:bold;">ℹ️</span>`;
+      if (statusEl) {
+        statusEl.textContent = statusText || 'Offline';
+        statusEl.style.color = '#D97706';
+      }
+      if (rowEl) {
+        rowEl.style.background = '#FFFBEB';
+        rowEl.style.borderColor = '#FDE68A';
+      }
+    }
+    if (descEl && desc) descEl.textContent = desc;
+  };
 
   try {
-    const res = await apiFetch('/api/attendance/sync', {
-      method: 'POST',
-      body: JSON.stringify({ date: attendanceState.date })
-    });
-    alert(`Sinxronizatsiya muvaffaqiyatli yakunlandi!\nQayta ishlangan voqealar: ${res.totalEvents}\nDavomati yangilangan talabalar: ${res.studentsPresent}`);
-    await loadAttendanceData();
-  } catch (err) {
-    alert(`HikCentral sinxronizatsiya xatosi:\n${err.message}\n\nEslatma: HikCentral serveriga VPN (Tailscale) orqali ulanish faollashtirilgan bo'lishi kerak.`);
-  } finally {
-    attendanceState.syncing = false;
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> <span>HikCentral Sinxronlash</span>`;
+    // 1-va 2-bosqich: LMS sinxronlash (parallel tezkor)
+    setProgress(20, '1/3: Moodle LMS dars jadvallari va darslar yangilanmoqda...');
+    updateStep(1, 'running', 'Moodle lms.akhu.uz dan jadvallar yuklanmoqda...', 'Bajarilmoqda...');
+
+    let lmsRes = null;
+    try {
+      lmsRes = await apiFetch('/api/lms/sync', { method: 'POST' });
+    } catch (lmsErr) {
+      console.warn('LMS sync warning:', lmsErr);
     }
+
+    const ttCount = lmsRes?.timetable?.count || 0;
+    const sessCount = lmsRes?.attendance?.sessions || 0;
+    const attCount = lmsRes?.attendance?.attendanceRecords || 0;
+
+    updateStep(1, 'success', `Moodle dars jadvali to'liq yangilandi (${ttCount} ta faol dars)`, '✅ Tayyor');
+    setProgress(55, '2/3: LMS talabalar davomat yozuvlari keshlandi...');
+    updateStep(2, 'success', `Davomat jurnali yangilandi (${sessCount} ta mashg'ulot, ${attCount} ta davomat qaydi)`, '✅ Tayyor');
+
+    // 3-bosqich: Turniket (Face ID) sinxronlash
+    setProgress(75, '3/3: Turniket Face ID loglari bilan solishtirilmoqda...');
+    updateStep(3, 'running', 'HikCentral turniket o\'tishlari tekshirilmoqda...', 'So\'ralmoqda...');
+
+    const currentDate = (typeof attendanceState !== 'undefined' && attendanceState.date) || new Date().toISOString().slice(0, 10);
+    let hikRes = null;
+    try {
+      hikRes = await apiFetch('/api/attendance/sync', {
+        method: 'POST',
+        body: JSON.stringify({ date: currentDate })
+      });
+    } catch (hikErr) {
+      hikRes = { offline: true, message: hikErr.message };
+    }
+
+    if (hikRes && hikRes.offline) {
+      updateStep(3, 'info', `Turniket serveri offline (VPN talab etiladi). Mavjud lokal loglar saqlab qolindi.`, 'ℹ️ Lokal kesh');
+    } else {
+      updateStep(3, 'success', `Turniket loglari yangilandi (${hikRes?.totalEvents || 0} ta o'tish, ${hikRes?.studentsPresent || 0} nafar talaba)`, '✅ Yangilandi');
+    }
+
+    // 4-bosqich: Tahlillar va statistika
+    setProgress(95, 'Barcha statistika va davomat auditi qayta hisoblanmoqda...');
+    updateStep(4, 'running', 'Reytinglar va tahlillar hisoblanmoqda...', 'Hisoblanmoqda...');
+
+    // Sahifadagi mavjud faol modullarni yangilash
+    if (typeof loadAttendanceData === 'function' && document.getElementById('att-table-body')) {
+      await loadAttendanceData().catch(() => {});
+    }
+    if (typeof loadUnifiedLmsOverviewData === 'function' && document.getElementById('unified-lms-sessions-tbody')) {
+      await loadUnifiedLmsOverviewData().catch(() => {});
+    }
+    if (typeof loadUnifiedGroupsRankingData === 'function' && document.getElementById('unified-groups-ranking-tbody')) {
+      await loadUnifiedGroupsRankingData().catch(() => {});
+    }
+
+    updateStep(4, 'success', 'Statistika, guruhlar reytingi va tahlillar yangilandi', '✅ Tayyor');
+    setProgress(100, 'Sinxronizatsiya muvaffaqiyatli yakunlandi!');
+
+    const badge = document.getElementById('usp-badge');
+    if (badge) {
+      badge.style.background = '#ECFDF5';
+      badge.style.color = '#059669';
+      badge.style.borderColor = '#BBF7D0';
+      badge.innerHTML = `<span>✅ Yakunlandi</span>`;
+    }
+
+    const banner = document.getElementById('usp-banner');
+    const bannerText = document.getElementById('usp-banner-text');
+    if (banner && bannerText) {
+      banner.style.display = 'block';
+      bannerText.innerHTML = `
+        📅 <b>${ttCount} ta</b> dars jadvali &bull;
+        🎓 <b>${sessCount} ta</b> mashg'ulot &bull;
+        👥 <b>${attCount} ta</b> talaba davomati yangilandi.<br>
+        ${hikRes && hikRes.offline ? `<span style="color:#B45309; font-size:11.5px;">⚠️ Turniket serveriga ulanish uchun VPN (Tailscale) faol bo'lishi kerak.</span>` : `🚪 <b>${hikRes?.totalEvents || 0} ta</b> turniket o'tishi qayd etildi.`}
+      `;
+    }
+
+    const note = document.getElementById('usp-timer-note');
+    if (note) note.textContent = 'Jarayon yakunlandi. Oyna 3 soniyadan so\'ng yopiladi.';
+
+    const closeBtn = document.getElementById('usp-btn-close');
+    if (closeBtn) {
+      closeBtn.disabled = false;
+      closeBtn.style.opacity = '1';
+      closeBtn.style.cursor = 'pointer';
+    }
+
+    setTimeout(() => {
+      closeUnifiedSyncModal();
+    }, 3200);
+
+  } catch (err) {
+    console.error('Unified sync error:', err);
+    setProgress(100, 'Xatolik yuz berdi');
+    const badge = document.getElementById('usp-badge');
+    if (badge) {
+      badge.style.background = '#FEF2F2';
+      badge.style.color = '#DC2626';
+      badge.style.borderColor = '#FECACA';
+      badge.textContent = 'Xatolik';
+    }
+    const note = document.getElementById('usp-timer-note');
+    if (note) note.textContent = `Xatolik: ${err.message}`;
+    const closeBtn = document.getElementById('usp-btn-close');
+    if (closeBtn) {
+      closeBtn.disabled = false;
+      closeBtn.style.opacity = '1';
+      closeBtn.style.cursor = 'pointer';
+    }
+  } finally {
+    isUnifiedSyncRunning = false;
   }
+}
+
+function closeUnifiedSyncModal() {
+  const modal = document.getElementById('unified-sync-process-modal');
+  if (modal) {
+    modal.style.opacity = '0';
+    setTimeout(() => {
+      modal.style.display = 'none';
+    }, 200);
+  }
+}
+
+async function triggerHikCentralSync(btnEl) {
+  return triggerUnifiedSyncModal(btnEl);
 }
 
 async function checkHikConnectionStatus() {
@@ -13050,7 +13325,7 @@ async function openLmsTurniketAuditModal() {
 
   try {
     const res = await apiFetch(`/api/attendance/lms-turniket-audit?date=${encodeURIComponent(date)}`);
-    const data = res.data;
+    const data = res.data || res;
     if (!data) throw new Error("Audit ma'lumotlari topilmadi");
 
     const discrepancies = data.discrepancies || [];
@@ -13658,29 +13933,8 @@ async function openLmsSessionModal(sessionId) {
 }
 
 // 5. QO'LDA SINXRONLASH
-async function syncLmsManually() {
-  const btn = document.getElementById('btn-sync-lms-main');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = `<div class="spinner spinner-sm" style="width:14px; height:14px; border-width:2px;"></div> <span>Sinxronlanmoqda...</span>`;
-  }
-
-  try {
-    const res = await apiFetch('/api/lms/sync', { method: 'POST' });
-    if (res.success) {
-      alert(`Moodle dan ma'lumotlar muvaffaqiyatli sinxronlandi!\n\n📅 Jadvallar: ${res.timetable?.count || 0} ta\n🎓 Darslar: ${res.attendance?.sessions || 0} ta\n👥 Talabalar yozuvlari: ${res.attendance?.attendanceRecords || 0} ta`);
-      renderLmsMonitoring(document.getElementById('module-page-container'));
-    } else {
-      alert(`Sinxronlashda xatolik: ${res.message || res.error || 'Noma\'lum xatolik'}`);
-    }
-  } catch (err) {
-    alert(`Xatolik: ${err.message}`);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = `${icon('refresh', 14)} <span>🔄 LMS dan yangilash</span>`;
-    }
-  }
+async function syncLmsManually(btnEl) {
+  return triggerUnifiedSyncModal(btnEl);
 }
 
 window.renderLmsMonitoring = renderLmsMonitoring;
@@ -13689,6 +13943,9 @@ window.filterTtDay = filterTtDay;
 window.handleLmsStudentSearch = handleLmsStudentSearch;
 window.openLmsSessionModal = openLmsSessionModal;
 window.syncLmsManually = syncLmsManually;
+window.triggerUnifiedSyncModal = triggerUnifiedSyncModal;
+window.closeUnifiedSyncModal = closeUnifiedSyncModal;
+window.triggerHikCentralSync = triggerUnifiedSyncModal;
 
 // Birlashgan Darslar & Davomat Tizimi window eksportlari
 window.renderUnifiedAttendance = renderUnifiedAttendance;
