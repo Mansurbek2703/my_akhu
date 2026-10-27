@@ -374,8 +374,8 @@ async function syncAttendance() {
       id, session_id, attendance_id, course_id, course_name,
       sessdate, sessdate_iso, duration, lasttaken, lasttaken_iso,
       description, total_enrolled, present_count, late_count,
-      excused_count, absent_count, attendance_rate, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      excused_count, absent_count, attendance_rate, group_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (session_id) DO UPDATE SET
       course_id = EXCLUDED.course_id,
       course_name = EXCLUDED.course_name,
@@ -391,6 +391,7 @@ async function syncAttendance() {
       excused_count = EXCLUDED.excused_count,
       absent_count = EXCLUDED.absent_count,
       attendance_rate = EXCLUDED.attendance_rate,
+      group_id = EXCLUDED.group_id,
       updated_at = EXCLUDED.updated_at
   `);
 
@@ -560,6 +561,7 @@ async function syncAttendance() {
         eCount,
         aCount,
         rate,
+        sDetail.groupid || null,
         nowIso,
         nowIso
       );
@@ -978,6 +980,19 @@ function getAdminLmsStudents(search = '', groupCode = '', limit = 100) {
   return { students: list };
 }
 
+const MOODLE_GROUPID_MAP = {
+  102: 'FDT01', 108: 'FDT01',
+  103: 'FMC01', 109: 'FMC01', 133: 'FMC01',
+  104: 'FMC02', 110: 'FMC02', 134: 'FMC02',
+  105: 'FMC03', 111: 'FMC03', 135: 'FMC03',
+  106: 'FMC04', 112: 'FMC04', 136: 'FMC04',
+  107: 'FMC05', 113: 'FMC05', 141: 'FMC05',
+  60: 'SAI01', 64: 'SAI01', 72: 'SAI01',
+  61: 'SAI02', 65: 'SAI02', 73: 'SAI02',
+  62: 'SSE01', 66: 'SSE01', 74: 'SSE01',
+  63: 'SSE02', 67: 'SSE02', 75: 'SSE02'
+};
+
 /**
  * Admin: Bitta dars sessiyasining to'liq talabalar davomatini olish
  */
@@ -985,13 +1000,30 @@ function getAdminSessionDetails(sessionId) {
   const session = db.prepare(`SELECT * FROM lms_attendance_session WHERE session_id = ?`).get(sessionId);
   if (!session) return { error: 'Dars sessiyasi topilmadi' };
 
-  const students = db.prepare(`
-    SELECT sa.*, st.group_code, st.photo_url
+  const fallbackGroup = session.group_id && MOODLE_GROUPID_MAP[session.group_id] ? MOODLE_GROUPID_MAP[session.group_id] : null;
+
+  const rawStudents = db.prepare(`
+    SELECT 
+      sa.*,
+      COALESCE(st1.group_code, st2.group_code, st3.group_code) as student_group_code,
+      COALESCE(st1.photo_url, st2.photo_url, st3.photo_url) as photo_url,
+      COALESCE(st1.id, st2.id, st3.id) as resolved_student_id,
+      COALESCE(st1.external_id, st2.external_id, st3.external_id) as external_id
     FROM lms_student_attendance sa
-    LEFT JOIN student st ON sa.student_id = st.id
+    LEFT JOIN student st1 ON sa.student_id = st1.id
+    LEFT JOIN student st2 ON sa.moodle_student_id = st2.moodle_id
+    LEFT JOIN student st3 ON (
+      LOWER(sa.student_name) = LOWER(st3.first_name || ' ' || st3.last_name)
+      OR LOWER(sa.student_name) = LOWER(st3.last_name || ' ' || st3.first_name)
+    )
     WHERE sa.session_id = ?
     ORDER BY sa.student_name ASC
   `).all(sessionId);
+
+  const students = rawStudents.map(st => ({
+    ...st,
+    group_code: st.student_group_code || fallbackGroup || '—'
+  }));
 
   return { session, students };
 }

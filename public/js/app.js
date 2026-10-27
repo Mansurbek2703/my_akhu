@@ -11215,6 +11215,8 @@ async function switchUnifiedAttTab(tabName) {
     await renderUnifiedTimetableTab(body);
   } else if (tabName === 'lms_attendance') {
     await renderUnifiedLmsOverviewTab(body);
+  } else if (tabName === 'group_ranking') {
+    await renderUnifiedGroupsRankingTab(body);
   } else if (tabName === 'turniket') {
     await renderCampusAttendance(body);
   } else if (tabName === 'cross_audit') {
@@ -11609,12 +11611,11 @@ async function renderUnifiedLmsOverviewTab(container) {
                   <th style="padding:10px 12px; text-align:center;">🟡 Kech</th>
                   <th style="padding:10px 12px; text-align:center;">🔴 Kelmadi</th>
                   <th style="padding:10px 12px; text-align:center;">Davomat Foizi</th>
-                  <th style="padding:10px 12px; text-align:right;">Amal</th>
                 </tr>
               </thead>
               <tbody>
                 ${recentSessions.length === 0 ? `
-                  <tr><td colspan="8" style="text-align:center; padding:30px; color:#94A3B8;">Ushbu davrda dars jurnali topilmadi</td></tr>
+                  <tr><td colspan="7" style="text-align:center; padding:30px; color:#94A3B8;">Ushbu davrda dars jurnali topilmadi</td></tr>
                 ` : recentSessions.map(s => {
                   const dt = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '—';
                   const rate = s.attendance_rate || 0;
@@ -11622,7 +11623,7 @@ async function renderUnifiedLmsOverviewTab(container) {
                   const col = rate >= 85 ? '#059669' : (rate >= 70 ? '#D97706' : '#DC2626');
 
                   return `
-                    <tr style="border-bottom:1px solid #F1F5F9; cursor:pointer;" onclick="openLmsSessionModal(${s.session_id})">
+                    <tr style="border-bottom:1px solid #F1F5F9; cursor:pointer; transition:background-color 0.15s ease;" onmouseover="this.style.backgroundColor='#F8FAFC'" onmouseout="this.style.backgroundColor=''" onclick="openLmsSessionModal(${s.session_id})" title="Davomat tafsilotini ko'rish uchun bosing">
                       <td style="padding:10px 12px; font-weight:600; color:#1E293B; white-space:nowrap;">📅 ${dt}</td>
                       <td style="padding:10px 12px;">
                         <strong style="color:#0F172A;">${s.course_name || `Kurs ${s.course_id}`}</strong>
@@ -11634,9 +11635,6 @@ async function renderUnifiedLmsOverviewTab(container) {
                       <td style="padding:10px 12px; text-align:center; font-weight:700; color:#EF4444;">${s.absent_count}</td>
                       <td style="padding:10px 12px; text-align:center;">
                         <span style="background:${bg}; color:${col}; font-weight:800; font-size:11.5px; padding:3px 8px; border-radius:6px;">${rate}%</span>
-                      </td>
-                      <td style="padding:10px 12px; text-align:right;">
-                        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); openLmsSessionModal(${s.session_id});" style="font-size:11px; padding:3px 8px;">Tafsilot</button>
                       </td>
                     </tr>
                   `;
@@ -12139,6 +12137,16 @@ async function downloadCrossAuditExcel() {
     }
   }
 }
+
+let attendanceState = {
+  date: new Date().toISOString().slice(0, 10),
+  group: '',
+  status: '',
+  search: '',
+  page: 1,
+  limit: 20,
+  syncing: false
+};
 
 async function renderCampusAttendance(targetContainer) {
   targetContainer.innerHTML = `
@@ -13315,12 +13323,11 @@ function renderLmsSessionsTab(container) {
               <th style="padding: 12px 14px; text-align: center;">🟡 Kech</th>
               <th style="padding: 12px 14px; text-align: center;">🔴 Kelmadi</th>
               <th style="padding: 12px 14px; text-align: center;">Davomat Foizi</th>
-              <th style="padding: 12px 14px; text-align: right;">Amal</th>
             </tr>
           </thead>
           <tbody>
             ${sessions.length === 0 ? `
-              <tr><td colspan="8" style="text-align: center; padding: 30px; color: #94A3B8;">Hozircha o'tkazilgan darslar topilmadi</td></tr>
+              <tr><td colspan="7" style="text-align: center; padding: 30px; color: #94A3B8;">Hozircha o'tkazilgan darslar topilmadi</td></tr>
             ` : sessions.map(s => {
               const dt = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '—';
               const rate = s.attendance_rate || 0;
@@ -13328,7 +13335,7 @@ function renderLmsSessionsTab(container) {
               const badgeColor = rate >= 85 ? '#059669' : (rate >= 70 ? '#D97706' : '#DC2626');
 
               return `
-                <tr style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s; cursor: pointer;" onclick="openLmsSessionModal(${s.session_id})">
+                <tr style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s; cursor: pointer;" onmouseover="this.style.backgroundColor='#F8FAFC'" onmouseout="this.style.backgroundColor=''" onclick="openLmsSessionModal(${s.session_id})" title="Davomat tafsilotini ko'rish uchun bosing">
                   <td style="padding: 12px 14px; font-weight: 600; color: #1E293B; white-space: nowrap;">
                     📅 ${dt}
                   </td>
@@ -13352,11 +13359,6 @@ function renderLmsSessionsTab(container) {
                     <span style="background: ${badgeBg}; color: ${badgeColor}; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 8px;">
                       ${rate}%
                     </span>
-                  </td>
-                  <td style="padding: 12px 14px; text-align: right;">
-                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); openLmsSessionModal(${s.session_id});" style="font-size: 11.5px; padding: 4px 10px;">
-                      👁️ Tafsilot
-                    </button>
                   </td>
                 </tr>
               `;
@@ -13639,7 +13641,7 @@ async function openLmsSessionModal(sessionId) {
                   <tr style="border-bottom:1px solid #F1F5F9;">
                     <td style="padding:8px 12px; color:#64748B;">${i + 1}</td>
                     <td style="padding:8px 12px; font-weight:700; color:#0F172A;">${st.student_name}</td>
-                    <td style="padding:8px 12px;"><span class="badge" style="background:#EFF6FF; color:#2563EB;">${st.group_code || '—'}</span></td>
+                    <td style="padding:8px 12px;"><span class="badge" style="background:${st.group_code ? '#EFF6FF' : '#F1F5F9'}; color:${st.group_code ? '#1D4ED8' : '#94A3B8'}; font-weight:700; padding:3px 8px; border-radius:6px; font-size:11.5px; border:1px solid ${st.group_code ? '#BFDBFE' : '#E2E8F0'};">${st.group_code || '—'}</span></td>
                     <td style="padding:8px 12px; text-align:center;">${badge}</td>
                     <td style="padding:8px 12px; font-size:11px; color:#64748B;">${st.remarks || '—'}</td>
                   </tr>
