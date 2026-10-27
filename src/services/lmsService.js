@@ -716,11 +716,34 @@ function getStudentAttendance(studentId) {
  * my.akhu.uz Admin / Monitoring uchun umumiy statistika va monitoring ma'lumotlari
  */
 function getAdminLmsOverview(filters = {}) {
+  const period = filters.period || 'all';
+  const selectedDate = filters.date || new Date().toISOString().split('T')[0];
+
+  let dateFilterClause = '';
+  const dateParams = [];
+
+  if (period === 'day') {
+    dateFilterClause = 'AND sessdate_iso LIKE ?';
+    dateParams.push(`${selectedDate}%`);
+  } else if (period === 'month') {
+    dateFilterClause = 'AND sessdate_iso LIKE ?';
+    dateParams.push(`${selectedDate.slice(0, 7)}%`);
+  } else if (period === 'week') {
+    const d = new Date(selectedDate + "T12:00:00Z");
+    const day = d.getUTCDay() || 7;
+    const monday = new Date(d);
+    monday.setUTCDate(d.getUTCDate() - day + 1);
+    const saturday = new Date(d);
+    saturday.setUTCDate(d.getUTCDate() - day + 6);
+    dateFilterClause = 'AND sessdate_iso >= ? AND sessdate_iso <= ?';
+    dateParams.push(monday.toISOString().slice(0, 10), saturday.toISOString().slice(0, 10) + 'T23:59:59');
+  }
+
   // 1. KPI kartalari
   const totalTimetable = db.prepare(`SELECT COUNT(*) as c FROM lms_timetable`).get().c;
   const totalCourses = db.prepare(`SELECT COUNT(*) as c FROM lms_course`).get().c;
-  const totalSessions = db.prepare(`SELECT COUNT(*) as c FROM lms_attendance_session`).get().c;
-  const takenSessions = db.prepare(`SELECT COUNT(*) as c FROM lms_attendance_session WHERE lasttaken IS NOT NULL`).get().c;
+  const totalSessions = db.prepare(`SELECT COUNT(*) as c FROM lms_attendance_session WHERE 1=1 ${dateFilterClause}`).get(...dateParams).c;
+  const takenSessions = db.prepare(`SELECT COUNT(*) as c FROM lms_attendance_session WHERE lasttaken IS NOT NULL ${dateFilterClause}`).get(...dateParams).c;
 
   // Umumiy davomat foizi
   const attStats = db.prepare(`
@@ -731,8 +754,8 @@ function getAdminLmsOverview(filters = {}) {
       SUM(absent_count) as a,
       SUM(total_enrolled) as total
     FROM lms_attendance_session 
-    WHERE lasttaken IS NOT NULL
-  `).get();
+    WHERE lasttaken IS NOT NULL ${dateFilterClause}
+  `).get(...dateParams);
 
   const p = Number(attStats.p || 0);
   const l = Number(attStats.l || 0);
@@ -740,13 +763,13 @@ function getAdminLmsOverview(filters = {}) {
   const total = Number(attStats.total || 0);
   const overallRate = total > 0 ? Math.round(((p + e + (l * 0.5)) / total) * 1000) / 10 : 0.0;
 
-  // Bugungi darslar
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todaySessions = db.prepare(`
+  // Davrdagi darslar
+  const periodSessions = db.prepare(`
     SELECT * FROM lms_attendance_session 
-    WHERE sessdate_iso LIKE ?
-    ORDER BY sessdate ASC
-  `).all(`${todayStr}%`);
+    WHERE 1=1 ${dateFilterClause}
+    ORDER BY sessdate DESC
+    LIMIT 100
+  `).all(...dateParams);
 
   // Fanlar kesimidagi davomat reytingi
   const coursesRanking = db.prepare(`
@@ -759,10 +782,10 @@ function getAdminLmsOverview(filters = {}) {
       SUM(absent_count) as absent,
       AVG(attendance_rate) as avg_rate
     FROM lms_attendance_session
-    WHERE lasttaken IS NOT NULL AND course_name IS NOT NULL
+    WHERE lasttaken IS NOT NULL AND course_name IS NOT NULL ${dateFilterClause}
     GROUP BY course_name
     ORDER BY avg_rate DESC
-  `).all().map(r => ({
+  `).all(...dateParams).map(r => ({
     course_name: r.course_name,
     sessions_count: Number(r.sessions_count),
     present: Number(r.present),
@@ -771,15 +794,9 @@ function getAdminLmsOverview(filters = {}) {
     avg_rate: Math.round(Number(r.avg_rate) * 10) / 10
   }));
 
-  // So'nggi darslar ro'yxati
-  const recentSessions = db.prepare(`
-    SELECT * FROM lms_attendance_session
-    WHERE lasttaken IS NOT NULL
-    ORDER BY sessdate DESC
-    LIMIT 25
-  `).all();
-
   return {
+    period,
+    selected_date: selectedDate,
     kpis: {
       total_timetable: totalTimetable,
       total_courses: totalCourses,
@@ -791,12 +808,12 @@ function getAdminLmsOverview(filters = {}) {
       late_count: l
     },
     today: {
-      date: todayStr,
-      count: todaySessions.length,
-      sessions: todaySessions
+      date: selectedDate,
+      count: periodSessions.length,
+      sessions: periodSessions
     },
     courses_ranking: coursesRanking,
-    recent_sessions: recentSessions,
+    recent_sessions: periodSessions.slice(0, 30),
     last_sync: lastSyncResult
   };
 }
@@ -884,6 +901,72 @@ function getAdminSessionDetails(sessionId) {
 }
 
 /**
+ * Admin: Guruhlar kesimida davomat reytingi va statistikasi
+ */
+function getLmsGroupsRanking(date = null, period = 'day') {
+  const selectedDate = date || new Date().toISOString().slice(0, 10);
+
+  const groups = db.prepare(`
+    SELECT 
+      st.group_code,
+      COALESCE(st.course, 1) as course,
+      COUNT(DISTINCT st.id) as total_students,
+      COUNT(DISTINCT ca.student_id) as in_campus_count
+    FROM student st
+    LEFT JOIN campus_attendance ca ON ca.student_id = st.id AND ca.date = ?
+    WHERE st.status = 'active' AND st.group_code IS NOT NULL
+    GROUP BY st.group_code, st.course
+  `).all(selectedDate);
+
+  // LMS attendance stats per group
+  let lmsDateClause = 'AND sa.sessdate_iso LIKE ?';
+  let lmsDateParam = `${selectedDate}%`;
+  if (period === 'month') {
+    lmsDateParam = `${selectedDate.slice(0, 7)}%`;
+  }
+
+  const groupLmsStats = db.prepare(`
+    SELECT 
+      st.group_code,
+      COUNT(sa.id) as total_records,
+      SUM(CASE WHEN sa.status IN ('P', 'L') THEN 1 ELSE 0 END) as present_count,
+      SUM(CASE WHEN sa.status = 'A' THEN 1 ELSE 0 END) as absent_count,
+      SUM(CASE WHEN sa.status = 'L' THEN 1 ELSE 0 END) as late_count
+    FROM student st
+    JOIN lms_student_attendance sa ON (sa.student_id = st.id OR sa.moodle_student_id = st.moodle_id)
+    WHERE st.status = 'active' ${lmsDateClause}
+    GROUP BY st.group_code
+  `).all(lmsDateParam);
+
+  const lmsMap = new Map(groupLmsStats.map(s => [s.group_code, s]));
+
+  const ranking = groups.map(g => {
+    const lms = lmsMap.get(g.group_code) || { total_records: 0, present_count: 0, absent_count: 0, late_count: 0 };
+    const turniketRate = Number(g.total_students) > 0 ? Math.round((Number(g.in_campus_count) / Number(g.total_students)) * 100) : 0;
+    const lmsRate = Number(lms.total_records) > 0 ? Math.round((Number(lms.present_count) / Number(lms.total_records)) * 100) : turniketRate;
+
+    return {
+      group_code: g.group_code,
+      course: Number(g.course) || 1,
+      total_students: Number(g.total_students),
+      in_campus_count: Number(g.in_campus_count),
+      turniket_rate: turniketRate,
+      lms_rate: lmsRate,
+      present_count: Number(lms.present_count),
+      absent_count: Number(lms.absent_count),
+      late_count: Number(lms.late_count),
+      composite_rate: Math.round((turniketRate * 0.6) + (lmsRate * 0.4))
+    };
+  }).sort((a, b) => b.composite_rate - a.composite_rate);
+
+  return ranking.map((item, idx) => ({
+    ...item,
+    rank: idx + 1,
+    badge: idx === 0 ? '🥇 1-o\'rin' : (idx === 1 ? '🥈 2-o\'rin' : (idx === 2 ? '🥉 3-o\'rin' : `${idx + 1}-o'rin`))
+  }));
+}
+
+/**
  * Fon rejimida davriy sinxronlash croni (Har 30 daqiqada)
  */
 function startLmsSyncCron() {
@@ -909,5 +992,6 @@ module.exports = {
   getAdminLmsOverview,
   getAdminLmsStudents,
   getAdminSessionDetails,
+  getLmsGroupsRanking,
   startLmsSyncCron
 };

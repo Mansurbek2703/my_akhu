@@ -781,14 +781,11 @@ function navigateTo(pageName) {
       renderStaffProfile(targetContainer);
       break;
     case 'campus-attendance-manage':
-      pageTitle.textContent = 'Davomat & Turniket (Face ID)';
-      pageDesc.textContent = 'Talabalarning universitetga kelgan-kelmagani, qachon kirdi va qachon chiqdi monitoringi';
-      renderCampusAttendance(targetContainer);
-      break;
     case 'lms-monitoring':
-      pageTitle.textContent = 'Darslar & LMS Davomati (Moodle)';
-      pageDesc.textContent = 'Dars jadvallari, o\'qituvchilar, auditoriyalar va Moodle tizimidagi dars davomatlari monitoringi';
-      renderLmsMonitoring(targetContainer);
+    case 'lms-attendance-unified':
+      pageTitle.textContent = 'Darslar & Davomat Tizimi';
+      pageDesc.textContent = 'LMS dars jadvali, kunlik/haftalik/oylik davomat, guruhlar reytingi, turniket va davomat mutanosibligi auditi';
+      renderUnifiedAttendance(targetContainer);
       break;
     default:
       targetContainer.innerHTML = `<div class="card"><p>Sahifa topilmadi: ${pageName}</p></div>`;
@@ -11103,17 +11100,915 @@ function exitImpersonation() {
 }
 
 // ====================================================================
-// SAHIFA: KAMPUSGA KIRISH-CHIQISH VA JONLI DAVOMAT (HIKCENTRAL)
+// DARSLAR & DAVOMAT TIZIMI (LMS VA TURNIKET YAGONA SUPER-PANELI)
 // ====================================================================
-let attendanceState = {
+let unifiedAttState = {
+  currentTab: 'timetable', // 'timetable' | 'lms_attendance' | 'group_ranking' | 'turniket' | 'cross_audit'
+  period: 'day',
   date: new Date().toISOString().slice(0, 10),
   group: '',
-  status: '',
+  weekday: 0,
+  auditCategory: 'all',
+  auditCourse: '',
+  auditGroup: '',
   search: '',
-  page: 1,
-  limit: 50,
-  syncing: false
+  timetableSearch: ''
 };
+
+async function renderUnifiedAttendance(targetContainer) {
+  targetContainer.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      
+      <!-- YUQORI BOSHQARUV VA TABLAR PANELI -->
+      <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+          <div>
+            <h2 style="font-size:18px; font-weight:800; color:#0F172A; margin:0 0 4px; display:flex; align-items:center; gap:8px;">
+              <span>🏛️ Darslar & Davomat Tizimi</span>
+              <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:11px; font-weight:700; border:1px solid #BFDBFE;">LMS & Turniket Nazorati</span>
+            </h2>
+            <div style="font-size:12.5px; color:#64748B;">
+              Haftalik dars jadvali, Moodle LMS davomati, guruhlar reytingi, Turniket Face ID va davomat mutanosibligi auditi
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="triggerHikPhotosSync(this)" style="font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+              📸 <span>Rasmlar</span>
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="triggerHikCentralSync()" style="font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+              ${icon('refresh', 13)} <span>Sinxronlash</span>
+            </button>
+            <span id="unified-live-badge" style="font-size:11px; font-weight:600; color:#15803D; background:#DCFCE7; border:1px solid #BBF7D0; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#22C55E;"></span>
+              <span>Jonli Tizim</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 5 TA ASOSIY BO'LIM TUGMALARI (NAV SWITCHER) -->
+        <div style="display:flex; gap:8px; border-top:1px solid #F1F5F9; padding-top:14px; flex-wrap:wrap;">
+          <button id="btn-u-timetable" class="btn btn-sm ${unifiedAttState.currentTab === 'timetable' ? 'btn-primary' : 'btn-outline'}" onclick="switchUnifiedAttTab('timetable')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px;">
+            <span>📅 Haftalik Dars Jadvali</span>
+          </button>
+
+          <button id="btn-u-lms_attendance" class="btn btn-sm ${unifiedAttState.currentTab === 'lms_attendance' ? 'btn-primary' : 'btn-outline'}" onclick="switchUnifiedAttTab('lms_attendance')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px;">
+            <span>📊 LMS Davomati</span>
+          </button>
+
+          <button id="btn-u-group_ranking" class="btn btn-sm ${unifiedAttState.currentTab === 'group_ranking' ? 'btn-primary' : 'btn-outline'}" onclick="switchUnifiedAttTab('group_ranking')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px;">
+            <span>👥 Guruhlar Davomati</span>
+          </button>
+
+          <button id="btn-u-turniket" class="btn btn-sm ${unifiedAttState.currentTab === 'turniket' ? 'btn-primary' : 'btn-outline'}" onclick="switchUnifiedAttTab('turniket')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px;">
+            <span>🚪 Turniket Davomati (Face ID)</span>
+          </button>
+
+          <button id="btn-u-cross_audit" class="btn btn-sm ${unifiedAttState.currentTab === 'cross_audit' ? 'btn-primary' : 'btn-outline'}" onclick="switchUnifiedAttTab('cross_audit')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px; ${unifiedAttState.currentTab === 'cross_audit' ? '' : 'background:#EFF6FF; color:#1D4ED8; border-color:#93C5FD;'}">
+            <span>⚖️ Turniket & LMS Mutanosibligi</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TANLANGAN TAB KONTENTI -->
+      <div id="unified-att-tab-body">
+        <div style="padding:40px; text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div>Ma'lumotlar yuklanmoqda...</div>
+      </div>
+
+    </div>
+  `;
+
+  await switchUnifiedAttTab(unifiedAttState.currentTab);
+}
+
+async function switchUnifiedAttTab(tabName) {
+  unifiedAttState.currentTab = tabName;
+  const tabs = ['timetable', 'lms_attendance', 'group_ranking', 'turniket', 'cross_audit'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`btn-u-${t}`);
+    if (btn) {
+      if (t === tabName) {
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-outline');
+        if (t === 'cross_audit') {
+          btn.style.background = '';
+          btn.style.color = '';
+        }
+      } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+        if (t === 'cross_audit') {
+          btn.style.background = '#EFF6FF';
+          btn.style.color = '#1D4ED8';
+          btn.style.borderColor = '#93C5FD';
+        }
+      }
+    }
+  });
+
+  const body = document.getElementById('unified-att-tab-body');
+  if (!body) return;
+
+  if (tabName === 'timetable') {
+    await renderUnifiedTimetableTab(body);
+  } else if (tabName === 'lms_attendance') {
+    await renderUnifiedLmsOverviewTab(body);
+  } else if (tabName === 'group_ranking') {
+    await renderUnifiedGroupsRankingTab(body);
+  } else if (tabName === 'turniket') {
+    await renderCampusAttendance(body);
+  } else if (tabName === 'cross_audit') {
+    await renderUnifiedCrossAuditTab(body);
+  }
+}
+
+// 1. HAFTALIK DARS JADVALI TABI (TIMETABLE)
+async function renderUnifiedTimetableTab(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+      <div class="spinner"></div>
+      <span style="margin-left:10px; font-weight:600; color:#64748B;">Dars jadvali yuklanmoqda...</span>
+    </div>
+  `;
+
+  try {
+    const [ttRes, grpRes] = await Promise.all([
+      apiFetch('/api/lms/timetable'),
+      apiFetch('/api/admin/groups-list').catch(() => ({ groups: [] }))
+    ]);
+
+    cachedLmsTimetable = ttRes;
+    const grouped = ttRes.grouped_by_weekday || [];
+    const groupsList = Array.isArray(grpRes.groups) ? grpRes.groups : [];
+
+    const now = new Date();
+    const currentWeekday = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- FILTRLAR PANELI -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <!-- Guruh tanlash -->
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; font-weight:700; color:#475569;">🎓 Guruh:</span>
+                <select id="u-tt-group-select" class="form-control" onchange="handleUnifiedTimetableFilter()" style="font-size:12.5px; padding:5px 8px; border-radius:6px; min-width:130px;">
+                  <option value="">Barcha guruhlar</option>
+                  ${groupsList.map(g => `<option value="${g}" ${unifiedAttState.group === g ? 'selected' : ''}>${g}</option>`).join('')}
+                </select>
+              </div>
+
+              <!-- Hafta kunlari tugmalari -->
+              <div style="display:flex; gap:4px; flex-wrap:wrap;" id="u-tt-weekday-buttons">
+                <button class="btn btn-sm ${unifiedAttState.weekday === 0 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(0, this)">Hafta (Barchasi)</button>
+                <button class="btn btn-sm ${unifiedAttState.weekday === 1 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(1, this)">Dush ${currentWeekday === 1 ? '●' : ''}</button>
+                <button class="btn btn-sm ${unifiedAttState.weekday === 2 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(2, this)">Sesh ${currentWeekday === 2 ? '●' : ''}</button>
+                <button class="btn btn-sm ${unifiedAttState.weekday === 3 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(3, this)">Chor ${currentWeekday === 3 ? '●' : ''}</button>
+                <button class="btn btn-sm ${unifiedAttState.weekday === 4 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(4, this)">Pay ${currentWeekday === 4 ? '●' : ''}</button>
+                <button class="btn btn-sm ${unifiedAttState.weekday === 5 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(5, this)">Juma ${currentWeekday === 5 ? '●' : ''}</button>
+                <button class="btn btn-sm ${unifiedAttState.weekday === 6 ? 'btn-primary' : 'btn-outline'}" onclick="handleUnifiedTtDay(6, this)">Shan ${currentWeekday === 6 ? '●' : ''}</button>
+              </div>
+            </div>
+
+            <!-- Qidiruv -->
+            <div>
+              <input type="text" id="u-tt-search-input" value="${unifiedAttState.timetableSearch}" placeholder="🔍 Fan, o'qituvchi yoki xona..." oninput="handleUnifiedTimetableFilter()" class="form-control" style="font-size:12.5px; padding:5px 10px; border-radius:6px; width:220px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- DARSLAR RO'YXATI GRIDI -->
+        <div id="u-tt-grid" style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Dinamik kunlar -->
+        </div>
+      </div>
+    `;
+
+    renderUnifiedTimetableDays(grouped);
+  } catch (err) {
+    container.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:#EF4444;">Dars jadvali yuklanmadi: ${err.message}</div>`;
+  }
+}
+
+function renderUnifiedTimetableDays(groupedDays) {
+  const container = document.getElementById('u-tt-grid');
+  if (!container) return;
+
+  const selectedDay = unifiedAttState.weekday || 0;
+  const search = (unifiedAttState.timetableSearch || '').toLowerCase().trim();
+  const group = (unifiedAttState.group || '').toLowerCase().trim();
+  const now = new Date();
+  const currentWeekday = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+
+  let html = '';
+
+  groupedDays.forEach(day => {
+    if (selectedDay !== 0 && day.weekday !== selectedDay) return;
+
+    let lessons = day.lessons || [];
+    if (search) {
+      lessons = lessons.filter(l => 
+        (l.subject_name || '').toLowerCase().includes(search) ||
+        (l.teacher_name || '').toLowerCase().includes(search) ||
+        (l.room || '').toLowerCase().includes(search)
+      );
+    }
+    if (group) {
+      lessons = lessons.filter(l => (l.subject_code || '').toLowerCase().includes(group) || (l.subject_name || '').toLowerCase().includes(group));
+    }
+
+    const isToday = day.weekday === currentWeekday;
+
+    html += `
+      <div class="tt-day-card" style="background:#FFFFFF; border:1px solid ${isToday ? '#93C5FD' : '#E2E8F0'}; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.03);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #F1F5F9; padding-bottom:8px;">
+          <h4 style="font-size:15px; font-weight:800; color:${isToday ? '#1D4ED8' : '#1E293B'}; margin:0; display:flex; align-items:center; gap:8px;">
+            <span>📅 ${day.name}</span>
+            ${isToday ? '<span class="badge" style="background:#DCFCE7; color:#15803D; font-size:10px; font-weight:700;">Bugun</span>' : ''}
+          </h4>
+          <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:11px;">${lessons.length} ta dars</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:12px;">
+          ${lessons.length === 0 ? `
+            <div style="color:#94A3B8; font-size:12.5px; padding:10px;">Ushbu mezonlar bo'yicha darslar topilmadi</div>
+          ` : lessons.map(l => {
+            const isLab = /lab|laboratoriya/i.test(l.subject_name);
+            const isLecture = /lecture|ma'ruza/i.test(l.subject_name);
+            const typeLabel = isLab ? '🔬 Lab' : (isLecture ? '🎓 Ma\'ruza' : '✏️ Amaliyot');
+
+            return `
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="background:#0F172A; color:white; font-weight:800; font-size:11.5px; padding:3px 8px; border-radius:6px; font-family:monospace;">
+                    🕒 ${l.time_str}
+                  </span>
+                  <span style="font-size:11px; font-weight:700; color:#475569; background:#FFFFFF; border:1px solid #E2E8F0; padding:2px 7px; border-radius:6px;">
+                    ${typeLabel}
+                  </span>
+                </div>
+                <div style="font-size:13.5px; font-weight:700; color:#0F172A; line-height:1.35; margin-top:2px;">
+                  ${l.subject_name}
+                </div>
+                <div style="font-size:11.5px; color:#64748B; margin-top:2px; display:flex; flex-direction:column; gap:2px;">
+                  <span>👨‍🏫 <b>Ustoz:</b> ${l.teacher_name || 'Belgilanmagan'}</span>
+                  <span>📍 <b>Xona:</b> ${l.room || 'Ko\'rsatilmagan'}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function handleUnifiedTtDay(dayNumber, btn) {
+  unifiedAttState.weekday = dayNumber;
+  document.querySelectorAll('#u-tt-weekday-buttons button').forEach(b => {
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-outline');
+  });
+  if (btn) {
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-outline');
+  }
+  if (cachedLmsTimetable && cachedLmsTimetable.grouped_by_weekday) {
+    renderUnifiedTimetableDays(cachedLmsTimetable.grouped_by_weekday);
+  }
+}
+
+function handleUnifiedTimetableFilter() {
+  const grpSelect = document.getElementById('u-tt-group-select');
+  const searchInput = document.getElementById('u-tt-search-input');
+  if (grpSelect) unifiedAttState.group = grpSelect.value;
+  if (searchInput) unifiedAttState.timetableSearch = searchInput.value;
+  if (cachedLmsTimetable && cachedLmsTimetable.grouped_by_weekday) {
+    renderUnifiedTimetableDays(cachedLmsTimetable.grouped_by_weekday);
+  }
+}
+
+// 2. LMS DAVOMATI TABI (KUNLIK / HAFTALIK / OYLIK)
+async function renderUnifiedLmsOverviewTab(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+      <div class="spinner"></div>
+      <span style="margin-left:10px; font-weight:600; color:#64748B;">LMS davomat ma'lumotlari yuklanmoqda...</span>
+    </div>
+  `;
+
+  try {
+    const period = unifiedAttState.period || 'day';
+    const date = unifiedAttState.date || new Date().toISOString().slice(0, 10);
+    const data = await apiFetch(`/api/lms/overview?period=${encodeURIComponent(period)}&date=${encodeURIComponent(date)}`);
+    cachedLmsOverview = data;
+    const kpis = data.kpis || {};
+    const recentSessions = data.recent_sessions || [];
+
+    const pRate = kpis.overall_rate || 0;
+    const rateColor = pRate >= 85 ? '#10B981' : (pRate >= 70 ? '#F59E0B' : '#EF4444');
+
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- DAVR FILTRI (KUNLIK / HAFTALIK / OYLIK) -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:12px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:12px; font-weight:700; color:#475569;">Davr:</span>
+              <button class="btn btn-sm ${period === 'day' ? 'btn-primary' : 'btn-outline'}" onclick="setUnifiedLmsPeriod('day')">⚡ Bugun (Kunlik)</button>
+              <button class="btn btn-sm ${period === 'week' ? 'btn-primary' : 'btn-outline'}" onclick="setUnifiedLmsPeriod('week')">📅 Shu Hafta</button>
+              <button class="btn btn-sm ${period === 'month' ? 'btn-primary' : 'btn-outline'}" onclick="setUnifiedLmsPeriod('month')">🗓️ Shu Oy (Oylik)</button>
+              <button class="btn btn-sm ${period === 'all' ? 'btn-primary' : 'btn-outline'}" onclick="setUnifiedLmsPeriod('all')">🌐 Barcha Davr</button>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:12px; font-weight:700; color:#475569;">Sana:</span>
+              <input type="date" value="${date}" onchange="setUnifiedLmsDate(this.value)" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; width:135px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 TA KPI KARTALAR -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+          <div class="card" style="padding:16px; border-radius:12px; border-left:4px solid #3B82F6; background:#FFFFFF;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Rejalashtirilgan Darslar</div>
+            <div style="font-size:24px; font-weight:800; color:#0F172A; margin:4px 0 2px;">${kpis.total_sessions || 0} ta</div>
+            <div style="font-size:11.5px; color:#64748B;">Tanlangan davrda</div>
+          </div>
+
+          <div class="card" style="padding:16px; border-radius:12px; border-left:4px solid #10B981; background:#FFFFFF;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">O'tkazilgan Darslar</div>
+            <div style="font-size:24px; font-weight:800; color:#10B981; margin:4px 0 2px;">${kpis.taken_sessions || 0} ta</div>
+            <div style="font-size:11.5px; color:#64748B;">Moodle da davomat olingan</div>
+          </div>
+
+          <div class="card" style="padding:16px; border-radius:12px; border-left:4px solid ${rateColor}; background:#FFFFFF;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">O'rtacha Davomat Foizi</div>
+            <div style="font-size:24px; font-weight:800; color:${rateColor}; margin:4px 0 2px;">${pRate}%</div>
+            <div style="font-size:11.5px; color:#64748B;">🟢 ${kpis.present_count || 0} bor • 🔴 ${kpis.absent_count || 0} yo'q</div>
+          </div>
+
+          <div class="card" style="padding:16px; border-radius:12px; border-left:4px solid #F59E0B; background:#FFFFFF;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Kechikishlar</div>
+            <div style="font-size:24px; font-weight:800; color:#D97706; margin:4px 0 2px;">${kpis.late_count || 0} marta</div>
+            <div style="font-size:11.5px; color:#64748B;">Olingan darslar bo'yicha</div>
+          </div>
+        </div>
+
+        <!-- FANLAR KESIMIDAGI REYTING VA DARS JURNALI -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:15px; font-weight:800; color:#0F172A; margin:0;">
+              📋 O'tkazilgan Dars Mashg'ulotlari Jurnali (${recentSessions.length} ta)
+            </h3>
+            <span style="font-size:12px; color:#64748B;">Batafsil ko'rish uchun dars ustiga bosing</span>
+          </div>
+
+          <div class="table-responsive" style="border:1px solid #E2E8F0; border-radius:10px; overflow:hidden;">
+            <table class="table" style="margin:0; width:100%; font-size:12.5px;">
+              <thead style="background:#F8FAFC;">
+                <tr>
+                  <th style="padding:10px 12px;">Sana & Vaqt</th>
+                  <th style="padding:10px 12px;">Fan / Dars Mashg'uloti</th>
+                  <th style="padding:10px 12px; text-align:center;">Jami Talabalar</th>
+                  <th style="padding:10px 12px; text-align:center;">🟢 Bor</th>
+                  <th style="padding:10px 12px; text-align:center;">🟡 Kech</th>
+                  <th style="padding:10px 12px; text-align:center;">🔴 Kelmadi</th>
+                  <th style="padding:10px 12px; text-align:center;">Davomat Foizi</th>
+                  <th style="padding:10px 12px; text-align:right;">Amal</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recentSessions.length === 0 ? `
+                  <tr><td colspan="8" style="text-align:center; padding:30px; color:#94A3B8;">Ushbu davrda dars jurnali topilmadi</td></tr>
+                ` : recentSessions.map(s => {
+                  const dt = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '—';
+                  const rate = s.attendance_rate || 0;
+                  const bg = rate >= 85 ? '#ECFDF5' : (rate >= 70 ? '#FFFBEB' : '#FEF2F2');
+                  const col = rate >= 85 ? '#059669' : (rate >= 70 ? '#D97706' : '#DC2626');
+
+                  return `
+                    <tr style="border-bottom:1px solid #F1F5F9; cursor:pointer;" onclick="openLmsSessionModal(${s.session_id})">
+                      <td style="padding:10px 12px; font-weight:600; color:#1E293B; white-space:nowrap;">📅 ${dt}</td>
+                      <td style="padding:10px 12px;">
+                        <strong style="color:#0F172A;">${s.course_name || `Kurs ${s.course_id}`}</strong>
+                        ${s.description ? `<div style="font-size:11px; color:#64748B;">${s.description}</div>` : ''}
+                      </td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700;">${s.total_enrolled} ta</td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700; color:#10B981;">${s.present_count}</td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700; color:#F59E0B;">${s.late_count}</td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700; color:#EF4444;">${s.absent_count}</td>
+                      <td style="padding:10px 12px; text-align:center;">
+                        <span style="background:${bg}; color:${col}; font-weight:800; font-size:11.5px; padding:3px 8px; border-radius:6px;">${rate}%</span>
+                      </td>
+                      <td style="padding:10px 12px; text-align:right;">
+                        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); openLmsSessionModal(${s.session_id});" style="font-size:11px; padding:3px 8px;">Tafsilot</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:#EF4444;">LMS ma'lumotlari yuklanmadi: ${err.message}</div>`;
+  }
+}
+
+function setUnifiedLmsPeriod(period) {
+  unifiedAttState.period = period;
+  const body = document.getElementById('unified-att-tab-body');
+  if (body) renderUnifiedLmsOverviewTab(body);
+}
+
+function setUnifiedLmsDate(date) {
+  unifiedAttState.date = date;
+  const body = document.getElementById('unified-att-tab-body');
+  if (body) renderUnifiedLmsOverviewTab(body);
+}
+
+// 3. GURUHLAR DAVOMATI VA REYTINGI TABI
+async function renderUnifiedGroupsRankingTab(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+      <div class="spinner"></div>
+      <span style="margin-left:10px; font-weight:600; color:#64748B;">Guruhlar davomati hisoblanmoqda...</span>
+    </div>
+  `;
+
+  try {
+    const date = unifiedAttState.date || new Date().toISOString().slice(0, 10);
+    const res = await apiFetch(`/api/lms/groups-ranking?date=${encodeURIComponent(date)}&period=${encodeURIComponent(unifiedAttState.period || 'day')}`);
+    const ranking = res.ranking || [];
+
+    const topGroup = ranking[0] || null;
+    const avgRate = ranking.length > 0 ? Math.round(ranking.reduce((s, r) => s + r.turniket_rate, 0) / ranking.length) : 0;
+
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- YUQORI METRIKALAR -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+          <div class="card" style="padding:16px; border-radius:12px; background:#FFFFFF; border:1px solid #E2E8F0;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Akademik Guruhlar</div>
+            <div style="font-size:24px; font-weight:800; color:#0F172A; margin:4px 0 2px;">${ranking.length} ta</div>
+            <div style="font-size:11.5px; color:#64748B;">Universitet bo'yicha</div>
+          </div>
+
+          <div class="card" style="padding:16px; border-radius:12px; background:#F0FDF4; border:1px solid #BBF7D0;">
+            <div style="font-size:11px; font-weight:700; color:#15803D; text-transform:uppercase;">Eng Intizomli Guruh</div>
+            <div style="font-size:24px; font-weight:800; color:#166534; margin:4px 0 2px;">${topGroup ? topGroup.group_code : '—'} (${topGroup ? topGroup.turniket_rate + '%' : '0%'})</div>
+            <div style="font-size:11.5px; color:#15803D;">🥇 1-o'rin sohibi</div>
+          </div>
+
+          <div class="card" style="padding:16px; border-radius:12px; background:#EFF6FF; border:1px solid #BFDBFE;">
+            <div style="font-size:11px; font-weight:700; color:#1D4ED8; text-transform:uppercase;">O'rtacha Guruh Davomati</div>
+            <div style="font-size:24px; font-weight:800; color:#1E40AF; margin:4px 0 2px;">${avgRate}%</div>
+            <div style="font-size:11.5px; color:#1E40AF;">Turniket ko'rsatkichi</div>
+          </div>
+        </div>
+
+        <!-- REYTING JADVALI -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h3 style="font-size:15px; font-weight:800; color:#0F172A; margin:0;">
+              🏆 Guruhlar Davomat Reytingi (${ranking.length} ta guruh)
+            </h3>
+            <span style="font-size:12px; color:#64748B;">Sana: <b>${date}</b></span>
+          </div>
+
+          <div class="table-responsive" style="border:1px solid #E2E8F0; border-radius:10px; overflow:hidden;">
+            <table class="table" style="margin:0; width:100%; font-size:12.5px;">
+              <thead style="background:#F8FAFC;">
+                <tr>
+                  <th style="padding:10px 12px; text-align:center; width:70px;">O'rin</th>
+                  <th style="padding:10px 12px;">Akademik Guruh</th>
+                  <th style="padding:10px 12px; text-align:center;">Kurs</th>
+                  <th style="padding:10px 12px; text-align:center;">Jami Talabalar</th>
+                  <th style="padding:10px 12px; text-align:center;">Turniket Davomati</th>
+                  <th style="padding:10px 12px; text-align:center;">LMS Qatnashuv</th>
+                  <th style="padding:10px 12px; text-align:center;">Qoldirilgan Darslar</th>
+                  <th style="padding:10px 12px; text-align:center; width:140px;">Davomat Ko'rsatkichi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${ranking.map((g, idx) => {
+                  const rate = g.turniket_rate || 0;
+                  const barColor = rate >= 80 ? '#22C55E' : (rate >= 65 ? '#EAB308' : '#EF4444');
+                  const badgeStyle = idx === 0 
+                    ? 'background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;' 
+                    : (idx === 1 ? 'background:#F1F5F9; color:#334155; border:1px solid #CBD5E1;' : (idx === 2 ? 'background:#FFEDD5; color:#C2410C; border:1px solid #FED7AA;' : 'background:#F8FAFC; color:#64748B;'));
+
+                  return `
+                    <tr style="border-bottom:1px solid #F1F5F9;">
+                      <td style="padding:10px 12px; text-align:center;">
+                        <span class="badge" style="${badgeStyle} font-weight:800; padding:3px 8px; border-radius:6px; font-size:11px;">
+                          ${g.badge}
+                        </span>
+                      </td>
+                      <td style="padding:10px 12px;">
+                        <strong style="color:#0F172A; font-size:13px;">${g.group_code}</strong>
+                      </td>
+                      <td style="padding:10px 12px; text-align:center; color:#64748B; font-weight:600;">
+                        ${g.course}-kurs
+                      </td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700;">
+                        ${g.total_students} ta
+                      </td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700; color:#15803D;">
+                        ${g.in_campus_count} / ${g.total_students} (${g.turniket_rate}%)
+                      </td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700; color:#2563EB;">
+                        ${g.lms_rate}%
+                      </td>
+                      <td style="padding:10px 12px; text-align:center; font-weight:700; color:#DC2626;">
+                        ${g.absent_count} ta
+                      </td>
+                      <td style="padding:10px 12px; text-align:center;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                          <div style="flex:1; height:7px; background:#E2E8F0; border-radius:4px; overflow:hidden;">
+                            <div style="width:${rate}%; height:100%; background:${barColor}; border-radius:4px;"></div>
+                          </div>
+                          <span style="font-size:11px; font-weight:800; color:#0F172A; min-width:32px;">${rate}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    `;
+  } catch(err) {
+    container.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:#EF4444;">Guruhlar davomati yuklanmadi: ${err.message}</div>`;
+  }
+}
+
+// 5. TURNIKET & LMS MUTANOSIBLIGI TABI (AUDIT & COMPARISON)
+async function renderUnifiedCrossAuditTab(container) {
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+      <div class="spinner"></div>
+      <span style="margin-left:10px; font-weight:600; color:#64748B;">Mutanosiblik tahlili hisoblanmoqda...</span>
+    </div>
+  `;
+
+  try {
+    const date = unifiedAttState.date || new Date().toISOString().slice(0, 10);
+    const category = unifiedAttState.auditCategory || 'all';
+    const group = unifiedAttState.auditGroup || '';
+    const course = unifiedAttState.auditCourse || '';
+    const search = unifiedAttState.search || '';
+
+    const query = new URLSearchParams({ date, category, group_code: group, course, search });
+    const [res, grpRes] = await Promise.all([
+      apiFetch(`/api/attendance/cross-audit-deep?${query.toString()}`),
+      apiFetch('/api/admin/groups-list').catch(() => ({ groups: [] }))
+    ]);
+
+    const summary = res.summary || {};
+    const counts = res.counts || {};
+    const students = res.students || [];
+    const groupsList = Array.isArray(grpRes.groups) ? grpRes.groups : [];
+
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- YUQORI ANALITIKA (UNIVERSITET VA BAKALAVR KESIMIDA) -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:12px;">
+          <!-- Universitet umumiy davomati -->
+          <div class="card" style="padding:16px; border-radius:12px; background:#FFFFFF; border:1px solid #E2E8F0;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">🏛️ Universitet Davomati</div>
+            <div style="font-size:24px; font-weight:800; color:#0F172A; margin:4px 0 2px;">
+              ${summary.university_attendance_rate || 0}% 
+              <span style="font-size:12px; font-weight:600; color:#64748B;">(${summary.in_campus_count || 0}/${summary.total_students || 0})</span>
+            </div>
+            <div style="font-size:11.5px; color:#15803D; font-weight:600;">Jami bino hududida</div>
+          </div>
+
+          <!-- Bakalavr kurslar kesimida -->
+          <div class="card" style="padding:16px; border-radius:12px; background:#FFFFFF; border:1px solid #E2E8F0;">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">🎓 Bakalavr Kurslar Davomati</div>
+            <div style="font-size:14px; font-weight:700; color:#1E293B; margin:6px 0 4px; display:flex; flex-wrap:wrap; gap:8px;">
+              ${(summary.bachelor_courses || []).map(bc => `
+                <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-weight:700; font-size:11.5px;">
+                  ${bc.course_name}: ${bc.rate}% (${bc.in_campus}/${bc.total_students})
+                </span>
+              `).join('')}
+            </div>
+            <div style="font-size:11.5px; color:#64748B;">Barcha kurslar bo'yicha</div>
+          </div>
+
+          <!-- LMS Ishonchlilik Indeksi -->
+          <div class="card" style="padding:16px; border-radius:12px; background:#FAF5FF; border:1px solid #E9D5FF;">
+            <div style="font-size:11px; font-weight:700; color:#7E22CE; text-transform:uppercase;">🎯 LMS Ishonchlilik Indeksi</div>
+            <div style="font-size:24px; font-weight:800; color:#6B21A8; margin:4px 0 2px;">${summary.reliability_rate || 100}%</div>
+            <div style="font-size:11.5px; color:#7E22CE;">Moodle va Turniket haqiqiylik mosligi</div>
+          </div>
+
+          <!-- Eng yaxshi guruhlar -->
+          <div class="card" style="padding:16px; border-radius:12px; background:#F0FDF4; border:1px solid #BBF7D0;">
+            <div style="font-size:11px; font-weight:700; color:#15803D; text-transform:uppercase;">🏆 Eng Intizomli Guruhlar</div>
+            <div style="font-size:12.5px; font-weight:700; color:#166534; margin-top:4px; display:flex; flex-wrap:wrap; gap:6px;">
+              ${(summary.top_groups || []).map((tg, i) => `
+                <span style="background:#DCFCE7; padding:2px 6px; border-radius:4px;">${i+1}. ${tg.group_code} (${tg.rate}%)</span>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 TA MUTANOSIBLIK TOIFASI KARTALARI (BOSILADIGAN FILTRLAR) -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:12px;">
+          <!-- 1. Shubhali (LMSda bor, Turniketda yo'q) -->
+          <div class="kpi-filter-card" onclick="filterCrossAuditCategory('suspicious_present')" style="background:#FEF2F2; border:1.5px solid ${category === 'suspicious_present' ? '#DC2626' : '#FECACA'}; border-radius:12px; padding:14px; cursor:pointer; box-shadow:${category === 'suspicious_present' ? '0 4px 14px rgba(220,38,38,0.2)' : 'none'};">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11.5px; font-weight:700; color:#991B1B;">⚠️ Shubhali (Binoda yo'q, darsda bor)</span>
+              <span class="badge" style="background:#FEE2E2; color:#B91C1C; font-weight:800; font-size:11px;">${counts.suspicious_present || 0}</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#DC2626; margin-top:6px;">${counts.suspicious_present || 0} nafar</div>
+            <div style="font-size:10.5px; color:#B91C1C; margin-top:2px;">Turniketdan o'tmagan, lekin LMSda 'Bor'</div>
+          </div>
+
+          <!-- 2. Binoda bo'lib darsga kirmagan -->
+          <div class="kpi-filter-card" onclick="filterCrossAuditCategory('in_campus_skipped')" style="background:#FFFBEB; border:1.5px solid ${category === 'in_campus_skipped' ? '#D97706' : '#FDE68A'}; border-radius:12px; padding:14px; cursor:pointer; box-shadow:${category === 'in_campus_skipped' ? '0 4px 14px rgba(217,119,6,0.2)' : 'none'};">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11.5px; font-weight:700; color:#92400E;">🚶 Binoda bor, lekin darsda yo'q</span>
+              <span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:800; font-size:11px;">${counts.in_campus_skipped || 0}</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#D97706; margin-top:6px;">${counts.in_campus_skipped || 0} nafar</div>
+            <div style="font-size:10.5px; color:#92400E; margin-top:2px;">Turniketdan kirgan, lekin LMSda 'Kelmadi'</div>
+          </div>
+
+          <!-- 3. Binoga ham kelmagan, darsga ham kelmagan -->
+          <div class="kpi-filter-card" onclick="filterCrossAuditCategory('both_absent')" style="background:#F8FAFC; border:1.5px solid ${category === 'both_absent' ? '#475569' : '#E2E8F0'}; border-radius:12px; padding:14px; cursor:pointer; box-shadow:${category === 'both_absent' ? '0 4px 14px rgba(71,85,105,0.2)' : 'none'};">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11.5px; font-weight:700; color:#475569;">❌ Kelmaganlar (Ikkalasida ham)</span>
+              <span class="badge" style="background:#E2E8F0; color:#334155; font-weight:800; font-size:11px;">${counts.both_absent || 0}</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#334155; margin-top:6px;">${counts.both_absent || 0} nafar</div>
+            <div style="font-size:10.5px; color:#64748B; margin-top:2px;">Turniketda ham, darsda ham qatnashmagan</div>
+          </div>
+
+          <!-- 4. 100% Tasdiqlangan (Haqiqiy) -->
+          <div class="kpi-filter-card" onclick="filterCrossAuditCategory('verified_present')" style="background:#F0FDF4; border:1.5px solid ${category === 'verified_present' ? '#16A34A' : '#BBF7D0'}; border-radius:12px; padding:14px; cursor:pointer; box-shadow:${category === 'verified_present' ? '0 4px 14px rgba(22,163,74,0.2)' : 'none'};">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11.5px; font-weight:700; color:#15803D;">✅ 100% Mos kelgan (Haqiqiy)</span>
+              <span class="badge" style="background:#DCFCE7; color:#166534; font-weight:800; font-size:11px;">${counts.verified_present || 0}</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#16A34A; margin-top:6px;">${counts.verified_present || 0} nafar</div>
+            <div style="font-size:10.5px; color:#15803D; margin-top:2px;">Turniketda binoda va darsda qatnashgan</div>
+          </div>
+        </div>
+
+        <!-- FILTRLAR VA AMALLAR QATORI -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <!-- Sana -->
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; font-weight:700; color:#475569;">📅 Sana:</span>
+                <input type="date" value="${date}" onchange="handleCrossAuditFilterChange('date', this.value)" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; width:135px;">
+              </div>
+
+              <!-- Toifa -->
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; font-weight:700; color:#475569;">Toifa:</span>
+                <select id="cross-category-select" onchange="handleCrossAuditFilterChange('category', this.value)" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; min-width:140px;">
+                  <option value="all" ${category === 'all' ? 'selected' : ''}>Barchasi (${counts.all || 0})</option>
+                  <option value="suspicious_present" ${category === 'suspicious_present' ? 'selected' : ''}>⚠️ Shubhali (${counts.suspicious_present || 0})</option>
+                  <option value="in_campus_skipped" ${category === 'in_campus_skipped' ? 'selected' : ''}>🚶 Binoda darsda yo'q (${counts.in_campus_skipped || 0})</option>
+                  <option value="both_absent" ${category === 'both_absent' ? 'selected' : ''}>❌ Kelmagan (${counts.both_absent || 0})</option>
+                  <option value="verified_present" ${category === 'verified_present' ? 'selected' : ''}>✅ Mos kelgan (${counts.verified_present || 0})</option>
+                </select>
+              </div>
+
+              <!-- Kurs -->
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; font-weight:700; color:#475569;">Kurs:</span>
+                <select onchange="handleCrossAuditFilterChange('course', this.value)" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; width:100px;">
+                  <option value="">Barchasi</option>
+                  <option value="1" ${course === '1' ? 'selected' : ''}>1-kurs</option>
+                  <option value="2" ${course === '2' ? 'selected' : ''}>2-kurs</option>
+                </select>
+              </div>
+
+              <!-- Guruh -->
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; font-weight:700; color:#475569;">Guruh:</span>
+                <select onchange="handleCrossAuditFilterChange('group', this.value)" class="form-control" style="font-size:12.5px; padding:5px 8px; border-radius:6px; min-width:110px;">
+                  <option value="">Barchasi</option>
+                  ${groupsList.map(g => `<option value="${g}" ${group === g ? 'selected' : ''}>${g}</option>`).join('')}
+                </select>
+              </div>
+
+              <!-- Qidiruv -->
+              <div>
+                <input type="text" id="cross-search-input" value="${search}" placeholder="🔍 F.I.SH. bo'yicha..." oninput="handleCrossAuditSearch(this.value)" class="form-control" style="font-size:12.5px; padding:5px 10px; border-radius:6px; width:180px;">
+              </div>
+            </div>
+
+            <!-- Excel yuklab olish -->
+            <div>
+              <button id="btn-export-cross-excel" class="btn btn-sm" onclick="downloadCrossAuditExcel()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12px; color:#15803D; border:1px solid #86EFAC; background:#F0FDF4; padding:6px 12px; border-radius:6px; cursor:pointer;">
+                ${icon('download', 13)} <span>Excel (.xlsx)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- JADVAL QISMI -->
+        <div class="card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:15px; font-weight:800; color:#0F172A; margin:0;">
+              ⚖️ Turniket va LMS Davomat Mutanosibligi Ro'yxati (${students.length} nafar)
+            </h3>
+            <span style="font-size:12px; color:#64748B;">Batafsil ma'lumot uchun satr ustiga bosing</span>
+          </div>
+
+          <div class="table-responsive" style="border:1px solid #E2E8F0; border-radius:10px; overflow:hidden;">
+            <table class="table" style="margin:0; width:100%; font-size:12.5px;">
+              <thead style="background:#F8FAFC;">
+                <tr>
+                  <th style="padding:10px 12px; text-align:center; width:50px;">№</th>
+                  <th style="padding:10px 12px;">Talaba F.I.SH.</th>
+                  <th style="padding:10px 12px; text-align:center;">Guruh / Kurs</th>
+                  <th style="padding:10px 12px;">Bugungi Darslar (LMS Jadval)</th>
+                  <th style="padding:10px 12px; text-align:center;">LMS Davomati</th>
+                  <th style="padding:10px 12px; text-align:center;">Turniket (Face ID)</th>
+                  <th style="padding:10px 12px; text-align:center;">Mutanosiblik Xulosasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${students.length === 0 ? `
+                  <tr><td colspan="7" style="text-align:center; padding:30px; color:#94A3B8;">Ushbu mezonlar bo'yicha ma'lumot topilmadi</td></tr>
+                ` : students.map((s, idx) => {
+                  const formatTime = (iso) => {
+                    if (!iso) return '-';
+                    try { return new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }); } catch(e) { return iso.slice(11, 16); }
+                  };
+
+                  let turniketHtml = '-';
+                  if (s.turniket.has_entry) {
+                    turniketHtml = `
+                      <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                        <span style="color:#15803D; font-weight:700;">🟢 ${formatTime(s.turniket.first_in)}</span>
+                        ${s.turniket.is_in_campus ? '<span style="font-size:10px; color:#1D4ED8; font-weight:700; background:#EFF6FF; padding:1px 6px; border-radius:4px;">🏢 Binoda</span>' : `<span style="font-size:10px; color:#475569;">Chiqdi: ${formatTime(s.turniket.last_out)}</span>`}
+                      </div>
+                    `;
+                  } else {
+                    turniketHtml = `<span style="color:#DC2626; font-weight:700; font-size:11px;">Turniketda yo'q</span>`;
+                  }
+
+                  let lmsBadge = `<span style="color:#94A3B8; font-size:11px;">Kiritilmagan</span>`;
+                  if (s.lms.has_record) {
+                    const stColor = s.lms.status === 'P' ? '#15803D' : (s.lms.status === 'L' ? '#B45309' : '#B91C1C');
+                    const stBg = s.lms.status === 'P' ? '#DCFCE7' : (s.lms.status === 'L' ? '#FEF3C7' : '#FEE2E2');
+                    lmsBadge = `<span class="badge" style="background:${stBg}; color:${stColor}; font-weight:700; padding:3px 8px; border-radius:6px;">${s.lms.status_label}</span>`;
+                  }
+
+                  let verdictBadgeHtml = '';
+                  if (s.category === 'suspicious_present') {
+                    verdictBadgeHtml = `<span class="badge" style="background:#FEE2E2; color:#B91C1C; font-weight:800; border:1px solid #FECACA; padding:4px 8px; border-radius:6px;" title="${s.verdict_details}">⚠️ Shubhali (LMSda bor, Turniketda yo'q)</span>`;
+                  } else if (s.category === 'in_campus_skipped') {
+                    verdictBadgeHtml = `<span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:800; border:1px solid #FDE68A; padding:4px 8px; border-radius:6px;" title="${s.verdict_details}">🚶 Binoda bor, lekin darsda yo'q</span>`;
+                  } else if (s.category === 'verified_present') {
+                    verdictBadgeHtml = `<span class="badge" style="background:#DCFCE7; color:#15803D; font-weight:700; border:1px solid #BBF7D0; padding:4px 8px; border-radius:6px;" title="${s.verdict_details}">✅ 100% Mos keldi (Haqiqiy)</span>`;
+                  } else {
+                    verdictBadgeHtml = `<span class="badge" style="background:#F1F5F9; color:#475569; font-weight:600; padding:4px 8px; border-radius:6px;" title="${s.verdict_details}">❌ Kelmagan (Tasdiqlangan)</span>`;
+                  }
+
+                  const avatarHtml = s.photo_url
+                    ? `<img src="${s.photo_url}" style="width:32px; height:32px; border-radius:50%; object-fit:cover; border:1px solid #CBD5E1;">`
+                    : `<div style="width:32px; height:32px; border-radius:50%; background:#E0F2FE; color:#0369A1; font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center;">${(s.first_name || 'T')[0]}</div>`;
+
+                  const lessonsPreview = (s.lessons && s.lessons.length > 0)
+                    ? s.lessons.map(ls => `<div style="font-size:11px; color:#334155;"><b>${ls.time_str}:</b> ${ls.subject} <span style="color:#64748B;">(${ls.room || ''})</span></div>`).join('')
+                    : `<span style="color:#94A3B8; font-size:11px;">Dars jadvalida yo'q</span>`;
+
+                  return `
+                    <tr style="border-bottom:1px solid #F1F5F9; cursor:pointer;" onclick="showStudentAttendanceModal('${s.student_id}')" title="Batafsil talaba davomati va auditini ochish">
+                      <td style="padding:10px 12px; text-align:center; color:#64748B; font-weight:600;">${idx + 1}</td>
+                      <td style="padding:10px 12px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          ${avatarHtml}
+                          <div>
+                            <div style="font-weight:700; color:#0F172A; font-size:13px;">${s.full_name}</div>
+                            ${s.phone ? `<div style="font-size:10.5px; color:#64748B;">📞 ${s.phone}</div>` : ''}
+                          </div>
+                        </div>
+                      </td>
+                      <td style="padding:10px 12px; text-align:center;">
+                        <span style="font-weight:700; color:#1E40AF; background:#EFF6FF; padding:2px 7px; border-radius:5px; font-size:11px;">${s.group_code}</span>
+                        <div style="font-size:10.5px; color:#64748B; margin-top:2px;">${s.course}-kurs</div>
+                      </td>
+                      <td style="padding:10px 12px; max-width:280px;">
+                        ${lessonsPreview}
+                      </td>
+                      <td style="padding:10px 12px; text-align:center;">
+                        ${lmsBadge}
+                      </td>
+                      <td style="padding:10px 12px; text-align:center;">
+                        ${turniketHtml}
+                      </td>
+                      <td style="padding:10px 12px; text-align:center;">
+                        ${verdictBadgeHtml}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    `;
+  } catch(err) {
+    container.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:#EF4444;">Mutanosiblik tahlili yuklanmadi: ${err.message}</div>`;
+  }
+}
+
+function handleCrossAuditFilterChange(field, val) {
+  if (field === 'date') unifiedAttState.date = val;
+  if (field === 'category') unifiedAttState.auditCategory = val;
+  if (field === 'course') unifiedAttState.auditCourse = val;
+  if (field === 'group') unifiedAttState.auditGroup = val;
+  const body = document.getElementById('unified-att-tab-body');
+  if (body) renderUnifiedCrossAuditTab(body);
+}
+
+let crossSearchTimer = null;
+function handleCrossAuditSearch(val) {
+  clearTimeout(crossSearchTimer);
+  crossSearchTimer = setTimeout(() => {
+    unifiedAttState.search = val;
+    const body = document.getElementById('unified-att-tab-body');
+    if (body) renderUnifiedCrossAuditTab(body);
+  }, 300);
+}
+
+function filterCrossAuditCategory(category) {
+  unifiedAttState.auditCategory = category;
+  const body = document.getElementById('unified-att-tab-body');
+  if (body) renderUnifiedCrossAuditTab(body);
+}
+
+async function downloadCrossAuditExcel() {
+  const btn = document.getElementById('btn-export-cross-excel');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner" style="width:12px; height:12px; display:inline-block; border-width:2px; vertical-align:middle; margin-right:4px;"></span> Tayyorlanmoqda...`;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      date: unifiedAttState.date,
+      category: unifiedAttState.auditCategory || 'all',
+      group_code: unifiedAttState.auditGroup || '',
+      course: unifiedAttState.auditCourse || '',
+      search: unifiedAttState.search || ''
+    });
+
+    const res = await fetch(`/api/attendance/export-cross-audit-excel?${params.toString()}`, {
+      headers: {
+        'x-user-id': (AppState.user && AppState.user.id) ? AppState.user.id : 'superadmin'
+      }
+    });
+
+    if (!res.ok) throw new Error(`Server xatoligi: ${res.statusText}`);
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mutanosiblik_audit_${unifiedAttState.date}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    showToast("✅ Mutanosiblik auditi Excel (.xlsx) muvaffaqiyatli yuklab olindi!", "success");
+  } catch(err) {
+    showToast(`Excel yuklab olishda xatolik: ${err.message}`, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+}
 
 async function renderCampusAttendance(targetContainer) {
   targetContainer.innerHTML = `
@@ -12662,6 +13557,21 @@ window.filterTtDay = filterTtDay;
 window.handleLmsStudentSearch = handleLmsStudentSearch;
 window.openLmsSessionModal = openLmsSessionModal;
 window.syncLmsManually = syncLmsManually;
+
+// Birlashgan Darslar & Davomat Tizimi window eksportlari
+window.renderUnifiedAttendance = renderUnifiedAttendance;
+window.switchUnifiedAttTab = switchUnifiedAttTab;
+window.handleUnifiedTtDay = handleUnifiedTtDay;
+window.handleUnifiedTimetableFilter = handleUnifiedTimetableFilter;
+window.setUnifiedLmsPeriod = setUnifiedLmsPeriod;
+window.setUnifiedLmsDate = setUnifiedLmsDate;
+window.loadUnifiedLmsOverviewData = loadUnifiedLmsOverviewData;
+window.loadUnifiedGroupsRankingData = loadUnifiedGroupsRankingData;
+window.filterCrossAuditCategory = filterCrossAuditCategory;
+window.handleCrossAuditFilterChange = handleCrossAuditFilterChange;
+window.handleCrossAuditSearch = handleCrossAuditSearch;
+window.downloadCrossAuditExcel = downloadCrossAuditExcel;
+
 
 
 

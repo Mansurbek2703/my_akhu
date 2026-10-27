@@ -887,6 +887,265 @@ function getLmsTurniketAudit(date = null) {
 }
 
 /**
+ * Chuqur Mutanosiblik Tahlili (Turniket va LMS Davomat Mutanosibligi)
+ * @param {Object} filters { date, category, group_code, course, search }
+ */
+function getDeepCrossAudit(filters = {}) {
+  const dateStr = filters.date || new Date().toISOString().slice(0, 10);
+  const selectedCategory = filters.category || 'all';
+  const groupCodeFilter = filters.group_code || '';
+  const courseFilter = filters.course ? Number(filters.course) : null;
+  const searchFilter = (filters.search || '').trim().toLowerCase();
+
+  const d = new Date(dateStr + "T12:00:00Z");
+  const weekday = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+  const weekdayNames = {
+    1: 'Dushanba', 2: 'Seshanba', 3: 'Chorshanba', 4: 'Payshanba', 5: 'Juma', 6: 'Shanba', 7: 'Yakshanba'
+  };
+
+  // 1. All active students
+  const students = db.prepare(`
+    SELECT id, external_id, first_name, last_name, group_code, course, phone, photo_url, moodle_id
+    FROM student
+    WHERE status = 'active'
+    ORDER BY group_code ASC, last_name ASC
+  `).all();
+
+  // 2. Campus attendance on date
+  const campusRecords = db.prepare(`SELECT * FROM campus_attendance WHERE date = ?`).all(dateStr);
+  const campusMap = new Map(campusRecords.map(c => [c.student_id, c]));
+
+  // 3. LMS student attendance on date
+  const lmsRecords = db.prepare(`
+    SELECT sa.*, c.name as course_name
+    FROM lms_student_attendance sa
+    LEFT JOIN lms_course c ON sa.course_id = c.id
+    WHERE sa.sessdate_iso LIKE ?
+  `).all(dateStr + '%');
+
+  const lmsMap = new Map();
+  for (const r of lmsRecords) {
+    if (r.student_id) lmsMap.set(r.student_id, r);
+    if (r.moodle_student_id) lmsMap.set(`m_${r.moodle_student_id}`, r);
+  }
+
+  // 4. Timetable on weekday (deduplicated by course_id and time_str)
+  const rawTimetable = db.prepare(`
+    SELECT course_id, subject_code, subject_name, teacher_name, room, time_str, timestart_iso
+    FROM lms_timetable
+    WHERE weekday = ?
+  `).all(weekday);
+
+  const ttMap = {};
+  for (const item of rawTimetable) {
+    if (!ttMap[item.course_id]) ttMap[item.course_id] = [];
+    if (!ttMap[item.course_id].some(x => x.time_str === item.time_str)) {
+      ttMap[item.course_id].push(item);
+    }
+  }
+
+  // 5. Course enrollments
+  let enrollments = [];
+  try {
+    enrollments = db.prepare(`SELECT moodle_student_id, course_id FROM lms_course_enrollment`).all();
+  } catch (e) {}
+  const studentCoursesMap = {};
+  for (const e of enrollments) {
+    if (!studentCoursesMap[e.moodle_student_id]) studentCoursesMap[e.moodle_student_id] = new Set();
+    studentCoursesMap[e.moodle_student_id].add(e.course_id);
+  }
+
+  let totalStudents = students.length;
+  let inCampusCount = 0;
+  let suspiciousCount = 0;
+  let inCampusSkippedCount = 0;
+  let verifiedCount = 0;
+  let bothAbsentCount = 0;
+
+  const groupStatsMap = {};
+  const courseStatsMap = {};
+  const evaluatedStudents = [];
+
+  for (const st of students) {
+    const campus = campusMap.get(st.id);
+    const hasTurniket = Boolean(campus && campus.first_in_at);
+    if (hasTurniket) inCampusCount++;
+
+    // Group stats accumulation
+    const gCode = st.group_code || 'Boshqa';
+    if (!groupStatsMap[gCode]) {
+      groupStatsMap[gCode] = { group_code: gCode, course: st.course || 1, total: 0, in_campus: 0 };
+    }
+    groupStatsMap[gCode].total++;
+    if (hasTurniket) groupStatsMap[gCode].in_campus++;
+
+    // Course stats accumulation
+    const cNum = Number(st.course) || 1;
+    if (!courseStatsMap[cNum]) {
+      courseStatsMap[cNum] = { course: cNum, course_name: `${cNum}-kurs`, total: 0, in_campus: 0 };
+    }
+    courseStatsMap[cNum].total++;
+    if (hasTurniket) courseStatsMap[cNum].in_campus++;
+
+    // LMS attendance for this student
+    const lms = lmsMap.get(st.id) || (st.moodle_id ? lmsMap.get(`m_${st.moodle_id}`) : null);
+    const isLmsPresent = lms && (lms.status === 'P' || lms.status === 'L');
+    const isLmsAbsent = lms && lms.status === 'A';
+
+    // Student lessons for today
+    const enrolledCourseIds = st.moodle_id && studentCoursesMap[st.moodle_id] 
+      ? Array.from(studentCoursesMap[st.moodle_id]) 
+      : [];
+    const lessons = [];
+    for (const cId of enrolledCourseIds) {
+      if (ttMap[cId]) {
+        lessons.push(...ttMap[cId]);
+      }
+    }
+
+    // Determine category
+    let category = 'no_class';
+    let categoryLabel = 'Darsi yo\'q';
+    let categoryBadge = 'neutral';
+    let verdictDetails = '';
+
+    if (!hasTurniket && isLmsPresent) {
+      category = 'suspicious_present';
+      categoryLabel = '⚠️ Shubhali (Binoda yo\'q, darsda bor)';
+      categoryBadge = 'danger';
+      verdictDetails = 'LMS tizimida qatnashgan (Present) belgilangan, ammo turniketda universitetga kirish umuman qayd etilmagan!';
+      suspiciousCount++;
+    } else if (hasTurniket && isLmsAbsent) {
+      category = 'in_campus_skipped';
+      categoryLabel = '🚶 Binoda bor, lekin darsga kirmagan';
+      categoryBadge = 'warning';
+      verdictDetails = 'Talaba universitet hududiga kirgan, biroq LMS dars davomatida "Kelmadi" (Absent) deb qayd etilgan.';
+      inCampusSkippedCount++;
+    } else if (hasTurniket && isLmsPresent) {
+      category = 'verified_present';
+      categoryLabel = '✅ 100% Tasdiqlangan (Haqiqiy)';
+      categoryBadge = 'success';
+      verdictDetails = 'Talaba turniketdan kirgan va dars mashg\'ulotida to\'liq qatnashgan.';
+      verifiedCount++;
+    } else if (!hasTurniket && (isLmsAbsent || lessons.length > 0)) {
+      category = 'both_absent';
+      categoryLabel = '❌ Kelmagan (Binoda ham, darsda ham yo\'q)';
+      categoryBadge = 'secondary';
+      verdictDetails = 'Talaba universitetga ham kelmagan va darsda ham qatnashmagan.';
+      bothAbsentCount++;
+    } else if (hasTurniket) {
+      category = 'verified_present';
+      categoryLabel = '🏢 Binoda (Darsi qayd etilmagan)';
+      categoryBadge = 'info';
+      verdictDetails = 'Talaba universitet hududida bo\'lgan.';
+      verifiedCount++;
+    }
+
+    evaluatedStudents.push({
+      student_id: st.id,
+      first_name: st.first_name,
+      last_name: st.last_name,
+      full_name: `${st.last_name || ''} ${st.first_name || ''}`.trim(),
+      group_code: st.group_code || '-',
+      course: st.course || 1,
+      phone: st.phone || '',
+      photo_url: st.photo_url || null,
+      moodle_id: st.moodle_id,
+      turniket: {
+        has_entry: hasTurniket,
+        first_in: campus ? campus.first_in_at : null,
+        last_out: campus ? campus.last_out_at : null,
+        in_count: campus ? campus.in_count : 0,
+        out_count: campus ? campus.out_count : 0,
+        is_in_campus: campus ? (campus.in_count > campus.out_count) : false
+      },
+      lms: {
+        has_record: Boolean(lms),
+        status: lms ? lms.status : null,
+        status_label: lms ? (lms.status_label || (lms.status === 'P' ? 'Present' : (lms.status === 'L' ? 'Late' : (lms.status === 'A' ? 'Absent' : 'Excused')))) : 'Kiritilmagan',
+        course_name: lms ? lms.course_name : null,
+        remarks: lms ? lms.remarks : null
+      },
+      lessons: lessons.map(l => ({
+        subject: l.subject_name || l.subject_code,
+        teacher: l.teacher_name || 'Ustoz ko\'rsatilmagan',
+        room: l.room || 'Xona ko\'rsatilmagan',
+        time_str: l.time_str
+      })),
+      category,
+      category_label: categoryLabel,
+      category_badge: categoryBadge,
+      verdict_details: verdictDetails
+    });
+  }
+
+  // Group rankings
+  const groupRankings = Object.values(groupStatsMap).map(g => ({
+    group_code: g.group_code,
+    course: g.course,
+    total_students: g.total,
+    in_campus_count: g.in_campus,
+    rate: g.total > 0 ? Math.round((g.in_campus / g.total) * 100) : 0
+  })).sort((a, b) => b.rate - a.rate);
+
+  // Bachelor courses breakdown
+  const bachelorCourses = Object.values(courseStatsMap).map(c => ({
+    course: c.course,
+    course_name: c.course_name,
+    total_students: c.total,
+    in_campus: c.in_campus,
+    rate: c.total > 0 ? Math.round((c.in_campus / c.total) * 100) : 0
+  })).sort((a, b) => a.course - b.course);
+
+  // Filter students list based on query
+  let filteredList = evaluatedStudents;
+  if (selectedCategory !== 'all') {
+    filteredList = filteredList.filter(s => s.category === selectedCategory);
+  }
+  if (groupCodeFilter) {
+    filteredList = filteredList.filter(s => s.group_code === groupCodeFilter);
+  }
+  if (courseFilter) {
+    filteredList = filteredList.filter(s => Number(s.course) === courseFilter);
+  }
+  if (searchFilter) {
+    filteredList = filteredList.filter(s => 
+      s.full_name.toLowerCase().includes(searchFilter) ||
+      (s.group_code && s.group_code.toLowerCase().includes(searchFilter)) ||
+      (s.phone && s.phone.includes(searchFilter))
+    );
+  }
+
+  const universityRate = totalStudents > 0 ? Math.round((inCampusCount / totalStudents) * 100) : 0;
+  const reliabilityRate = (verifiedCount + suspiciousCount) > 0
+    ? Math.round((verifiedCount / (verifiedCount + suspiciousCount)) * 100)
+    : 100;
+
+  return {
+    date: dateStr,
+    weekday,
+    weekday_name: weekdayNames[weekday] || '',
+    summary: {
+      total_students: totalStudents,
+      in_campus_count: inCampusCount,
+      university_attendance_rate: universityRate,
+      reliability_rate: reliabilityRate,
+      bachelor_courses: bachelorCourses,
+      top_groups: groupRankings.slice(0, 3),
+      bottom_groups: groupRankings.slice(-3)
+    },
+    counts: {
+      all: evaluatedStudents.length,
+      suspicious_present: suspiciousCount,
+      in_campus_skipped: inCampusSkippedCount,
+      both_absent: bothAbsentCount,
+      verified_present: verifiedCount
+    },
+    students: filteredList
+  };
+}
+
+/**
  * Bitta talabaning to'liq kirish-chiqish va davomat tarixi
  */
 function getStudentAttendanceHistory(studentId, days = 30) {
@@ -1151,5 +1410,6 @@ module.exports = {
   getCampusAttendanceList,
   getStudentAttendanceHistory,
   getStudentLmsCrosscheck,
-  getLmsTurniketAudit
+  getLmsTurniketAudit,
+  getDeepCrossAudit
 };

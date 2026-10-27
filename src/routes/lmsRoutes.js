@@ -6,7 +6,8 @@ const {
   syncAll,
   getAdminLmsOverview,
   getAdminLmsStudents,
-  getAdminSessionDetails
+  getAdminSessionDetails,
+  getLmsGroupsRanking
 } = require('../services/lmsService');
 
 // Middleware: Faqat tizimga kirgan xodimlar, registrator, superadmin yoki observer
@@ -177,6 +178,21 @@ router.get('/students', (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('LMS Students error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/lms/groups-ranking
+ * Guruhlar kesimida davomat reytingi
+ */
+router.get('/groups-ranking', (req, res) => {
+  try {
+    const { date, period } = req.query;
+    const ranking = getLmsGroupsRanking(date, period);
+    res.json({ success: true, ranking });
+  } catch (err) {
+    console.error('LMS groups ranking error:', err);
     res.status(500).json({ error: err.message });
   }
 });

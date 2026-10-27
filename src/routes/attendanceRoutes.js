@@ -11,7 +11,8 @@ const {
   getCampusAttendanceList,
   getStudentAttendanceHistory,
   getStudentLmsCrosscheck,
-  getLmsTurniketAudit
+  getLmsTurniketAudit,
+  getDeepCrossAudit
 } = require('../services/hikcentralService');
 
 // Xodimlarni autentifikatsiya qilish
@@ -282,6 +283,90 @@ router.get('/lms-turniket-audit', (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/attendance/cross-audit-deep
+ * Turniket va LMS davomati mutanosibligi chuqur auditi (4 ta toifa, reytinglar, statistikalar)
+ */
+router.get('/cross-audit-deep', (req, res) => {
+  try {
+    const { date, category, group_code, course, search } = req.query;
+    const result = getDeepCrossAudit({ date, category, group_code, course, search });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Cross-audit-deep error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/attendance/export-cross-audit-excel
+ * Mutanosiblik hisobotini Excel (.xlsx) formatida yuklab olish
+ */
+router.get('/export-cross-audit-excel', (req, res) => {
+  try {
+    const { date, category, group_code, course, search } = req.query;
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    const result = getDeepCrossAudit({ date: dateStr, category, group_code, course, search });
+
+    const formatTime = (iso) => {
+      if (!iso) return '-';
+      try {
+        return new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch(e) {
+        return iso.slice(11, 19);
+      }
+    };
+
+    const excelData = (result.students || []).map((s, idx) => {
+      const lessonsStr = (s.lessons || []).map(l => `${l.subject} (${l.time_str || ''})`).join('; ') || 'Dars jadvalida yo\'q';
+      const turniketStr = s.turniket.has_entry
+        ? `Kirdi: ${formatTime(s.turniket.first_in)}${s.turniket.is_in_campus ? ' [Binoda]' : ' Chiqdi: ' + formatTime(s.turniket.last_out)}`
+        : 'Turniketdan o\'tmagan';
+
+      return {
+        '№': idx + 1,
+        'Talaba F.I.SH.': s.full_name,
+        'Guruh': s.group_code || '-',
+        'Kurs': s.course ? `${s.course}-kurs` : '-',
+        'Telefon': s.phone || '-',
+        'Sana': dateStr,
+        'Bugungi Darslar (LMS)': lessonsStr,
+        'LMS (Moodle) Davomat': s.lms.status_label,
+        'Turniket (Face ID)': turniketStr,
+        'Mutanosiblik Xulosasi': s.category_label,
+        'Izoh': s.verdict_details
+      };
+    });
+
+    const ws = xlsx.utils.json_to_sheet(excelData);
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 30 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 40 },
+      { wch: 22 },
+      { wch: 30 },
+      { wch: 36 },
+      { wch: 45 }
+    ];
+
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Mutanosiblik_Audit');
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const filename = `mutanosiblik_audit_${dateStr}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('Export cross-audit error:', err);
+    res.status(500).json({ error: `Excel eksport xatosi: ${err.message}` });
   }
 });
 
