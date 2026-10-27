@@ -7129,30 +7129,59 @@ function setStudentsViewMode(mode) {
   }
 }
 
-function previewStudentPhoto(photoUrl, studentName, studentId) {
+function previewStudentPhoto(firstParam, secondParam, thirdParam) {
+  let studentId = '';
+  let photoUrl = '';
+  let studentName = '';
+
+  // Agar bitta parametr (studentId) uzatilgan bo'lsa
+  if (!secondParam && !thirdParam) {
+    studentId = firstParam;
+  } else if (thirdParam) {
+    studentId = thirdParam;
+    photoUrl = firstParam;
+    studentName = secondParam;
+  } else {
+    studentId = firstParam;
+  }
+
+  // Talabani keshdan topish
+  let st = (adminStudentsState.items || []).find(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId));
+  if (!st && window.tutorStudentsCache) {
+    st = window.tutorStudentsCache.find(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId));
+  }
+
+  if (st) {
+    studentId = st.id || studentId;
+    photoUrl = st.photo_url || photoUrl;
+    studentName = `${st.first_name || ''} ${st.last_name || ''}`.trim() || studentName;
+  }
+
+  if (!photoUrl) {
+    showToast("Ushbu talabada fotosurat mavjud emas", "warning");
+    return;
+  }
+
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
-
-  // Talabaning qo'shimcha ma'lumotlarini keshdan topish
-  const st = (adminStudentsState.items || []).find(s => String(s.id) === String(studentId) || String(s.external_id) === String(studentId)) || {};
 
   modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${icon('image', 18)} Talaba Fotosurati</span>`;
   modalBody.innerHTML = `
     <div style="text-align: center; padding: 4px;">
       <!-- Katta va bir xil standart freymda kesilmasdan ochiladigan rasm -->
       <div class="student-photo-frame-container">
-        <img src="${photoUrl}" alt="${studentName}" class="student-photo-frame-img" loading="eager">
+        <img src="${photoUrl}" alt="${studentName}" class="student-photo-frame-img" loading="eager" title="Kattalashtirilgan rasm">
       </div>
 
       <!-- Talaba ma'lumotlari (Rasm fayl nomi butunlay olib tashlandi!) -->
       <div style="margin-top: 10px; margin-bottom: 4px;">
-        <h3 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">${studentName}</h3>
+        <h3 style="font-size: 19px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">${studentName}</h3>
         <div style="display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap;">
-          <span class="badge badge-group" style="font-size: 12px; padding: 4px 10px; font-weight: 700;">ID: ${st.external_id || studentId}</span>
-          ${st.group_code ? `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:12px; padding:4px 10px;">Guruh: ${st.group_code}</span>` : ''}
-          ${st.course ? `<span class="badge badge-course" style="font-size:12px; padding:4px 10px;">${st.course}-kurs</span>` : ''}
-          ${st.level ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-size:12px; padding:4px 10px; font-weight:700;">${st.level === 'mag' ? 'Magistratura' : 'Bakalavriat'}</span>` : ''}
+          <span class="badge badge-group" style="font-size: 12px; padding: 4px 10px; font-weight: 700;">ID: ${st ? (st.external_id || studentId) : studentId}</span>
+          ${(st && st.group_code) ? `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:12px; padding:4px 10px;">Guruh: ${st.group_code}</span>` : ''}
+          ${(st && st.course) ? `<span class="badge badge-course" style="font-size:12px; padding:4px 10px;">${st.course}-kurs</span>` : ''}
+          ${(st && st.level) ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-size:12px; padding:4px 10px; font-weight:700;">${st.level === 'mag' ? 'Magistratura' : 'Bakalavriat'}</span>` : ''}
         </div>
       </div>
     </div>
@@ -7165,6 +7194,9 @@ function previewStudentPhoto(photoUrl, studentName, studentId) {
     <button class="btn btn-primary" onclick="downloadSingleStudentPhoto('${studentId}')" style="display: inline-flex; align-items: center; gap: 6px;">
       ${icon('download', 14)} Fotosuratni Yuklab Olish
     </button>
+    <a href="${photoUrl}" target="_blank" class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 6px;" title="Asl o'lchamda alohida oynada ko'rish">
+      ${icon('external', 14)} Asl Hajmda
+    </a>
   `;
   openModal();
 }
@@ -7503,10 +7535,9 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         <table class="data-table">
           <thead>
             <tr>
-              <th style="width: 60px;">Rasm</th>
-              <th style="width: 115px;">Talaba ID</th>
+              <th style="width: 55px;">Rasm</th>
+              <th style="width: 110px;">Talaba ID</th>
               <th>F.I.Sh</th>
-              <th>Rasm Fayl Nomi (Standart)</th>
               <th>Yo'nalish & Guruh</th>
               <th style="width: 115px;">Bosqich</th>
               <th>Kurs</th>
@@ -7518,7 +7549,7 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           </thead>
           <tbody id="admin-students-table-body">
             <tr>
-              <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
                 <div class="spinner" style="margin-bottom: 10px;"></div>
                 <p>Talabalar ro'yxati yuklanmoqda...</p>
               </td>
@@ -7867,16 +7898,17 @@ function renderAdminStudentsCards(students) {
     const isActive = st.status === 'active';
     const isMag = st.level === 'mag';
     const levelBadgeHtml = isMag
-      ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px;">Magistratura</span>`
-      : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px;">Bakalavriat</span>`;
+      ? `<span class="badge" style="background:#FAF5FF; color:#6D28D9; border:1px solid #DDD6FE; font-weight:700; font-size:10.5px; padding:2px 6px; border-radius:4px;">Mag</span>`
+      : `<span class="badge" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-weight:700; font-size:10.5px; padding:2px 6px; border-radius:4px;">Bak</span>`;
     
     const hasPhoto = Boolean(st.photo_url);
 
     return `
       <div class="student-photo-card" onclick="showStudentDetailsModal('${st.id}')">
-        <div class="student-card-photo-wrap">
+        <!-- FOTOSURAT FREYMI: Bosilganda katta rasm xatosiz ochiladi -->
+        <div class="student-card-photo-wrap" ${hasPhoto ? `onclick="event.stopPropagation(); previewStudentPhoto('${st.id}')" title="Kattalashtirib ko'rish uchun bosing"` : `onclick="event.stopPropagation(); showStudentDetailsModal('${st.id}')" title="Fotosurat biriktirish"`} style="cursor: pointer;">
           ${hasPhoto ? `
-            <img src="${st.photo_url}" alt="${st.first_name} ${st.last_name}" class="student-card-img" loading="lazy" onclick="event.stopPropagation(); previewStudentPhoto('${st.photo_url}', '${st.first_name} ${st.last_name}', '${st.id}')" title="Kattalashtirib ko'rish uchun bosing">
+            <img src="${st.photo_url}" alt="${st.first_name || ''}" class="student-card-img" loading="lazy">
           ` : `
             <div class="student-card-no-photo">
               <span class="no-photo-initials ${isFemale ? 'female' : ''}">${initials || 'ST'}</span>
@@ -7885,10 +7917,10 @@ function renderAdminStudentsCards(students) {
           `}
           <div class="card-badges-top">
             ${levelBadgeHtml}
-            <span class="badge badge-course" style="font-size: 11px; padding: 2px 7px;">${st.course || 1}-kurs</span>
+            <span class="badge badge-course" style="font-size: 10px; padding: 2px 6px; background:#0F172A; color:#FFF; font-weight:700;">${st.course || 1}-k</span>
           </div>
           <div class="card-badges-bottom">
-            <span class="badge badge-group" style="font-size: 11px; padding: 2px 7px;">${st.group_code || '-'}</span>
+            <span class="badge badge-group" style="font-size: 10.5px; padding: 2px 6px; background:#1E293B; color:#FFF; font-weight:700;">${st.group_code || '-'}</span>
             <span class="card-status-dot ${isActive ? 'active' : 'inactive'}" title="${isActive ? 'Faol' : 'Nofaol'}"></span>
           </div>
         </div>
@@ -7905,7 +7937,7 @@ function renderAdminStudentsCards(students) {
           <div class="student-card-meta">
             <div class="meta-item">
               <span class="meta-label">Tel:</span>
-              <span class="meta-val">${st.phone || '-'}</span>
+              <span class="meta-val" title="${st.phone || '-'}">${st.phone ? st.phone.replace('+998', '') : '-'}</span>
             </div>
             <div class="meta-item">
               <span class="meta-label">Ball:</span>
@@ -7915,14 +7947,18 @@ function renderAdminStudentsCards(students) {
 
           <div class="student-card-actions" onclick="event.stopPropagation()">
             ${hasPhoto ? `
-              <button class="btn-card-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Fotosuratni yuklab olish">
-                ${icon('download', 13)} <span>Yuklab olish</span>
+              <button class="btn-card-action btn-action-primary" onclick="previewStudentPhoto('${st.id}')" title="Fotosuratni katta freymda ko'rish" style="flex: 1;">
+                ${icon('image', 13)} <span>Rasm</span>
               </button>
-            ` : ''}
-            <button class="btn-card-action btn-action-primary" onclick="showStudentDetailsModal('${st.id}')" title="Talaba fotosurati va profili">
-              ${icon('image', 13)} <span>${hasPhoto ? 'Rasm' : 'Rasm qo\'shish'}</span>
-            </button>
-            <button class="btn-card-action" onclick="showEditStudentModal('${st.id}')" title="Talaba ma'lumotlarini tahrirlash" style="flex: 0 0 34px; padding: 6px; justify-content: center;">
+              <button class="btn-card-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Fotosuratni yuklab olish" style="flex: 0 0 32px; padding: 4px; justify-content: center;">
+                ${icon('download', 13)}
+              </button>
+            ` : `
+              <button class="btn-card-action btn-action-primary" onclick="showStudentDetailsModal('${st.id}')" title="Fotosurat biriktirish" style="flex: 1;">
+                ${icon('plus', 13)} <span>Rasm qo'shish</span>
+              </button>
+            `}
+            <button class="btn-card-action" onclick="showEditStudentModal('${st.id}')" title="Talaba ma'lumotlarini tahrirlash" style="flex: 0 0 32px; padding: 4px; justify-content: center;">
               ${icon('edit', 14)}
             </button>
           </div>
@@ -7939,7 +7975,7 @@ function renderAdminStudentsTable(students) {
   if (students.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="11" style="text-align: center; padding: 48px; color: var(--text-muted);">
+        <td colspan="10" style="text-align: center; padding: 48px; color: var(--text-muted);">
           <div style="font-size: 32px; color: #94A3B8; margin-bottom: 8px;">${icon('users', 32)}</div>
           <p style="font-size: 14px; font-weight: 600; color: var(--text-main);">Talabalar topilmadi</p>
           <p style="font-size: 12px; margin-top: 4px;">Qidiruv yoki filtr mezonlarini o'zgartiring.</p>
@@ -7958,12 +7994,10 @@ function renderAdminStudentsTable(students) {
       ? `<span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px;">Magistratura</span>`
       : `<span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px;">Bakalavriat</span>`;
     
-    const formattedName = formatStudentPhotoFilename(st);
-    const ext = (st.photo_url ? pathExt(st.photo_url) : 'JPG').toUpperCase();
     const hasPhoto = Boolean(st.photo_url);
 
     const photoHtml = hasPhoto
-      ? `<img src="${st.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1.5px solid #3B82F6; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; transition: transform 0.15s ease;" onclick="event.stopPropagation(); previewStudentPhoto('${st.photo_url}', '${st.first_name} ${st.last_name}', '${st.id}', '${formattedName}')" alt="${st.first_name}" title="Kattalashtirib ko'rish">`
+      ? `<img src="${st.photo_url}" class="avatar-badge" style="object-fit: cover; border: 1.5px solid #3B82F6; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; transition: transform 0.15s ease;" onclick="event.stopPropagation(); previewStudentPhoto('${st.id}')" alt="${st.first_name || ''}" title="Kattalashtirib ko'rish">`
       : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 40px; height: 40px; border-radius: 8px;">${initials || 'ST'}</span>`;
 
     return `
@@ -7977,15 +8011,6 @@ function renderAdminStudentsTable(students) {
         <td>
           <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${st.first_name} ${st.last_name}</div>
           <div class="table-sub-text">${st.email || 'Email yo\'q'}</div>
-        </td>
-        <td>
-          <div style="display: inline-flex; align-items: center; gap: 5px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 2px 7px; border-radius: 5px; font-family: monospace; font-size: 11px; font-weight: 600; color: #1E293B;">
-            <span class="filename-format-pill ${ext.toLowerCase()}" style="font-size: 8px; padding: 1px 3px;">${ext}</span>
-            <span>${formattedName}</span>
-            <button class="btn-copy-filename" onclick="event.stopPropagation(); copyStudentPhotoName('${formattedName}')" title="Fayl nomidan nusxa olish" style="padding: 1px 3px;">
-              ${icon('copy', 11)}
-            </button>
-          </div>
         </td>
         <td>
           <div style="font-weight: 600; font-size: 12px;">${st.group_code || '-'}</div>
@@ -8015,7 +8040,7 @@ function renderAdminStudentsTable(students) {
         <td style="text-align: right;" onclick="event.stopPropagation()">
           <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
             ${hasPhoto ? `
-              <button class="btn-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Rasmni yuklab olish (${formattedName})">
+              <button class="btn-action" onclick="downloadSingleStudentPhoto('${st.id}')" title="Rasmni yuklab olish">
                 ${icon('download', 14)}
               </button>
             ` : ''}
