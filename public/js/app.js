@@ -4955,9 +4955,10 @@ async function openEditEventModal(eventId) {
             </label>
           </div>
 
-          <div id="edit-ev-photo-preview-wrap" style="display: ${event.photo_url || event.image_url ? 'block' : 'none'}; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; max-height: 200px; background: #0F172A; text-align: center; position: relative;">
-            <img id="edit-ev-photo-preview" src="${event.photo_url || event.image_url || ''}" alt="Banner ko'rinishi" style="width: 100%; max-height: 200px; object-fit: cover; display: block;">
-            <button type="button" onclick="clearEventPhoto('edit-ev-photo-url', 'edit-ev-photo-preview', 'edit-ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
+          <div id="edit-ev-photo-preview-wrap" style="display: ${event.photo_url || event.image_url ? 'block' : 'none'}; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; height: 165px; background: #0B0F19; position: relative;">
+            <div id="edit-ev-photo-blur-bg" style="position: absolute; inset: -10px; background-image: url('${event.photo_url || event.image_url || ''}'); background-size: cover; background-position: center; filter: blur(15px); opacity: 0.45;"></div>
+            <img id="edit-ev-photo-preview" src="${event.photo_url || event.image_url || ''}" alt="Banner ko'rinishi" style="position: relative; max-height: 100%; max-width: 100%; width: 100%; height: 100%; object-fit: contain; z-index: 2; margin: 0 auto; display: block;">
+            <button type="button" onclick="clearEventPhoto('edit-ev-photo-url', 'edit-ev-photo-preview', 'edit-ev-photo-preview-wrap')" style="position: absolute; top: 6px; right: 6px; z-index: 5; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 6px; padding: 3px 7px; font-size: 10.5px; cursor: pointer;">✕ O'chirish</button>
           </div>
         </div>
 
@@ -9969,7 +9970,7 @@ async function renderStaffUsersManagement(container) {
           </p>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <button class="btn btn-outline" id="btn-sync-staff-photos" onclick="syncAllStaffPhotosFromHikCentral()" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border-color: #3B82F6; color: #2563EB; font-weight: 600;" title="Barcha xodimlarning Face ID fotosuratlarini HikCentral turniket serveridan tortib olish">
+          <button class="btn btn-outline" id="btn-sync-staff-photos" onclick="syncStaffPhotosFromHikCentral()" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border-color: #3B82F6; color: #2563EB; font-weight: 600;" title="Barcha xodimlarning Face ID fotosuratlarini HikCentral turniket serveridan tortib olish">
             ${icon('refresh', 14)} <span>🔄 Turniket Rasmlarini Yangilash</span>
           </button>
           <button class="btn btn-primary" onclick="showCreateStaffModal()" style="display: inline-flex; align-items: center; gap: 6px;">
@@ -10300,7 +10301,7 @@ function renderStaffTableRows() {
         <td>
           <div class="table-student-name" style="cursor:pointer;" onclick="showStaffMonitoringModal('${u.id}')" title="Xodimning to'liq monitoringi, Telegram holati va doimiy arxivini ko'rish uchun bosing">
             ${u.photo_url ? `
-              <img src="${u.photo_url}" class="avatar-badge" style="object-fit:cover; border-radius:50%; width:34px; height:34px; border:2px solid #3B82F6;" onerror="this.outerHTML='<span class=\\'avatar-badge\\'>${initials || 'X'}</span>'">
+              <img src="${u.photo_url}${u.photo_url.includes('?') ? '&' : '?'}v=${window._staffPhotoVersion || 1}" class="avatar-badge" style="object-fit:cover; border-radius:50%; width:34px; height:34px; border:2px solid #3B82F6;" onerror="this.onerror=null; this.outerHTML='<span class=\\'avatar-badge\\'>${initials || 'X'}</span>';">
             ` : `
               <span class="avatar-badge">${initials || 'X'}</span>
             `}
@@ -11527,6 +11528,7 @@ async function syncSingleStaffPhotoFromHik(userId) {
       method: 'POST'
     });
     if (res && res.updatedStaff && res.updatedStaff.length > 0) {
+      window._staffPhotoVersion = Date.now();
       showToast("Xodim rasmi HikCentral'dan muvaffaqiyatli yuklandi!", "success");
       const urlInp = document.getElementById('edit-staff-photourl');
       if (urlInp) {
@@ -11544,20 +11546,39 @@ async function syncSingleStaffPhotoFromHik(userId) {
 window.syncSingleStaffPhotoFromHik = syncSingleStaffPhotoFromHik;
 
 async function syncStaffPhotosFromHikCentral() {
+  const btn = document.getElementById('btn-sync-staff-photos');
+  const originalHtml = btn ? btn.innerHTML : '';
+  
   if (!confirm("Barcha xodimlarning rasmlarini HikCentral turniket bazasidan sinxronizatsiya qilasizmi? Bu biroz vaqt olishi mumkin.")) return;
+  
   try {
-    showToast("HikCentral'dan barcha xodimlar rasmlari sinxronizatsiya qilinmoqda...", "info");
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.innerHTML = `<span class="spinner" style="display:inline-block; width:13px; height:13px; border:2px solid #2563EB; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite;"></span> <span>Turniketdan yuklanmoqda...</span>`;
+    }
+    showToast("HikCentral turniketidan barcha xodimlar rasmlari sinxronizatsiya qilinmoqda...", "info");
+    
     const res = await apiFetch('/api/admin/users/sync-photos', {
       method: 'POST',
       body: JSON.stringify({ force_all: true })
     });
-    showToast(`HikCentral'dan ${res?.downloadedCount || 0} ta xodim rasmi muvaffaqiyatli yuklandi!`, "success");
+    
+    window._staffPhotoVersion = Date.now();
+    showToast(`✅ Turniketdan ${res?.downloadedCount || 0} ta xodim fotosurati muvaffaqiyatli yuklandi va yangilandi!`, "success");
     await loadStaffUsersList();
   } catch (err) {
-    showToast(err.message || "HikCentral sinxronizatsiyasida xatolik", "error");
+    showToast(err.message || "HikCentral sinxronizatsiyasida xatolik yuz berdi", "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.innerHTML = originalHtml;
+    }
   }
 }
 window.syncStaffPhotosFromHikCentral = syncStaffPhotosFromHikCentral;
+window.syncAllStaffPhotosFromHikCentral = syncStaffPhotosFromHikCentral;
 
 // Universal xodim saqlash funksiyasi
 const handleEditStaffSubmit = submitStaffEditPage;
