@@ -587,6 +587,7 @@ function updateSidebarPermissions() {
 async function checkPendingBadge() {
   try {
     const res = await apiFetch('/api/approvals');
+    window._pendingApprovalsCount = res.count || 0;
     const badge = document.getElementById('pending-badge');
     if (badge) {
       if (res.count > 0) {
@@ -595,6 +596,10 @@ async function checkPendingBadge() {
       } else {
         badge.style.display = 'none';
       }
+    }
+    const pill = document.querySelector('.module-nav-pill[data-tab-id="dept-approvals"]');
+    if (pill) {
+      pill.textContent = res.count > 0 ? `📑 Tasdiqlash & Ijro (${res.count})` : '📑 Tasdiqlash & Ijro';
     }
   } catch (e) {
     // Jim e'tiborsiz qoldirish
@@ -611,13 +616,13 @@ const PAGE_SECTION_MAP = {
   'admin-students-manage': 'admin-students-manage',
   'dept-students-manage': 'admin-students-manage',
 
+  // Tadbirlar & Tasdiqlash bitta umumiy menyu!
   'dept-events': 'dept-events',
   'observe-events': 'dept-events',
-
-  'dept-approvals': 'dept-approvals',
-  'prorektor-queue': 'dept-approvals',
-  'prorektor-risks': 'dept-approvals',
-  'prorektor-appeals': 'dept-approvals',
+  'dept-approvals': 'dept-events',
+  'prorektor-queue': 'dept-events',
+  'prorektor-risks': 'dept-events',
+  'prorektor-appeals': 'dept-events',
 
   'tutor-my-students': 'tutor-my-students',
   'tutor-add-points': 'tutor-my-students',
@@ -636,6 +641,8 @@ const PAGE_SECTION_MAP = {
 
 function renderModuleSubNav(pageName) {
   const sectionKey = PAGE_SECTION_MAP[pageName] || pageName;
+  const userRoles = (AppState.isLoggedIn && AppState.user && AppState.user.roles) ? AppState.user.roles : [];
+  const isSuperadmin = userRoles.includes('superadmin');
   let tabs = [];
   let extraActions = '';
 
@@ -648,18 +655,25 @@ function renderModuleSubNav(pageName) {
   } else if (sectionKey === 'admin-students-manage') {
     tabs = [];
   } else if (sectionKey === 'dept-events') {
+    // BIRLASHGAN MENYU: Tadbirlar & Tasdiqlash
     tabs = [
-      { id: 'dept-events', label: 'Barcha Tadbirlar' }
+      { id: 'dept-events', label: '📅 Tadbirlar & QR' }
     ];
-  } else if (sectionKey === 'dept-approvals') {
-    tabs = [
-      { id: 'dept-approvals', label: 'Tasdiq Navbati' }
-    ];
+
+    const canApprove = isSuperadmin || userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor'));
+    if (canApprove) {
+      const pCount = window._pendingApprovalsCount || 0;
+      tabs.push({ 
+        id: 'dept-approvals', 
+        label: pCount > 0 ? `📑 Tasdiqlash & Ijro (${pCount})` : '📑 Tasdiqlash & Ijro' 
+      });
+    }
+
     const canSeeRector = isSuperadmin || userRoles.includes('rector') || userRoles.includes('prorektor');
     if (canSeeRector) {
-      tabs.push({ id: 'prorektor-queue', label: 'Rektorat (25+ / -30)' });
-      tabs.push({ id: 'prorektor-risks', label: 'Xavf va Monitoring' });
-      tabs.push({ id: 'prorektor-appeals', label: 'E\'tirozlar (Apellyatsiya)' });
+      tabs.push({ id: 'prorektor-queue', label: '🏛️ Rektorat (25+ / -30)' });
+      tabs.push({ id: 'prorektor-risks', label: '⚠️ Xavf va Monitoring' });
+      tabs.push({ id: 'prorektor-appeals', label: '⚖️ E\'tirozlar (Apellyatsiya)' });
     }
   } else if (sectionKey === 'tutor-my-students') {
     tabs = [
@@ -704,7 +718,7 @@ function renderModuleSubNav(pageName) {
     <div class="module-subnav-bar">
       <div class="module-nav-pills">
         ${tabs.map(t => `
-          <button class="module-nav-pill ${t.id === pageName ? 'active' : ''}" onclick="navigateTo('${t.id}')">
+          <button class="module-nav-pill ${t.id === pageName ? 'active' : ''}" data-tab-id="${t.id}" onclick="navigateTo('${t.id}')">
             ${t.label}
           </button>
         `).join('')}
