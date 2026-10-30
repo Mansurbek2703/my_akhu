@@ -157,8 +157,14 @@ function isPagePermittedForUser(pageName, userRoles = []) {
     return userRoles.includes('dep_ob') || userRoles.includes('superadmin');
   }
 
-  // Tadbirlar & QR (Faqat ruxsat berilgan bo'lim xodimlari, prorektor va superadmin)
-  if (pageName === 'dept-events' || pageName === 'observe-events') {
+  // Tadbirlar & QR (Har bir xodim tadbir uyushtira oladi va ko'ra oladi)
+  if (pageName === 'dept-events') {
+    return AppState.isLoggedIn && (
+      (AppState.user && AppState.user.user_type === 'staff') ||
+      userRoles.length > 0
+    );
+  }
+  if (pageName === 'observe-events') {
     return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'superadmin'));
   }
 
@@ -4732,10 +4738,85 @@ async function submitFinalEventApprove(eventId) {
   }
 }
 
+// Bo'lim e'tirozi bildirilgan tadbirni qayta kelishishga yuborish modali
+async function openResubmitAgreementModal(eventId) {
+  try {
+    const data = await apiFetch('/api/events');
+    const ev = (data.events || []).find(e => e.id === eventId);
+    if (!ev) {
+      alert("Tadbir topilmadi!");
+      return;
+    }
+
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalFooter = document.getElementById('modal-footer');
+
+    modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">🔄 Qayta Kelishuvga Yuborish &mdash; ${ev.title}</span>`;
+    modalBody.innerHTML = `
+      <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px; padding:12px; margin-bottom:14px;">
+        <div style="font-weight:700; color:#DC2626; margin-bottom:4px;">Quyidagi bo'lim(lar) e'tiroz bildirgan:</div>
+        <div style="font-size:12.5px; color:#991B1B;">
+          ${ev.agreement_xb_status === 'rejected' ? `<div>🏢 <b>Xo'jalik:</b> ${ev.agreement_xb_note || 'Rad etildi'}</div>` : ''}
+          ${ev.agreement_atm_status === 'rejected' ? `<div>💻 <b>ATM (IT):</b> ${ev.agreement_atm_note || 'Rad etildi'}</div>` : ''}
+          ${ev.agreement_ob_status === 'rejected' ? `<div>📚 <b>O'quv:</b> ${ev.agreement_ob_note || 'Rad etildi'}</div>` : ''}
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight:700;">Qaysi bo'limga qayta yuborilsin? *</label>
+        <select id="resubmit-dept" class="form-control" style="font-weight:600;">
+          <option value="all">Barcha rad etgan bo'limlarga</option>
+          ${ev.agreement_xb_status === 'rejected' ? `<option value="xb">Faqat Xo'jalik bo'limiga</option>` : ''}
+          ${ev.agreement_atm_status === 'rejected' ? `<option value="atm">Faqat ATM (IT) ga</option>` : ''}
+          ${ev.agreement_ob_status === 'rejected' ? `<option value="ob">Faqat O'quv bo'limiga</option>` : ''}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" style="font-weight:700;">O'zgartirilgan talab yoki tushuntirish izohi:</label>
+        <textarea id="resubmit-note" class="form-control" rows="3" placeholder="Masalan: Boshqa bo'sh xonaga ko'chirildi yoki jihozlar qisqartirildi..."></textarea>
+      </div>
+    `;
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+      <button class="btn btn-outline" onclick="closeModal(); openEditEventModal('${eventId}');" style="color:#2563EB;">✏️ Tadbir vaqtini/joyini tahrirlash</button>
+      <button class="btn btn-primary" onclick="submitResubmitAgreement('${eventId}')" style="font-weight:700;">
+        🔄 Qayta Kelishuvga Yuborish
+      </button>
+    `;
+
+    openModal();
+  } catch (err) {
+    alert("Xatolik: " + err.message);
+  }
+}
+
+async function submitResubmitAgreement(eventId) {
+  const dept = document.getElementById('resubmit-dept')?.value || 'all';
+  const note = document.getElementById('resubmit-note')?.value.trim();
+
+  try {
+    const res = await apiFetch(`/api/events/${eventId}/resubmit-agreement`, {
+      method: 'POST',
+      body: JSON.stringify({ dept, note })
+    });
+
+    closeModal();
+    alert(res.message || "Tadbir qayta kelishuvga yuborildi!");
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
 window.openEventAgreementModal = openEventAgreementModal;
 window.submitEventAgreement = submitEventAgreement;
 window.openFinalEventApproveModal = openFinalEventApproveModal;
 window.submitFinalEventApprove = submitFinalEventApprove;
+window.openResubmitAgreementModal = openResubmitAgreementModal;
+window.submitResubmitAgreement = submitResubmitAgreement;
 window.onEventLeadTypeChange = onEventLeadTypeChange;
 window.onEventLeadSearchInput = onEventLeadSearchInput;
 window.selectEventLeadItem = selectEventLeadItem;
@@ -11428,15 +11509,15 @@ window.generateStaffPassword = generateStaffPassword;
 async function syncSingleStaffPhotoFromHik(userId) {
   try {
     showToast("HikCentral'dan rasm yuklanmoqda...", "info");
-    const res = await apiFetch(`/api/admin/users/${userId}/sync-hik-photo`, {
+    const res = await apiFetch(`/api/admin/users/${userId}/sync-photo`, {
       method: 'POST'
     });
-    if (res && res.photo_url) {
+    if (res && res.updatedStaff && res.updatedStaff.length > 0) {
       showToast("Xodim rasmi HikCentral'dan muvaffaqiyatli yuklandi!", "success");
       const urlInp = document.getElementById('edit-staff-photourl');
       if (urlInp) {
-        urlInp.value = res.photo_url;
-        updateAdminStaffPhotoPreview(res.photo_url, 'edit-staff-photo-preview');
+        urlInp.value = res.updatedStaff[0].photo_url;
+        updateAdminStaffPhotoPreview(res.updatedStaff[0].photo_url, 'edit-staff-photo-preview');
       }
       await loadStaffUsersList();
     } else {
@@ -11452,10 +11533,11 @@ async function syncStaffPhotosFromHikCentral() {
   if (!confirm("Barcha xodimlarning rasmlarini HikCentral turniket bazasidan sinxronizatsiya qilasizmi? Bu biroz vaqt olishi mumkin.")) return;
   try {
     showToast("HikCentral'dan barcha xodimlar rasmlari sinxronizatsiya qilinmoqda...", "info");
-    const res = await apiFetch('/api/admin/users/sync-hik-photos', {
-      method: 'POST'
+    const res = await apiFetch('/api/admin/users/sync-photos', {
+      method: 'POST',
+      body: JSON.stringify({ force_all: true })
     });
-    showToast(res?.message || "Xodimlar rasmlari yangilandi!", "success");
+    showToast(`HikCentral'dan ${res?.downloadedCount || 0} ta xodim rasmi muvaffaqiyatli yuklandi!`, "success");
     await loadStaffUsersList();
   } catch (err) {
     showToast(err.message || "HikCentral sinxronizatsiyasida xatolik", "error");

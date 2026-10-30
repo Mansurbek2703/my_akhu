@@ -2582,45 +2582,5 @@ router.post('/sync-student-photos', authenticateSuperadmin, async (req, res) => 
   }
 });
 
-/**
- * POST /api/admin/users/sync-hik-photos
- * Turniket serveridan barcha xodimlar rasmlarini sinxronlash
- */
-router.post('/users/sync-hik-photos', authenticateAdmin, async (req, res) => {
-  try {
-    const { syncStaffPhotosFromHikCentral } = require('../services/hikcentralService');
-    const result = await syncStaffPhotosFromHikCentral({ forceAll: true });
-    res.json({
-      success: true,
-      message: `HikCentral'dan ${result.downloadedCount || 0} ta xodim rasmi muvaffaqiyatli sinxronlashtirildi!`,
-      result
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * POST /api/admin/users/:id/sync-hik-photo
- * Bitta xodimning rasmini HikCentral serveridan yuklab olish
- */
-router.post('/users/:id/sync-hik-photo', authenticateAdmin, async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const { syncStaffPhotosFromHikCentral } = require('../services/hikcentralService');
-    const result = await syncStaffPhotosFromHikCentral({ specificStaffId: userId, forceAll: true });
-    
-    // Yangilangan xodimni olish
-    const updatedUser = db.prepare('SELECT id, photo_url, full_name, passport_id FROM app_user WHERE id = ?').get(userId);
-    res.json({
-      success: true,
-      message: updatedUser?.photo_url ? "Rasm muvaffaqiyatli yangilandi!" : "Ushbu xodim uchun HikCentral'da rasm topilmadi",
-      photo_url: updatedUser?.photo_url || null,
-      result
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 module.exports = router;
+
