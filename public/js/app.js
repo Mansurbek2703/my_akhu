@@ -297,10 +297,8 @@ function updateAuthUI() {
     const tvUrl = `/tv?user_id=${encodeURIComponent(AppState.user.id)}`;
     const tvBtn1 = document.getElementById('sidebar-footer-tv-btn');
     const tvBtn2 = document.getElementById('topbar-tv-btn');
-    const tvBtn3 = document.getElementById('nav-item-tv');
     if (tvBtn1) tvBtn1.href = tvUrl;
     if (tvBtn2) tvBtn2.href = tvUrl;
-    if (tvBtn3) tvBtn3.href = tvUrl;
   }
 }
 
@@ -618,9 +616,11 @@ function renderModuleSubNav(pageName) {
 function initNavigation() {
   document.querySelectorAll('.sidebar-nav a.nav-item').forEach(link => {
     link.addEventListener('click', (e) => {
-      e.preventDefault();
       const page = link.getAttribute('data-page');
-      if (page) navigateTo(page);
+      if (page) {
+        e.preventDefault();
+        navigateTo(page);
+      }
     });
   });
 }
