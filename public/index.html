@@ -175,10 +175,19 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
             Katta Ekran (TV)
           </a>
-          <a href="/miniapp" target="_blank" class="btn btn-outline btn-sm" title="Talaba Mini App interfeysini ko'rish">
+          <a href="/miniapp" target="_blank" id="topbar-miniapp-btn" class="btn btn-outline btn-sm" title="Talaba Mini App interfeysini ko'rish" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             Talaba Mini App
           </a>
+
+          <!-- SUPERADMIN MODE SWITCHER (NORMAL MODE vs SUPER MODE) -->
+          <div id="superadmin-mode-container" style="display: none; align-items: center;">
+            <button id="btn-toggle-admin-mode" onclick="toggleAdminMode()" class="btn btn-sm" style="font-weight: 700; font-size: 12px; border-radius: 20px; padding: 4px 12px; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <span id="admin-mode-icon">🛡️</span>
+              <span id="admin-mode-label">Normal Mode (IT Bo'lim)</span>
+              <span id="admin-mode-pill" style="font-size: 9.5px; padding: 2px 6px; border-radius: 10px;">Faol</span>
+            </button>
+          </div>
 
           <!-- Foydalanuvchi Profil qismi -->
           <div id="auth-action-area" style="display: inline-flex; align-items: center; gap: 8px;">
@@ -228,6 +237,6 @@
   </div>
 
   <script src="/js/html5-qrcode.min.js"></script>
-  <script src="/js/app.js?v=20261030_tv_fix_v2"></script>
+  <script src="/js/app.js?v=20261030_dept_events_v1"></script>
 </body>
 </html>

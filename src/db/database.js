@@ -85,6 +85,9 @@ function initPostgresSchema() {
       ALTER TABLE event ADD COLUMN IF NOT EXISTS lead_group TEXT;
       ALTER TABLE event ADD COLUMN IF NOT EXISTS lead_points INTEGER DEFAULT 0;
       ALTER TABLE event ADD COLUMN IF NOT EXISTS lead_rewarded INTEGER DEFAULT 0;
+      ALTER TABLE event ADD COLUMN IF NOT EXISTS req_xb_note TEXT;
+      ALTER TABLE event ADD COLUMN IF NOT EXISTS req_atm_note TEXT;
+      ALTER TABLE event ADD COLUMN IF NOT EXISTS req_ob_note TEXT;
       ALTER TABLE event ADD COLUMN IF NOT EXISTS agreement_xb_status TEXT DEFAULT 'pending';
       ALTER TABLE event ADD COLUMN IF NOT EXISTS agreement_xb_note TEXT;
       ALTER TABLE event ADD COLUMN IF NOT EXISTS agreement_xb_by TEXT;

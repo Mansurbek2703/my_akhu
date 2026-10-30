@@ -121,8 +121,19 @@ router.post('/', (req, res) => {
       lead_name = null,
       lead_group = null,
       lead_points = 0,
+      req_xb_note = null,
+      req_atm_note = null,
+      req_ob_note = null,
+      agreement_xb_note = null,
+      agreement_atm_note = null,
+      agreement_ob_note = null,
       is_direct_publish = false
     } = req.body;
+
+    // Har ikki nom bilan kelishi mumkin: req_xb_note yoki agreement_xb_note
+    const finalReqXb = (req_xb_note || agreement_xb_note || '').trim() || null;
+    const finalReqAtm = (req_atm_note || agreement_atm_note || '').trim() || null;
+    const finalReqOb = (req_ob_note || agreement_ob_note || '').trim() || null;
 
     if (!title || !starts_at || !ends_at || !place || !category_id || !level) {
       return res.status(400).json({ error: 'Majburiy maydonlar to\'ldirilishi shart' });
@@ -164,8 +175,9 @@ router.post('/', (req, res) => {
         level, points, capacity, requires_registration, status, qr_secret,
         qr_refresh_seconds, attendance_open_minutes_before, created_by, created_at,
         lead_type, lead_id, lead_name, lead_group, lead_points, lead_rewarded,
+        req_xb_note, req_atm_note, req_ob_note,
         agreement_xb_status, agreement_atm_status, agreement_ob_status, approval_final_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 60, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 60, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       eventId,
       title,
@@ -190,6 +202,9 @@ router.post('/', (req, res) => {
       finalLeadName,
       finalLeadGroup,
       finalLeadPoints,
+      finalReqXb,
+      finalReqAtm,
+      finalReqOb,
       initialDeptStatus,
       initialDeptStatus,
       initialDeptStatus,
@@ -223,28 +238,28 @@ router.post('/', (req, res) => {
         });
       } catch (e) {}
     } else {
-      // 3 ta kelishuvchi bo'lim xodimlariga Telegram orqali xabar yuborish
+      // 3 ta kelishuvchi bo'lim xodimlariga Telegram orqali xabar yuborish (o'ziga tegishli talab bilan birga!)
       try {
         const { sendTelegramMessage } = require('../services/telegramService');
-        const departments = ['dep_xb', 'dep_atm', 'dep_ob'];
-        const deptNames = {
-          dep_xb: "Xo'jalik bo'limi",
-          dep_atm: "Axborot texnologiyalari markazi",
-          dep_ob: "O'quv bo'limi"
-        };
+        const departments = [
+          { code: 'dep_xb', name: "Xo'jalik bo'limi", reqNote: finalReqXb || "Zal, stol, stul va moddiy baza imkoniyatlari" },
+          { code: 'dep_atm', name: "Axborot texnologiyalari markazi", reqNote: finalReqAtm || "Mikrofon, proyektor, internet va IT jihozlar" },
+          { code: 'dep_ob', name: "O'quv bo'limi", reqNote: finalReqOb || "Bo'sh xona/zal va dars jadvaliga xalaqit bermaslik" }
+        ];
         const startsStr = new Date(starts_at).toLocaleString('uz-UZ', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         
         for (const dept of departments) {
-          const staffUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE roles LIKE ? AND active = 1 AND telegram_user_id IS NOT NULL`).all(`%${dept}%`);
+          const staffUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE roles LIKE ? AND active = 1 AND telegram_user_id IS NOT NULL`).all(`%${dept.code}%`);
           for (const su of staffUsers) {
             sendTelegramMessage(su.telegram_user_id, 
               `📅 <b>Yangi Tadbir Kelishuvi!</b>\n\n` +
-              `🏢 <b>Bo'lim:</b> ${deptNames[dept]}\n` +
+              `🏢 <b>Sizning bo'limingiz:</b> ${dept.name}\n` +
               `📌 <b>Tadbir:</b> ${title}\n` +
               `📍 <b>Joyi:</b> ${place}\n` +
               `⏰ <b>Vaqti:</b> ${startsStr}\n` +
               `👤 <b>Tashabbuskor:</b> ${finalLeadName || req.staffUser.full_name}\n\n` +
-              `<i>Iltimos, tizimga kirib moddiy/texnik/joy imkoniyatini ko'rib chiqing va kelishing.</i>`
+              `📋 <b>Sizning bo'limdan so'ralgan talab:</b>\n<i>${dept.reqNote}</i>\n\n` +
+              `⚡️ <i>Iltimos, tizimga kirib o'z bo'limingiz qarorini bildiring (Tasdiqlash yoki Rad etish).</i>`
             ).catch(() => {});
           }
         }
@@ -272,7 +287,8 @@ router.post('/', (req, res) => {
 router.post('/:id/agree', (req, res) => {
   try {
     const eventId = req.params.id;
-    const { department, status, note } = req.body; // department: 'xb' | 'atm' | 'ob', status: 'agreed' | 'rejected'
+    const department = req.body.department || req.body.dept;
+    const { status, note } = req.body; // department: 'xb' | 'atm' | 'ob', status: 'agreed' | 'rejected'
 
     if (!['xb', 'atm', 'ob'].includes(department)) {
       return res.status(400).json({ error: "Noto'g'ri bo'lim ko'rsatildi (xb, atm yoki ob bo'lishi kerak)" });
@@ -322,6 +338,25 @@ router.post('/:id/agree', (req, res) => {
     // Yangilangan tadbirni o'qish
     const updated = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
 
+    // Agar bo'lim rad etgan bo'lsa (rejected) — Tadbir yaratuvchisiga Telegram orqali xabar yuborish!
+    if (status === 'rejected' && event.created_by) {
+      try {
+        const { sendTelegramMessage } = require('../services/telegramService');
+        const creator = db.prepare('SELECT telegram_user_id, full_name FROM staff_user WHERE id = ?').get(event.created_by);
+        if (creator && creator.telegram_user_id) {
+          const deptNames = { xb: "Xo'jalik bo'limi", atm: "Axborot texnologiyalari markazi (ATM)", ob: "O'quv bo'limi" };
+          sendTelegramMessage(creator.telegram_user_id,
+            `❌ <b>Tadbir bo'lim tomonidan rad etildi!</b>\n\n` +
+            `🏢 <b>Bo'lim:</b> ${deptNames[department] || department}\n` +
+            `📌 <b>Tadbir:</b> ${event.title}\n` +
+            `👤 <b>Rad etuvchi:</b> ${approverName}\n` +
+            `📝 <b>Rad etish sababi:</b> ${note.trim()}\n\n` +
+            `⚠️ <i>Iltimos, rad etish sababini o'rganib, talab yoki sharoitni o'zgartirgan holda tadbirni qayta kelishishga yuboring.</i>`
+          ).catch(() => {});
+        }
+      } catch (e) {}
+    }
+
     // Agar 3 ta bo'lim ham rozi bo'lgan bo'lsa (agreed), Ish yurituvchi (dep_iy) ga Telegram orqali xabar yuborish
     if (updated.agreement_xb_status === 'agreed' && 
         updated.agreement_atm_status === 'agreed' && 
@@ -345,7 +380,89 @@ router.post('/:id/agree', (req, res) => {
 
     res.json({
       success: true,
-      message: `${department.toUpperCase()} bo'limi kelishuvi muvaffaqiyatli saqlandi.`
+      message: `${department.toUpperCase()} bo'limi qarori muvaffaqiyatli saqlandi.`
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/events/:id/resubmit-agreement
+ * Rad etilgan tadbirni talab/izohini yangilab qayta kelishishga yuborish
+ */
+router.post('/:id/resubmit-agreement', (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { dept, note } = req.body; // dept: 'xb' | 'atm' | 'ob' | 'all'
+
+    const event = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
+
+    const isCreator = event.created_by && String(event.created_by).toLowerCase() === String(req.staffUser.id).toLowerCase();
+    const isSuperadmin = (req.staffUser.roles || []).includes('superadmin');
+    if (!isCreator && !isSuperadmin) {
+      return res.status(403).json({ error: "Faqat tadbir tashkilotchisi yoki Superadmin qayta kelishishga yuborishi mumkin!" });
+    }
+
+    const deptsToReset = dept === 'all' 
+      ? ['xb', 'atm', 'ob'] 
+      : (['xb', 'atm', 'ob'].includes(dept) ? [dept] : ['xb', 'atm', 'ob']);
+
+    for (const d of deptsToReset) {
+      const noteParam = (note && note.trim()) ? note.trim() : null;
+      if (noteParam) {
+        db.prepare(`
+          UPDATE event 
+          SET agreement_${d}_status = 'pending',
+              agreement_${d}_at = NULL,
+              req_${d}_note = ?,
+              status = 'pending_agreement'
+          WHERE id = ?
+        `).run(noteParam, eventId);
+      } else {
+        db.prepare(`
+          UPDATE event 
+          SET agreement_${d}_status = 'pending',
+              agreement_${d}_at = NULL,
+              status = 'pending_agreement'
+          WHERE id = ?
+        `).run(eventId);
+      }
+    }
+
+    // Tegishli bo'limlarga Telegram xabarnoma yuborish
+    try {
+      const { sendTelegramMessage } = require('../services/telegramService');
+      const deptNames = { xb: "Xo'jalik bo'limi", atm: "Axborot texnologiyalari markazi (ATM)", ob: "O'quv bo'limi" };
+      for (const d of deptsToReset) {
+        const staffUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE roles LIKE ? AND active = 1 AND telegram_user_id IS NOT NULL`).all(`%dep_${d}%`);
+        for (const su of staffUsers) {
+          sendTelegramMessage(su.telegram_user_id,
+            `🔄 <b>Tadbir Qayta Kelishuvga Yuborildi!</b>\n\n` +
+            `🏢 <b>Bo'lim:</b> ${deptNames[d]}\n` +
+            `📌 <b>Tadbir:</b> ${event.title}\n` +
+            `👤 <b>Tashabbuskor:</b> ${req.staffUser.full_name}\n` +
+            `📝 <b>Yangilangan talab / izoh:</b> ${note || 'Talab qayta ko\'rib chiqish uchun yuborildi'}\n\n` +
+            `⚡️ <i>Iltimos, tizimga kirib qayta ko'rib chiqing va tasdiqlang.</i>`
+          ).catch(() => {});
+        }
+      }
+    } catch (e) {}
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: isSuperadmin ? 'superadmin' : 'staff',
+      action: 'EVENT_RESUBMIT_AGREEMENT',
+      object_type: 'event',
+      object_id: eventId,
+      after: { deptsToReset, note },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({
+      success: true,
+      message: "Tadbir muvaffaqiyatli qayta kelishuvga yuborildi!"
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -632,8 +749,36 @@ router.get('/:id/qr', async (req, res) => {
     const event = db.prepare('SELECT * FROM event WHERE id = ?').get(req.params.id);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
 
+    // QAT'IY XAVFSIZLIK: Bu tadbir QR si talabalarga KO'RINMAYDI!
+    // Bu faqat tadbir yaratgan xodimga va superadminning profilida ko'rinadi!
+    const requesterId = req.staffUser ? String(req.staffUser.id).toLowerCase() : '';
+    const requesterRoles = req.staffUser?.roles || [];
+    const isSuperadmin = requesterRoles.includes('superadmin') || requesterId === 'superadmin';
+    const isCreator = event.created_by && String(event.created_by).toLowerCase() === requesterId;
+
+    if (!isSuperadmin && !isCreator) {
+      return res.status(403).json({
+        error: "Ruxsat etilmagan. Ushbu tadbir dinamik QR kodi faqat tadbir yaratuvchisi va Superadminga ko'rinadi (talabalar va begona shaxslarga ko'rinmaydi)!"
+      });
+    }
+
     const now = new Date();
+    const startsAt = new Date(event.starts_at);
     const endsAt = new Date(event.ends_at);
+    // Tadbir boshlanish vaqtidan 5 daqiqa oldin ochiladi!
+    const opensAt = new Date(startsAt.getTime() - 5 * 60 * 1000);
+
+    if (now < opensAt) {
+      const waitSeconds = Math.max(1, Math.ceil((opensAt.getTime() - now.getTime()) / 1000));
+      return res.status(400).json({
+        error: `Tadbir QR kodi va skaneri tadbir boshlanishidan 5 daqiqa oldin avtomatik ochiladi!`,
+        is_locked: true,
+        opens_at: opensAt.toISOString(),
+        starts_at: event.starts_at,
+        wait_seconds: waitSeconds
+      });
+    }
+
     if (now > endsAt) {
       return res.status(400).json({ error: 'Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.' });
     }
@@ -642,15 +787,17 @@ router.get('/:id/qr', async (req, res) => {
     res.json({
       title: event.title,
       points: event.points,
-      qr_refresh_seconds: 5,
-      ttl: 5,
-      attendance_open_minutes_before: event.attendance_open_minutes_before ?? 5,
+      qr_refresh_seconds: 10,
+      ttl: 10,
+      attendance_open_minutes_before: 5,
       qr_data_url: data.dataUrl,
       dataUrl: data.dataUrl,
-      payload: data.payload
+      payload: data.payload,
+      is_locked: false,
+      valid_for_seconds: data.valid_for_seconds
     });
   } catch (e) {
-    res.status(404).json({ error: e.message });
+    res.status(400).json({ error: e.message });
   }
 });
 
@@ -714,17 +861,32 @@ router.post('/:id/checkin-student', (req, res) => {
     const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
 
-    // Davomat vaqti tekshiruvi:
+    // QAT'IY XAVFSIZLIK: Skaner faqat tadbir yaratuvchisi va Superadminga ochiq
+    const requesterId = req.staffUser ? String(req.staffUser.id).toLowerCase() : '';
+    const requesterRoles = req.staffUser?.roles || [];
+    const isSuperadmin = requesterRoles.includes('superadmin') || requesterId === 'superadmin';
+    const isCreator = event.created_by && String(event.created_by).toLowerCase() === requesterId;
+
+    if (!isSuperadmin && !isCreator) {
+      return res.status(403).json({
+        error: "Ruxsat etilmagan. Ushbu tadbir davomat skaneri faqat tadbir tashkilotchisi va Superadminga ochiq!"
+      });
+    }
+
+    // Davomat vaqti tekshiruvi: 5 daqiqa oldin ochiladi
     const now = new Date();
     const startsAt = new Date(event.starts_at);
     const endsAt = new Date(event.ends_at);
-    const openMinutes = (event.attendance_open_minutes_before !== undefined && event.attendance_open_minutes_before !== null)
-      ? Number(event.attendance_open_minutes_before)
-      : 5;
-    const minAllowedTime = new Date(startsAt.getTime() - openMinutes * 60 * 1000);
+    const minAllowedTime = new Date(startsAt.getTime() - 5 * 60 * 1000);
 
     if (now < minAllowedTime) {
-      return res.status(400).json({ error: `Tadbir davomati hali boshlanmagan. Davomat tadbir boshlanishidan ${openMinutes} daqiqa oldin ochiladi.` });
+      const waitSeconds = Math.max(1, Math.ceil((minAllowedTime.getTime() - now.getTime()) / 1000));
+      return res.status(400).json({
+        error: `Tadbir skaneri tadbir boshlanishidan 5 daqiqa oldin ochiladi!`,
+        is_locked: true,
+        opens_at: minAllowedTime.toISOString(),
+        wait_seconds: waitSeconds
+      });
     }
     if (now > endsAt) {
       return res.status(400).json({ error: 'Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.' });

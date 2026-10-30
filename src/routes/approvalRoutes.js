@@ -103,7 +103,43 @@ router.get('/', authenticateStaff, (req, res) => {
     };
   });
 
-  res.json({ entries: list, count: list.length });
+  // Yangi tadbirlarni kelishish va tasdiqlash arizalari (har bir bo'lim va superadmin uchun)
+  let pendingEvents = [];
+  try {
+    const isSuper = user.roles.includes('superadmin');
+    let evConds = [];
+
+    if (isSuper) {
+      evConds.push("status = 'pending_agreement'");
+    } else {
+      if (user.roles.includes('dep_xb')) evConds.push("(status = 'pending_agreement' AND agreement_xb_status = 'pending')");
+      if (user.roles.includes('dep_atm')) evConds.push("(status = 'pending_agreement' AND agreement_atm_status = 'pending')");
+      if (user.roles.includes('dep_ob')) evConds.push("(status = 'pending_agreement' AND agreement_ob_status = 'pending')");
+      if (user.roles.includes('dep_iy')) {
+        evConds.push("(status = 'pending_agreement' AND agreement_xb_status = 'agreed' AND agreement_atm_status = 'agreed' AND agreement_ob_status = 'agreed')");
+      }
+    }
+
+    if (evConds.length > 0) {
+      const evSql = `
+        SELECT e.*, su.full_name as creator_name
+        FROM event e
+        LEFT JOIN staff_user su ON e.created_by = su.id
+        WHERE ${evConds.join(' OR ')}
+        ORDER BY e.created_at DESC
+      `;
+      pendingEvents = db.prepare(evSql).all();
+    }
+  } catch (evErr) {
+    console.error('Error fetching pending events in approvals:', evErr);
+  }
+
+  res.json({
+    entries: list,
+    pending_events: pendingEvents,
+    pending_events_count: pendingEvents.length,
+    count: list.length + pendingEvents.length
+  });
 });
 
 /**

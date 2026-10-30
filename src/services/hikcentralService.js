@@ -1211,10 +1211,25 @@ function getStudentAttendanceHistory(studentId, days = 30) {
     LIMIT 100
   `).all(studentId);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const latestLogDirection = logs.length > 0 ? logs[0].direction : null;
+
+  const enrichedRecords = records.map((r, idx) => {
+    let isIn = (r.in_count > r.out_count);
+    if (r.date === todayStr && latestLogDirection) {
+      isIn = (latestLogDirection === 'in');
+    }
+    return {
+      ...r,
+      is_in_campus: isIn
+    };
+  });
+
   return {
     student,
-    history: records,
-    logs
+    history: enrichedRecords,
+    logs,
+    is_currently_in_campus: (latestLogDirection === 'in') || ((records[0]?.in_count || 0) > (records[0]?.out_count || 0))
   };
 }
 

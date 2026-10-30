@@ -36,11 +36,11 @@ async function generateEventQrDataUrl(eventId) {
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
   if (!event) throw new Error('Tadbir topilmadi');
   
-  // Tadbir yaratuvchi QR kodi har doim qat'iy 60 sekunddan yangilanadi!
-  const ttl = 60;
+  // Tadbir dinamik QR kodi har doim qat'iy 10 sekundda yangilanadi!
+  const ttl = 10;
   const payload = generateEventQrPayload(eventId);
   const payloadStr = JSON.stringify(payload);
-  const validForSeconds = 60 - (payload.ts % 60);
+  const validForSeconds = 10 - (payload.ts % 10);
   const dataUrl = await QRCode.toDataURL(payloadStr, {
     width: 480,
     margin: 2,
@@ -52,7 +52,7 @@ async function generateEventQrDataUrl(eventId) {
     dataUrl,
     ttl,
     valid_for_seconds: validForSeconds,
-    expires_at: new Date((Math.floor(payload.ts / 60) + 1) * 60 * 1000).toISOString()
+    expires_at: new Date((Math.floor(payload.ts / 10) + 1) * 10 * 1000).toISOString()
   };
 }
 
@@ -112,13 +112,13 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(event_id);
   if (!event) throw new Error('Tadbir topilmadi');
 
-  // Anti-fraud chorasi: Tadbir yaratuvchining QR kodi har doim 60 sekunddan yangilanadi!
-  // Ruxsat etilgan vaqt oralig'i: 60 soniya + 15 soniya tarmoq buferi (jami 75s)
-  const refreshSec = 60;
-  const allowedWindow = refreshSec + 15;
+  // Anti-fraud chorasi: Tadbir yaratuvchining QR kodi har doim 10 sekundda yangilanadi!
+  // Ruxsat etilgan vaqt oralig'i: 10 soniya + 10 soniya tarmoq/kamera buferi (jami 20s)
+  const refreshSec = 10;
+  const allowedWindow = refreshSec + 10;
   const nowTs = Math.floor(Date.now() / 1000);
   if (Math.abs(nowTs - ts) > allowedWindow) {
-    throw new Error(`QR kodi eskirgan (amal qilish muddati 60 soniya). Ekranda har 60 sekundda yangilanayotgan yangi QR kodni skanerlang!`);
+    throw new Error(`QR kodi eskirgan (amal qilish muddati 10 soniya). Har 10 soniyada yangilanayotgan joriy dinamik QR kodni skanerlang!`);
   }
 
   // Imzo (sig) tekshiruvi
@@ -130,17 +130,19 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
   }
 
   // Davomat vaqti tekshiruvi:
-  // Talab bo'yicha: Davomat tadbir boshlanish vaqtida ochiladi va tadbir tugaganidan keyin 5 daqiqa davom etadi!
+  // Talab bo'yicha: Tadbir boshlanishidan 5 daqiqa oldin ochiladi va tadbir tugaguncha davom etadi!
   const now = new Date();
   const startsAt = new Date(event.starts_at);
   const endsAt = new Date(event.ends_at);
-  const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
+  const opensAt = new Date(startsAt.getTime() - 5 * 60 * 1000);
 
-  if (now < startsAt) {
-    throw new Error(`Tadbir davomati hali boshlanmagan. Davomat faqat tadbir rejalashtirilgan boshlanish vaqtida ochiladi.`);
+  if (now < opensAt) {
+    const diffSec = Math.ceil((opensAt.getTime() - now.getTime()) / 1000);
+    const diffMin = Math.ceil(diffSec / 60);
+    throw new Error(`Tadbir davomati va QR kodi tadbir boshlanishidan 5 daqiqa oldin ochiladi. Hali ${diffMin} daqiqa bor.`);
   }
-  if (now > closesAt) {
-    throw new Error('Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan (tadbirdan so\'ng 5 daqiqalik qo\'shimcha vaqt tugadi).');
+  if (now > endsAt) {
+    throw new Error('Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.');
   }
 
   // Q-04: Bir talaba — bir tadbir — bir check-in
