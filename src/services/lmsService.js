@@ -631,12 +631,15 @@ async function syncAll() {
 
 /**
  * Talaba uchun Dars Jadvalini olish (Mini App)
+ * Har bir talaba faqat o'z guruhi va o'z kurslariga tegishli darslarni ko'radi!
  */
 function getStudentTimetable(studentId) {
   const student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(studentId, studentId);
   if (!student) return { error: 'Talaba topilmadi' };
 
-  // Talaba yozilgan kurslar
+  const studentGroup = (student.group_code || '').trim();
+
+  // 1. Talaba a'zo bo'lgan LMS kurslari
   let enrolledCourses = [];
   if (student.moodle_id) {
     enrolledCourses = db.prepare(`
@@ -645,31 +648,48 @@ function getStudentTimetable(studentId) {
   }
 
   if (enrolledCourses.length === 0) {
-    // Agar aniq a'zolik topilmasa, talabaning dars davomati bor kurslarini olamiz
     enrolledCourses = db.prepare(`
       SELECT DISTINCT course_id FROM lms_student_attendance WHERE student_id = ?
     `).all(student.id).map(r => r.course_id);
   }
 
-  let timetableQuery = `
-    SELECT * FROM lms_timetable 
-    ORDER BY weekday ASC, timestart ASC
-  `;
+  // 2. Dars jadvalidan talabaning guruhi va kurslariga mos darslarni saralab olish
   let timetableEvents = [];
 
-  if (enrolledCourses.length > 0) {
+  if (studentGroup && enrolledCourses.length > 0) {
     const placeholders = enrolledCourses.map(() => '?').join(',');
-    timetableEvents = db.prepare(`
+    // Faqat: Talabaning o'z guruhi YOKI (guruh ko'rsatilmagan umumiy ma'ruza va uning kursi)
+    const sql = `
+      SELECT * FROM lms_timetable 
+      WHERE (group_code = ? OR group_name LIKE ?)
+         OR ((group_code IS NULL OR group_code = '') AND course_id IN (${placeholders}))
+      ORDER BY weekday ASC, timestart ASC
+    `;
+    timetableEvents = db.prepare(sql).all(studentGroup, `%${studentGroup}%`, ...enrolledCourses);
+  } else if (studentGroup) {
+    // Agar kurs ID lari bo'lmasa, faqat uning guruhi bo'yicha darslar
+    const sql = `
+      SELECT * FROM lms_timetable 
+      WHERE (group_code = ? OR group_name LIKE ?)
+      ORDER BY weekday ASC, timestart ASC
+    `;
+    timetableEvents = db.prepare(sql).all(studentGroup, `%${studentGroup}%`);
+  } else if (enrolledCourses.length > 0) {
+    // Agar guruh bo'lmasa, faqat kursning guruhsiz umumiy ma'ruzalari
+    const placeholders = enrolledCourses.map(() => '?').join(',');
+    const sql = `
       SELECT * FROM lms_timetable 
       WHERE course_id IN (${placeholders})
+        AND (group_code IS NULL OR group_code = '')
       ORDER BY weekday ASC, timestart ASC
-    `).all(...enrolledCourses);
+    `;
+    timetableEvents = db.prepare(sql).all(...enrolledCourses);
   } else {
-    // Default hamma darslar
-    timetableEvents = db.prepare(timetableQuery).all();
+    // Agar na guruh, na kurs bo'lsa, begona guruh darslarini ko'rsatmaslik uchun bo'sh ro'yxat
+    timetableEvents = [];
   }
 
-  // Hafta kunlari bo'yicha guruhlash (1 = Dushanba ... 6 = Shanba)
+  // 3. Hafta kunlari bo'yicha guruhlash (1 = Dushanba ... 6 = Shanba)
   const weekdaysMap = {
     1: { day: 1, name: 'Dushanba', lessons: [] },
     2: { day: 2, name: 'Seshanba', lessons: [] },
@@ -679,43 +699,56 @@ function getStudentTimetable(studentId) {
     6: { day: 6, name: 'Shanba', lessons: [] }
   };
 
-  const now = new Date();
-  const currentDay = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+  // Toshkent vaqti bo'yicha joriy hafta kunini aniqlash (1..7, 7 = Yakshanba)
+  const nowTashkent = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }));
+  const rawDay = nowTashkent.getDay(); // 0 = Yakshanba, 1 = Dushanba ...
+  const currentDay = rawDay === 0 ? 7 : rawDay;
+  const tomorrowDay = (currentDay % 7) + 1;
 
-  // Distinct dars mashg'ulotlarini ajratish (takrorlanuvchi haftalarni bitta shablon sifatida ko'rsatish)
+  // Unikal dars slotlarini ajratish (hafta kuni + vaqt + fan nomi)
   const seenClassKeys = new Set();
+  const allUniqueLessons = [];
 
   for (const ev of timetableEvents) {
-    const key = `${ev.weekday}_${ev.course_id}_${ev.time_str}`;
+    const key = `${ev.weekday}_${ev.time_str}_${ev.subject_name}`;
     if (!seenClassKeys.has(key)) {
       seenClassKeys.add(key);
+      const lessonObj = {
+        id: ev.id,
+        event_id: ev.event_id,
+        course_id: ev.course_id,
+        subject_code: ev.subject_code,
+        subject_name: ev.subject_name,
+        teacher_name: ev.teacher_name || 'Kafedra o\'qituvchisi',
+        room: ev.room || 'Xona ko\'rsatilmagan',
+        time_str: ev.time_str,
+        group_code: ev.group_code || studentGroup,
+        weekday: ev.weekday,
+        is_today: ev.weekday === currentDay,
+        is_tomorrow: ev.weekday === tomorrowDay
+      };
+      allUniqueLessons.push(lessonObj);
       if (weekdaysMap[ev.weekday]) {
-        weekdaysMap[ev.weekday].lessons.push({
-          id: ev.id,
-          event_id: ev.event_id,
-          course_id: ev.course_id,
-          subject_code: ev.subject_code,
-          subject_name: ev.subject_name,
-          teacher_name: ev.teacher_name || 'Belgilanmagan',
-          room: ev.room || 'Xona ko\'rsatilmagan',
-          time_str: ev.time_str,
-          is_today: ev.weekday === currentDay
-        });
+        weekdaysMap[ev.weekday].lessons.push(lessonObj);
       }
     }
   }
 
   const todayClasses = weekdaysMap[currentDay] ? weekdaysMap[currentDay].lessons : [];
+  const tomorrowClasses = weekdaysMap[tomorrowDay] ? weekdaysMap[tomorrowDay].lessons : [];
 
   return {
     student: {
       id: student.id,
       name: `${student.first_name} ${student.last_name}`,
-      group_code: student.group_code,
+      group_code: studentGroup || 'Guruhsiz',
       moodle_id: student.moodle_id
     },
     current_weekday: currentDay,
+    tomorrow_weekday: tomorrowDay,
     today_classes: todayClasses,
+    tomorrow_classes: tomorrowClasses,
+    total_classes_week: allUniqueLessons.length,
     weekly_schedule: Object.values(weekdaysMap)
   };
 }

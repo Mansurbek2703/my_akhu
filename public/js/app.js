@@ -3087,7 +3087,24 @@ async function renderDeptEvents(container) {
       `;
     } else {
       html += `
-        <div class="grid grid-2">
+        <style>
+          .events-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+          }
+          @media (max-width: 1380px) {
+            .events-cards-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+          }
+          @media (max-width: 880px) {
+            .events-cards-grid {
+              grid-template-columns: 1fr !important;
+            }
+          }
+        </style>
+        <div class="events-cards-grid">
           ${events.map(ev => {
             const startsFormatted = new Date(ev.starts_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             const endsFormatted = new Date(ev.ends_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -3119,11 +3136,14 @@ async function renderDeptEvents(container) {
             return `
               <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
                 <div>
-                  <!-- BANNER HEADER (AMBIENT BLUR FON + TO'LIQ MARKAZIY BANNER, MATNLAR KESILMAYDI) -->
+                  <!-- BANNER HEADER (16:9 STANDART PROPORSIYA, AMBIENT BLUR FON + TO'LIQ MARKAZIY BANNER) -->
                   ${imgSrc ? `
-                    <div style="height: 180px; width: 100%; position: relative; overflow: hidden; background: #0B0F19; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
-                      <div style="position: absolute; inset: -15px; background-image: url('${imgSrc}'); background-size: cover; background-position: center; filter: blur(16px); opacity: 0.38; transform: scale(1.18);"></div>
-                      <img src="${imgSrc}" alt="${ev.title}" style="position: relative; max-height: 100%; max-width: 100%; object-fit: contain; z-index: 2; display: block;" onerror="this.parentElement.style.display='none';">
+                    <div style="height: 200px; width: 100%; position: relative; overflow: hidden; background: #0B0F19; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                      <div style="position: absolute; inset: -15px; background-image: url('${imgSrc}'); background-size: cover; background-position: center; filter: blur(20px); opacity: 0.40; transform: scale(1.15);"></div>
+                      <img src="${imgSrc}" alt="${ev.title}" style="position: relative; max-height: 100%; max-width: 100%; width: 100%; height: 100%; object-fit: contain; z-index: 2; display: block;" onerror="this.parentElement.style.display='none';">
+                      <div style="position: absolute; top: 8px; right: 8px; z-index: 3; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); color: #E2E8F0; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);">
+                        16:9
+                      </div>
                     </div>
                   ` : `
                     <div style="height: 105px; width: 100%; background: linear-gradient(135deg, ${ev.category_color || '#3B82F6'}25 0%, #0F172A 100%); display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.06);">
@@ -4030,32 +4050,34 @@ async function openCreateEventModal() {
         </div>
       </div>
 
-      <!-- TADBIK BANNERI (PREMIUM AMBIENT PREVIEW) -->
+      <!-- TADBIK BANNERI (STANDART 16:9 PREVIEW VA O'LCHAMLAR) -->
       <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <label class="form-label" style="font-weight: 700; color: #1E293B; margin: 0; display: flex; align-items: center; gap: 6px;">
-            🖼️ Tadbir Rasmi / Banneri (TV va Ilova uchun)
+            🖼️ Tadbir Banneri / Rasmi (Standart 16:9 format)
           </label>
-          <span style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
-            16:9 Nisbatda
+          <span style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 800; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
+            16:9 Standart
           </span>
         </div>
-        <p style="font-size: 11.5px; color: #64748B; margin-bottom: 10px; line-height: 1.4;">
-          📐 <strong>Tavsiya etilgan o'lcham:</strong> 16:9 nisbatda sifatli rasm yuklang. Tizim avtomatik ambient blur va to'liq nisbatda harflar kesilmasdan chiroyli ko'rsatadi.
-        </p>
+        <div style="font-size: 11.5px; color: #475569; margin-bottom: 10px; line-height: 1.5; background: #FFFFFF; border: 1px solid #E2E8F0; padding: 8px 12px; border-radius: 8px;">
+          📌 <strong>Tavsiya etilgan aniq o'lcham:</strong> <b>1200 × 675 px</b> yoki <b>1280 × 720 px</b> (16:9 nisbatda, max 5 MB).
+          <div style="color: #64748B; font-size: 11px; margin-top: 2px;">Ushbu rasm Telegram bot orqali barcha talabalarga bildirishnoma sifatida yuboriladi va Katta Ekran (TV) da sifatli ko'rinadi.</div>
+        </div>
 
         <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-          <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili yoki quyidagi tugma orqali rasm tanlang..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 13px;">
-          <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; font-size: 12.5px;">
-            📁 Fayl tanlash
+          <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili yoki quyidagi tugma orqali rasm yuklang..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 13px;">
+          <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; font-size: 12.5px; font-weight: 600;">
+            📁 Rasm yuklash
             <input type="file" accept="image/*" style="display: none;" onchange="handleEventPhotoUpload(this, 'ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')">
           </label>
         </div>
 
-        <div id="ev-photo-preview-wrap" style="display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; height: 180px; background: #0B0F19; position: relative; text-align: center;">
+        <div id="ev-photo-preview-wrap" style="display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; height: 190px; background: #0B0F19; position: relative; text-align: center;">
           <img id="ev-photo-preview" src="" alt="Banner ko'rinishi" style="max-height: 100%; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;">
           <button type="button" onclick="clearEventPhoto('ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
         </div>
+        <div id="ev-photo-preview-wrap-info" style="font-size: 11.5px; padding: 6px 10px; margin-top: 6px; border-radius: 6px; background: #F1F5F9; display: none;"></div>
       </div>
 
       <div class="grid grid-2 mb-3">
@@ -4608,13 +4630,30 @@ async function handleEventPhotoUpload(fileInput, urlInputId, previewImgId, wrapI
 function handleEventPhotoUrlChange(url, previewImgId, wrapId) {
   const wrap = document.getElementById(wrapId);
   const preview = document.getElementById(previewImgId);
+  const infoEl = document.getElementById(wrapId + '-info');
   if (!wrap || !preview) return;
   if (url && url.trim()) {
     preview.src = url.trim();
+    preview.onload = () => {
+      const w = preview.naturalWidth;
+      const h = preview.naturalHeight;
+      const ratio = (w / (h || 1)).toFixed(2);
+      const is16by9 = (ratio >= 1.68 && ratio <= 1.88);
+      if (infoEl) {
+        infoEl.innerHTML = is16by9 
+          ? `<span style="color: #059669; font-weight: 700;">✅ Standart O'lcham: ${w}×${h} px (${ratio}:1 — 16:9 formatga to'liq mos!). Telegram va Katta Ekran uchun ideal.</span>`
+          : `<span style="color: #D97706; font-weight: 600;">📐 O'lcham: ${w}×${h} px (${ratio}:1). Rasm TV va Mini App ilovada eng sifatli ko'rinishi uchun 16:9 (masalan: 1200×675 px yoki 1280×720 px) tavsiya etiladi.</span>`;
+        infoEl.style.display = 'block';
+      }
+    };
     wrap.style.display = 'block';
   } else {
     preview.src = '';
     wrap.style.display = 'none';
+    if (infoEl) {
+      infoEl.innerHTML = '';
+      infoEl.style.display = 'none';
+    }
   }
 }
 

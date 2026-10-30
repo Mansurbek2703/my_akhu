@@ -8,3 +8,5 @@ uploads/*
 .env
 .DS_Store
 Thumbs.db
+scratch/
+scripts/__pycache__/

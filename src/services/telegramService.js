@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { db } = require('../db/database');
 const config = require('../config');
 const { recalculateStudentScores } = require('./ratingService');
@@ -40,10 +42,49 @@ async function sendTelegramMessage(chatId, text, options = {}) {
 
 /**
  * Telegram API ga rasm (photo) bilan xabar yuborish
+ * Qo'llab-quvvatlaydi: Telegram file_id, tashqi HTTP URL va lokal fayllar (/api/files/xxx yoki uploads)
  */
 async function sendTelegramPhoto(chatId, photo, caption = '', options = {}) {
   try {
     const url = `${TELEGRAM_API}/sendPhoto`;
+
+    // 1. Agar photo lokal yuklangan fayl bo'lsa
+    let localFilePath = null;
+    if (typeof photo === 'string') {
+      if (photo.startsWith('/api/files/')) {
+        const fname = photo.replace('/api/files/', '').split('?')[0];
+        const candidate = path.join(config.uploadDir, fname);
+        if (fs.existsSync(candidate)) localFilePath = candidate;
+      } else if (photo.startsWith('uploads/') || photo.startsWith('/uploads/')) {
+        const candidate = path.resolve(photo.replace(/^\//, ''));
+        if (fs.existsSync(candidate)) localFilePath = candidate;
+      } else if (fs.existsSync(photo) && !photo.startsWith('http')) {
+        localFilePath = photo;
+      }
+    }
+
+    if (localFilePath) {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      const fileBuffer = fs.readFileSync(localFilePath);
+      const ext = path.extname(localFilePath).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+      const blob = new Blob([fileBuffer], { type: mime });
+      formData.append('photo', blob, path.basename(localFilePath));
+      if (caption) formData.append('caption', caption);
+      formData.append('parse_mode', 'HTML');
+      if (options.reply_markup) {
+        formData.append('reply_markup', typeof options.reply_markup === 'string' ? options.reply_markup : JSON.stringify(options.reply_markup));
+      }
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        body: formData
+      });
+      return await resp.json();
+    }
+
+    // 2. Agar Telegram file_id yoki tashqi URL bo'lsa
     const body = {
       chat_id: chatId,
       photo,
@@ -299,24 +340,36 @@ async function broadcastNewEventToStudents(event) {
     // Orqa fonda xavfsiz asinxron yuborish
     (async () => {
       let sentCount = 0;
-      let rawPhoto = event.photo_url || event.image_url;
-      let fullPhotoUrl = null;
-      if (rawPhoto) {
-        fullPhotoUrl = rawPhoto.startsWith('http') ? rawPhoto : `${config.baseUrl}${rawPhoto.startsWith('/') ? '' : '/'}${rawPhoto}`;
-      }
+      const rawPhoto = event.photo_url || event.image_url;
+      let cachedPhotoId = null;
 
       for (const st of students) {
         try {
           let photoSent = false;
-          if (fullPhotoUrl) {
-            const photoRes = await sendTelegramPhoto(st.telegram_user_id, fullPhotoUrl, text, { reply_markup: replyMarkup });
+          if (cachedPhotoId) {
+            // Tezkor file_id orqali yuborish (Telegram serveridan yuklanmaydi, bir zumda jo'naydi)
+            const photoRes = await sendTelegramPhoto(st.telegram_user_id, cachedPhotoId, text, { reply_markup: replyMarkup });
             if (photoRes && photoRes.ok) photoSent = true;
+          } else if (rawPhoto) {
+            // Birinchi talabaga lokal fayl yoki to'liq URL orqali yuborish
+            let targetPhoto = rawPhoto;
+            if (!rawPhoto.startsWith('http') && !rawPhoto.startsWith('/api/files/') && !rawPhoto.startsWith('uploads/')) {
+              targetPhoto = `${config.baseUrl}${rawPhoto.startsWith('/') ? '' : '/'}${rawPhoto}`;
+            }
+            const photoRes = await sendTelegramPhoto(st.telegram_user_id, targetPhoto, text, { reply_markup: replyMarkup });
+            if (photoRes && photoRes.ok) {
+              photoSent = true;
+              if (photoRes.result && Array.isArray(photoRes.result.photo) && photoRes.result.photo.length > 0) {
+                cachedPhotoId = photoRes.result.photo[photoRes.result.photo.length - 1].file_id;
+              }
+            }
           }
+
           if (!photoSent) {
             await sendTelegramMessage(st.telegram_user_id, text, { reply_markup: replyMarkup });
           }
           sentCount++;
-          await new Promise(r => setTimeout(r, 45)); // Rate-limiting tolerans
+          await new Promise(r => setTimeout(r, 40)); // Rate-limiting tolerans
         } catch (e) {
           console.warn(`Broadcast error to ${st.telegram_user_id}:`, e.message);
         }
@@ -325,7 +378,6 @@ async function broadcastNewEventToStudents(event) {
         studentId: null
       });
     })();
-
   } catch (err) {
     console.error('broadcastNewEventToStudents error:', err.message);
   }
