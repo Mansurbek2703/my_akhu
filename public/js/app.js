@@ -4210,6 +4210,8 @@ async function openCreateEventModal() {
     points: 20
   };
 
+  window._userEditedObNote = false;
+
   modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('calendar', 18)} Yangi Tadbir Uyushtirish (4 Bo'lim Kelishuvi)</span>`;
 
   let categories = [];
@@ -4222,207 +4224,222 @@ async function openCreateEventModal() {
 
   modalBody.innerHTML = `
     <form id="dept-create-event-form" onsubmit="event.preventDefault(); submitCreateEvent();">
-      <div class="form-group mb-3">
-        <label class="form-label" style="font-weight:700;">Tadbir Nomi *</label>
-        <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026' yoki 'Zakovat Intellektual Turniri'" required style="font-size: 14.5px; font-weight: 600;">
-      </div>
+      <div class="event-modal-grid" style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 20px;">
+        <!-- CHAP USTUN: NOMI, SANA/VAQT, JOY VA 4 BO'LIM KELISHUVI -->
+        <div>
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-weight:700;">Tadbir Nomi *</label>
+            <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026' yoki 'Zakovat Intellektual Turniri'" required style="font-size: 14.5px; font-weight: 600;">
+          </div>
 
-      <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
-      <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <label style="font-weight: 800; font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
-            📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
-          </label>
-          <span style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: 700;">Kamida +10 daqiqa keyin</span>
-        </div>
+          <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
+          <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <label style="font-weight: 800; font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
+                📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
+              </label>
+              <span style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: 700;">Kamida +10 daqiqa keyin</span>
+            </div>
 
-        <div style="margin-bottom: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni (O'tgan kunlar tanlanmaydi):</span>
-            <div style="display: flex; gap: 4px;">
-              <button type="button" id="date-btn-today" class="btn btn-sm btn-outline date-quick-btn btn-primary" onclick="setEventQuickDate('today', '')" style="font-size: 11px; padding: 2px 8px;">Bugun</button>
-              <button type="button" id="date-btn-tomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('tomorrow', '')" style="font-size: 11px; padding: 2px 8px;">Ertaga</button>
-              <button type="button" id="date-btn-afterTomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('afterTomorrow', '')" style="font-size: 11px; padding: 2px 8px;">Indinga</button>
+            <div style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni:</span>
+                <div style="display: flex; gap: 4px;">
+                  <button type="button" id="date-btn-today" class="btn btn-sm btn-outline date-quick-btn btn-primary" onclick="setEventQuickDate('today', ''); syncEventObNoteAuto();" style="font-size: 11px; padding: 2px 8px;">Bugun</button>
+                  <button type="button" id="date-btn-tomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('tomorrow', ''); syncEventObNoteAuto();" style="font-size: 11px; padding: 2px 8px;">Ertaga</button>
+                  <button type="button" id="date-btn-afterTomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('afterTomorrow', ''); syncEventObNoteAuto();" style="font-size: 11px; padding: 2px 8px;">Indinga</button>
+                </div>
+              </div>
+              <div id="cal-container" class="custom-calendar-widget"></div>
+            </div>
+
+            <div class="time-scroll-track-wrapper">
+              <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>⏰ 2. Boshlanish vaqti</span>
+                <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
+              </div>
+              <div class="time-scroll-track" id="start-time-track"></div>
+            </div>
+
+            <div class="time-scroll-track-wrapper">
+              <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
+                <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
+              </div>
+              <div class="time-scroll-track" id="end-time-track"></div>
+            </div>
+
+            <div id="ev-datetime-summary"></div>
+          </div>
+
+          <div class="form-group mb-3">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label class="form-label" style="font-weight:700; margin:0;">O'tkazilish joyi (Bino / Zal / Auditoriya) *</label>
+              <label style="cursor:pointer; font-size:12px; font-weight:700; color:#4338CA; display:inline-flex; align-items:center; gap:5px; margin:0;">
+                <input type="checkbox" id="ev-is-external" onchange="onEventExternalToggle(this.checked)">
+                🌍 Tashqi tadbir (Universitet hududidan tashqarida)
+              </label>
+            </div>
+            <input type="text" id="ev-place" class="form-control" placeholder="Masalan: Bosh bino, 2-qavat Katta Aktlar Zali" oninput="syncEventObNoteAuto()" required>
+          </div>
+
+          <!-- 4 TA BO'LIMNING MODDIY-TEXNIK JARAYONLARI VA KELISHUVI -->
+          <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label class="form-label" style="font-weight: 800; color: #1E293B; margin: 0; display: flex; align-items: center; gap: 6px;">
+                <span>📑</span> 4 Ta Bo'lim uchun Moddiy-Texnik Talablar va Jarayonlar
+              </label>
+              <span style="font-size:11px; color:#64748B;">Kelishuv tizimi</span>
+            </div>
+            <p style="font-size: 11.5px; color: #64748B; margin-bottom: 10px; line-height:1.4;">
+              Bo'limlardan zarur bo'ladigan imkoniyatlarni kiriting. Agar bo'limga talab bo'lmasa, bo'sh qoldiring (kelishuv talab etilmaydi va ortiqcha bezovta qilinmaydi).
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <label style="font-size: 12px; font-weight: 700; color: #B45309; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+                  🏢 Xo'jalik bo'limi:
+                </label>
+                <input type="text" id="ev-note-xb" class="form-control" placeholder="Stol, stul, zal tayyorlash, moddiy baza bo'yicha talablar (bo'sh qolsa: shart emas)..." style="font-size: 12.5px;">
+              </div>
+              <div>
+                <label style="font-size: 12px; font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+                  💻 Axborot texnologiyalari markazi (ATM):
+                </label>
+                <input type="text" id="ev-note-atm" class="form-control" placeholder="Speaker, mikrofon, proyektor, kompyuter, Wi-Fi (bo'sh qolsa: shart emas)..." style="font-size: 12.5px;">
+              </div>
+              <div id="ev-note-ob-wrap">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                  <label style="font-size: 12px; font-weight: 700; color: #16A34A; display: flex; align-items: center; gap: 4px; margin:0;">
+                    📚 O'quv bo'limi (Avtomatik xona & vaqt jadvali):
+                  </label>
+                  <span id="ev-ob-auto-tag" style="font-size:10px; background:#DCFCE7; color:#166534; font-weight:700; padding:1px 6px; border-radius:4px;">Avtomatik generatsiya</span>
+                </div>
+                <input type="text" id="ev-note-ob" class="form-control" placeholder="Bo'sh xona/zal ajratish va dars jadvaliga xalaqit bermasligini kelishish..." oninput="window._userEditedObNote = true;" style="font-size: 12.5px;">
+              </div>
+              <div style="background:#EEF2FF; border:1px solid #C7D2FE; border-radius:6px; padding:8px 10px; font-size:11.5px; color:#3730A3;">
+                <strong>📑 Ish yurituvchi:</strong> Barcha bo'limlar ko'rib chiqqach, buyruq/rasmiy tasdiq beradi va tadbirni rasman chop etadi (Doim majburiy).
+              </div>
             </div>
           </div>
-          <div id="cal-container" class="custom-calendar-widget"></div>
         </div>
 
-        <div class="time-scroll-track-wrapper">
-          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-            <span>⏰ 2. Boshlanish vaqti</span>
-            <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
-          </div>
-          <div class="time-scroll-track" id="start-time-track"></div>
-        </div>
-
-        <div class="time-scroll-track-wrapper">
-          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-            <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
-            <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
-          </div>
-          <div class="time-scroll-track" id="end-time-track"></div>
-        </div>
-
-        <div id="ev-datetime-summary"></div>
-      </div>
-
-      <div class="form-group mb-3">
-        <label class="form-label" style="font-weight:700;">O'tkazilish joyi (Bino / Zal / Auditoriya) *</label>
-        <input type="text" id="ev-place" class="form-control" placeholder="Masalan: Bosh bino, 2-qavat Katta Aktlar Zali" required>
-      </div>
-
-      <!-- ASOSIY TASHABBUSKOR TANLOVI (TALABA / HODIM / O'ZIM) -->
-      <div class="form-group mb-3" style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 12px; padding: 14px;">
-        <label class="form-label" style="font-weight: 800; color: #166534; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-          <span>🎯</span> Asosiy Tashabbuskor (Tadbirni o'ylab topgan shaxs) *
-        </label>
-        <p style="font-size: 12px; color: #15803D; margin-bottom: 10px; line-height: 1.4;">
-          Agar tadbir tashabbuskori <strong>talaba</strong> bo'lsa, uni belgilang. Ish yurituvchi tasdiqlaganidan keyin <strong>tizim ushbu talabaga avtomatik ravishda baholash mezonlari bo'yicha ball</strong> hisoblaydi!
-        </p>
-
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
-            <input type="radio" name="ev_lead_type_radio" value="self" checked onchange="onEventLeadTypeChange(this.value)">
-            Men o'zim (Tashkilotchi xodim)
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; font-size:13px; color:#15803D;">
-            <input type="radio" name="ev_lead_type_radio" value="student" onchange="onEventLeadTypeChange(this.value)">
-            ⭐ Talaba (Asosiy Tashabbuskor - Avtomatik Ball)
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
-            <input type="radio" name="ev_lead_type_radio" value="staff" onchange="onEventLeadTypeChange(this.value)">
-            Boshqa xodim
-          </label>
-        </div>
-
-        <!-- Talaba yoki Xodim qidiruv qismi -->
-        <div id="ev-lead-search-wrap" style="display: none; position: relative; margin-bottom: 10px;">
-          <input type="text" id="ev-lead-search-input" class="form-control" placeholder="Talaba F.I.Sh yoki ID bo'yicha qidiring..." oninput="onEventLeadSearchInput(this.value)" autocomplete="off">
-          <div id="ev-lead-results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; max-height: 200px; overflow-y: auto;"></div>
-        </div>
-
-        <div id="ev-lead-selected-display" style="display: none; margin-bottom: 10px;"></div>
-
-        <!-- Talaba uchun baholash mezonlari bo'yicha ball tanlash -->
-        <div id="ev-lead-points-wrap" style="display: none; background: #FFFFFF; border: 1px solid #A7F3D0; border-radius: 8px; padding: 10px 12px;">
-          <label class="form-label" style="font-weight: 700; color: #065F46; font-size: 12px; margin-bottom: 4px;">
-            🏆 Talabaga beriladigan tashkilotchilik bali (Baholash mezoni bo'yicha):
-          </label>
-          <select id="ev-lead-points-select" class="form-control" style="font-weight:600; font-size:13px;" onchange="createEventLeadState.points = Number(this.value)">
-            <option value="10">i3: 10 ball &mdash; Tadbir tashkiliy guruhida faoliyat</option>
-            <option value="15">m3: 15 ball &mdash; Ma'naviy-ma'rifiy tadbir tashkiloti</option>
-            <option value="20" selected>i6: 20 ball &mdash; Universitet tadbirini o'zi tashkil etdi (30+ ishtirokchi)</option>
-            <option value="30">i7: 30 ball &mdash; Katta universitet tadbirini o'zi tashkil etdi (100+ ishtirokchi)</option>
-          </select>
-          <small style="color: #047857; font-size: 11px; display: block; margin-top: 4px;">
-            ✓ Ushbu ball tadbir Ish yurituvchi tomonidan tasdiqlangach avtomatik ravishda talabaning hisobiga qo'shiladi.
-          </small>
-        </div>
-      </div>
-
-      <!-- 4 TA BO'LIMNING MODDIY-TEXNIK JARAYONLARI VA KELISHUVI -->
-      <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 14px;">
-        <label class="form-label" style="font-weight: 800; color: #1E293B; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-          <span>📑</span> 4 Ta Bo'lim uchun Moddiy-Texnik Talablar va Jarayonlar
-        </label>
-        <p style="font-size: 12px; color: #64748B; margin-bottom: 10px;">
-          Tadbir o'tkazish uchun bo'limlardan zarur bo'ladigan imkoniyatlarni ko'rsating (har bir bo'lim ko'rib chiqib kelishadi):
-        </p>
-
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div>
-            <label style="font-size: 12px; font-weight: 700; color: #B45309; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-              🏢 Xo'jalik bo'limi:
+        <!-- O'NG USTUN: TASHABBUSKOR, BANNER, SOHA, SIG'IM -->
+        <div>
+          <!-- ASOSIY TASHABBUSKOR TANLOVI (TALABA / HODIM / O'ZIM) -->
+          <div class="form-group mb-3" style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 12px; padding: 14px;">
+            <label class="form-label" style="font-weight: 800; color: #166534; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>🎯</span> Asosiy Tashabbuskor *
             </label>
-            <input type="text" id="ev-note-xb" class="form-control" placeholder="Stol, stul, zal tayyorlash, moddiy baza bo'yicha talablar..." style="font-size: 12.5px;">
+            <p style="font-size: 11.5px; color: #15803D; margin-bottom: 10px; line-height: 1.4;">
+              Agar tadbir tashabbuskori <strong>talaba</strong> bo'lsa, uni belgilang. Ish yurituvchi tasdiqlaganidan keyin <strong>tizim ushbu talabaga avtomatik ravishda baholash mezonlari bo'yicha ball</strong> taqdim etadi!
+            </p>
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
+                <input type="radio" name="ev_lead_type_radio" value="self" checked onchange="onEventLeadTypeChange(this.value)">
+                Men o'zim
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; font-size:13px; color:#15803D;">
+                <input type="radio" name="ev_lead_type_radio" value="student" onchange="onEventLeadTypeChange(this.value)">
+                ⭐ Talaba (Avtomatik Ball)
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
+                <input type="radio" name="ev_lead_type_radio" value="staff" onchange="onEventLeadTypeChange(this.value)">
+                Boshqa xodim
+              </label>
+            </div>
+
+            <!-- Talaba yoki Xodim qidiruv qismi -->
+            <div id="ev-lead-search-wrap" style="display: none; position: relative; margin-bottom: 10px;">
+              <input type="text" id="ev-lead-search-input" class="form-control" placeholder="F.I.Sh yoki ID bo'yicha qidiring..." oninput="onEventLeadSearchInput(this.value)" autocomplete="off">
+              <div id="ev-lead-results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; max-height: 200px; overflow-y: auto;"></div>
+            </div>
+
+            <div id="ev-lead-selected-display" style="display: none; margin-bottom: 10px;"></div>
+
+            <!-- Talaba uchun baholash mezonlari bo'yicha ball tanlash -->
+            <div id="ev-lead-points-wrap" style="display: none; background: #FFFFFF; border: 1px solid #A7F3D0; border-radius: 8px; padding: 10px 12px;">
+              <label class="form-label" style="font-weight: 700; color: #065F46; font-size: 12px; margin-bottom: 4px;">
+                🏆 Talabaga beriladigan tashkilotchilik bali:
+              </label>
+              <select id="ev-lead-points-select" class="form-control" style="font-weight:600; font-size:12.5px;" onchange="createEventLeadState.points = Number(this.value)">
+                <option value="10">i3: 10 ball &mdash; Tadbir tashkiliy guruhida faoliyat</option>
+                <option value="15">m3: 15 ball &mdash; Ma'naviy-ma'rifiy tadbir tashkiloti</option>
+                <option value="20" selected>i6: 20 ball &mdash; Universitet tadbirini o'zi tashkil etdi (30+ ishtirokchi)</option>
+                <option value="30">i7: 30 ball &mdash; Katta tadbir tashkilotchisi (100+ ishtirokchi)</option>
+              </select>
+              <small style="color: #047857; font-size: 11px; display: block; margin-top: 4px;">
+                ✓ Ushbu ball Ish yurituvchi tasdiqlangach avtomatik taqdim etiladi.
+              </small>
+            </div>
           </div>
-          <div>
-            <label style="font-size: 12px; font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-              💻 Axborot texnologiyalari markazi (ATM):
+
+          <!-- TADBIK BANNERI (PREMIUM AMBIENT BLUR PREVIEW) -->
+          <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: 14px;">
+            <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              🖼️ Tadbir Banneri / Rasmi
             </label>
-            <input type="text" id="ev-note-atm" class="form-control" placeholder="Speaker, mikrofonlar soni, kompyuter/noutbuk, interaktiv panel, Wi-Fi..." style="font-size: 12.5px;">
+            <div style="font-size: 11px; color: #64748B; margin-bottom: 8px;">
+              1200×675 px yoki 1280×720 px tavsiya etiladi (Telegram va Katta Ekran uchun).
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 12.5px;">
+              <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 7px 12px; font-size: 12px; font-weight: 600;">
+                📁 Yuklash
+                <input type="file" accept="image/*" style="display: none;" onchange="handleEventPhotoUpload(this, 'ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')">
+              </label>
+            </div>
+
+            <div id="ev-photo-preview-wrap" style="display: none; margin-top: 8px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; height: 160px; background: #0B0F19; position: relative;">
+              <div id="ev-photo-blur-bg" style="position: absolute; inset: -10px; background-size: cover; background-position: center; filter: blur(15px); opacity: 0.45;"></div>
+              <img id="ev-photo-preview" src="" alt="Banner ko'rinishi" style="position: relative; max-height: 100%; max-width: 100%; width: 100%; height: 100%; object-fit: contain; z-index: 2; margin: 0 auto; display: block;">
+              <button type="button" onclick="clearEventPhoto('ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')" style="position: absolute; top: 6px; right: 6px; z-index: 5; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 6px; padding: 3px 7px; font-size: 10.5px; cursor: pointer;">✕ O'chirish</button>
+            </div>
+            <div id="ev-photo-preview-wrap-info" style="font-size: 11px; padding: 4px 8px; margin-top: 6px; border-radius: 6px; background: #F1F5F9; display: none;"></div>
           </div>
-          <div>
-            <label style="font-size: 12px; font-weight: 700; color: #16A34A; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-              📚 O'quv bo'limi:
+
+          <div class="grid grid-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-weight:700;">Soha / Kategoriya *</label>
+              <select id="ev-cat-id" class="form-control" required style="font-size:12.5px;">
+                ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight:700;">Miqyos (Ishtirok bali) *</label>
+              <select id="ev-level" class="form-control" required style="font-size:12.5px;">
+                <option value="klub">Klub miqyosida (+3 ball)</option>
+                <option value="universitet" selected>Universitet (+5 ball)</option>
+                <option value="viloyat">Viloyat miqyosida (+8 ball)</option>
+                <option value="respublika">Respublika (+15 ball)</option>
+                <option value="xalqaro">Xalqaro miqyosda (+25 ball)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size:12px;">Maksimal sig'im</label>
+              <input type="number" id="ev-capacity" class="form-control" placeholder="Cheksiz bo'lsa bo'sh" style="font-size:12.5px;">
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; padding-top: 20px;">
+              <label style="cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="ev-req-reg"> Ro'yxatdan o'tish majburiy
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px;">
+            <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 2px; font-size: 12px;">
+              ⏱️ Davomat Boshlanish Vaqti *
             </label>
-            <input type="text" id="ev-note-ob" class="form-control" placeholder="Bo'sh xona/zal ajratish va dars jadvaliga xalaqit bermasligini kelishish..." style="font-size: 12.5px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="number" id="ev-att-open-minutes" class="form-control" min="0" max="180" value="5" style="max-width: 90px; font-weight: 700; font-size: 13px;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">daqiqa oldin ochiladi</span>
+            </div>
           </div>
-        </div>
-      </div>
-
-      <!-- TADBIK BANNERI (STANDART 16:9 PREVIEW VA O'LCHAMLAR) -->
-      <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: 14px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <label class="form-label" style="font-weight: 700; color: #1E293B; margin: 0; display: flex; align-items: center; gap: 6px;">
-            🖼️ Tadbir Banneri / Rasmi (Standart 16:9 format)
-          </label>
-          <span style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 800; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
-            16:9 Standart
-          </span>
-        </div>
-        <div style="font-size: 11.5px; color: #475569; margin-bottom: 10px; line-height: 1.5; background: #FFFFFF; border: 1px solid #E2E8F0; padding: 8px 12px; border-radius: 8px;">
-          📌 <strong>Tavsiya etilgan aniq o'lcham:</strong> <b>1200 × 675 px</b> yoki <b>1280 × 720 px</b> (16:9 nisbatda, max 5 MB).
-          <div style="color: #64748B; font-size: 11px; margin-top: 2px;">Ushbu rasm Telegram bot orqali barcha talabalarga bildirishnoma sifatida yuboriladi va Katta Ekran (TV) da sifatli ko'rinadi.</div>
-        </div>
-
-        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-          <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili yoki quyidagi tugma orqali rasm yuklang..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 13px;">
-          <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; font-size: 12.5px; font-weight: 600;">
-            📁 Rasm yuklash
-            <input type="file" accept="image/*" style="display: none;" onchange="handleEventPhotoUpload(this, 'ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')">
-          </label>
-        </div>
-
-        <div id="ev-photo-preview-wrap" style="display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; height: 190px; background: #0B0F19; position: relative; text-align: center;">
-          <img id="ev-photo-preview" src="" alt="Banner ko'rinishi" style="max-height: 100%; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;">
-          <button type="button" onclick="clearEventPhoto('ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
-        </div>
-        <div id="ev-photo-preview-wrap-info" style="font-size: 11.5px; padding: 6px 10px; margin-top: 6px; border-radius: 6px; background: #F1F5F9; display: none;"></div>
-      </div>
-
-      <div class="grid grid-2 mb-3">
-        <div class="form-group">
-          <label class="form-label" style="font-weight:700;">Soha / Kategoriya *</label>
-          <select id="ev-cat-id" class="form-control" required>
-            ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight:700;">Miqyos / Daraja (Ball avtomatik) *</label>
-          <select id="ev-level" class="form-control" required>
-            <option value="klub">Klub miqyosida (+3 ball)</option>
-            <option value="universitet" selected>Universitet miqyosida (+5 ball)</option>
-            <option value="viloyat">Viloyat miqyosida (+8 ball)</option>
-            <option value="respublika">Respublika miqyosida (+15 ball)</option>
-            <option value="xalqaro">Xalqaro miqyosda (+25 ball)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="grid grid-2 mb-3">
-        <div class="form-group">
-          <label class="form-label">Maksimal sig'im (o'rinlar soni)</label>
-          <input type="number" id="ev-capacity" class="form-control" placeholder="Cheksiz bo'lsa bo'sh qoldiring">
-        </div>
-        <div class="form-group" style="display: flex; align-items: center; padding-top: 24px;">
-          <label style="cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="ev-req-reg"> Oldindan ro'yxatdan o'tish majburiy
-          </label>
-        </div>
-      </div>
-
-      <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px;">
-        <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px;">
-          ⏱️ Davomat Boshlanish Vaqti (Attendance Window) *
-        </label>
-        <p style="font-size: 12px; color: #64748B; margin-bottom: 8px;">
-          Default holatda davomat tadbirdan 5 daqiqa oldin boshlanadi:
-        </p>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <input type="number" id="ev-att-open-minutes" class="form-control" min="0" max="180" value="5" style="max-width: 130px; font-weight: 700; font-size: 14px;">
-          <span style="font-size: 13px; font-weight: 600; color: #334155;">daqiqa oldin boshlanadi</span>
         </div>
       </div>
     </form>
@@ -4431,12 +4448,68 @@ async function openCreateEventModal() {
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
     <button class="btn btn-primary" onclick="submitCreateEvent()" style="display: inline-flex; align-items: center; gap: 6px; font-weight:700;">
-      ${icon('check', 14)} Tadbirni Yaratish & 4 Bo'limga Kelishuvga Yuborish
+      ${icon('check', 14)} Tadbirni Yaratish & Bo'limlarga Yuborish
     </button>
   `;
 
-  openModal();
+  openModal('xl');
   initEventDateTimeControls('');
+  syncEventObNoteAuto();
+}
+
+// Tashqi tadbir holati o'zgarganda O'quv bo'limi talabini boshqarish
+function onEventExternalToggle(isExternal) {
+  const obWrap = document.getElementById('ev-note-ob-wrap');
+  const obInput = document.getElementById('ev-note-ob');
+  if (isExternal) {
+    if (obInput) {
+      obInput.value = "Tashqi tadbir (Universitet xonasi talab etilmaydi)";
+      obInput.disabled = true;
+    }
+    const tag = document.getElementById('ev-ob-auto-tag');
+    if (tag) {
+      tag.textContent = "Kelishuv shart emas";
+      tag.style.background = "#F1F5F9";
+      tag.style.color = "#64748B";
+    }
+  } else {
+    if (obInput) {
+      obInput.disabled = false;
+      window._userEditedObNote = false;
+      syncEventObNoteAuto();
+    }
+    const tag = document.getElementById('ev-ob-auto-tag');
+    if (tag) {
+      tag.textContent = "Avtomatik generatsiya";
+      tag.style.background = "#DCFCE7";
+      tag.style.color = "#166534";
+    }
+  }
+}
+
+// Sana, vaqt va joy o'zgarganda O'quv bo'limi uchun avtomatik xona kelishuvi matnini shakllantirish
+function syncEventObNoteAuto() {
+  const isExternal = document.getElementById('ev-is-external')?.checked;
+  if (isExternal) return;
+  if (window._userEditedObNote) return;
+
+  const obInput = document.getElementById('ev-note-ob');
+  if (!obInput) return;
+
+  const place = (document.getElementById('ev-place')?.value || '').trim() || "Belgilangan zal/auditoriya";
+  const dt = updateEventDateTimeSummary('');
+  
+  if (dt && dt.valid) {
+    const sDate = new Date(dt.starts_at);
+    const eDate = new Date(dt.ends_at);
+    const dateStr = sDate.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    const sTime = sDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const eTime = eDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+
+    obInput.value = `${dateStr} kuni soat ${sTime} - ${eTime} oralig'ida "${place}" bo'shligi va dars jadvaliga xalaqit bermasligini kelishish`;
+  } else {
+    obInput.value = `"${place}" bo'shligi va dars jadvaliga xalaqit bermasligini kelishish`;
+  }
 }
 
 async function submitCreateEvent() {
@@ -4486,6 +4559,7 @@ async function submitCreateEvent() {
   }
 
   const attOpenMinutes = Math.max(0, Number(att_open_val) || 5);
+  const is_external = document.getElementById('ev-is-external')?.checked ? 1 : 0;
   const photo_url = document.getElementById('ev-photo-url')?.value.trim() || null;
   const noteXb = document.getElementById('ev-note-xb')?.value.trim() || null;
   const noteAtm = document.getElementById('ev-note-atm')?.value.trim() || null;
@@ -4505,6 +4579,7 @@ async function submitCreateEvent() {
       capacity: capacity ? Number(capacity) : null,
       requires_registration: Boolean(req_reg),
       attendance_open_minutes_before: attOpenMinutes,
+      is_external,
       lead_type: leadType,
       lead_id: leadId,
       lead_name: leadName,
@@ -7338,9 +7413,16 @@ function initModals() {
   });
 }
 
-function openModal() {
+function openModal(size) {
   const m = document.getElementById('common-modal');
   if (m) {
+    const mc = m.querySelector('.modal-content');
+    if (mc) {
+      mc.classList.remove('modal-xl', 'modal-lg');
+      if (size === 'xl' || size === 'lg') {
+        mc.classList.add('modal-' + size);
+      }
+    }
     m.classList.add('active');
     m.style.display = 'flex';
   }
@@ -7362,6 +7444,8 @@ function closeModal() {
   } catch (e) {}
   const m = document.getElementById('common-modal');
   if (m) {
+    const mc = m.querySelector('.modal-content');
+    if (mc) mc.classList.remove('modal-xl', 'modal-lg');
     m.classList.remove('active');
     m.style.display = 'none';
   }

@@ -80,11 +80,11 @@ router.get('/search-leads', (req, res) => {
     }
 
     const staff = db.prepare(`
-      SELECT id, full_name, username, roles, photo_url 
+      SELECT id, full_name, id as username, roles, photo_url 
       FROM staff_user 
-      WHERE (LOWER(full_name) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?)) AND active = 1 
+      WHERE (LOWER(full_name) LIKE LOWER(?) OR LOWER(id) LIKE LOWER(?) OR LOWER(COALESCE(telegram_username, '')) LIKE LOWER(?)) AND active = 1 
       LIMIT 10
-    `).all(`%${q}%`, `%${q}%`);
+    `).all(`%${q}%`, `%${q}%`, `%${q}%`);
 
     const students = db.prepare(`
       SELECT id, first_name, last_name, group_code, photo_url 
@@ -93,7 +93,24 @@ router.get('/search-leads', (req, res) => {
       LIMIT 10
     `).all(`%${q}%`, `%${q}%`);
 
-    res.json({ staff, students });
+    const formattedStaff = staff.map(s => ({
+      id: s.id,
+      name: s.full_name,
+      username: s.username,
+      roles: s.roles,
+      photo_url: s.photo_url,
+      type: 'staff'
+    }));
+
+    const formattedStudents = students.map(st => ({
+      id: st.id,
+      name: `${st.first_name} ${st.last_name}`,
+      group: st.group_code,
+      photo_url: st.photo_url,
+      type: 'student'
+    }));
+
+    res.json({ staff: formattedStaff, students: formattedStudents });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -130,10 +147,12 @@ router.post('/', (req, res) => {
       is_direct_publish = false
     } = req.body;
 
+    const isExternal = Boolean(req.body.is_external);
+
     // Har ikki nom bilan kelishi mumkin: req_xb_note yoki agreement_xb_note
     const finalReqXb = (req_xb_note || agreement_xb_note || '').trim() || null;
     const finalReqAtm = (req_atm_note || agreement_atm_note || '').trim() || null;
-    const finalReqOb = (req_ob_note || agreement_ob_note || '').trim() || null;
+    const finalReqOb = isExternal ? null : ((req_ob_note || agreement_ob_note || '').trim() || null);
 
     if (!title || !starts_at || !ends_at || !place || !category_id || !level) {
       return res.status(400).json({ error: 'Majburiy maydonlar to\'ldirilishi shart' });
@@ -166,7 +185,15 @@ router.post('/', (req, res) => {
     const finalLeadPoints = Number(lead_points) || 0;
 
     const initialStatus = shouldDirectPublish ? 'published' : 'pending_agreement';
-    const initialDeptStatus = shouldDirectPublish ? 'agreed' : 'pending';
+    
+    // Shartli bo'lim kelishuvlari:
+    // 1. Xo'jalik bo'limi: Agar talab bo'lmasa -> not_required (tasdiqlash va xabar talab etilmaydi)
+    const xbStatus = shouldDirectPublish ? 'agreed' : (finalReqXb ? 'pending' : 'not_required');
+    // 2. IT bo'limi: Agar talab bo'lmasa -> not_required
+    const atmStatus = shouldDirectPublish ? 'agreed' : (finalReqAtm ? 'pending' : 'not_required');
+    // 3. O'quv bo'limi: Agar tashqi tadbir bo'lsa yoki xona talabi bo'lmasa -> not_required
+    const obStatus = shouldDirectPublish ? 'agreed' : ((isExternal || !finalReqOb) ? 'not_required' : 'pending');
+    // 4. Ish yurituvchi: DOIM tasdiqlash majburiy!
     const initialFinalStatus = shouldDirectPublish ? 'approved' : 'pending';
 
     db.prepare(`
@@ -205,9 +232,9 @@ router.post('/', (req, res) => {
       finalReqXb,
       finalReqAtm,
       finalReqOb,
-      initialDeptStatus,
-      initialDeptStatus,
-      initialDeptStatus,
+      xbStatus,
+      atmStatus,
+      obStatus,
       initialFinalStatus
     );
 
@@ -217,7 +244,7 @@ router.post('/', (req, res) => {
       action: 'CREATE_EVENT',
       object_type: 'event',
       object_id: eventId,
-      after: { title, level, points, status: initialStatus, lead_name: finalLeadName },
+      after: { title, level, points, status: initialStatus, lead_name: finalLeadName, xbStatus, atmStatus, obStatus },
       ip: req.ip || '127.0.0.1'
     });
 
@@ -238,14 +265,21 @@ router.post('/', (req, res) => {
         });
       } catch (e) {}
     } else {
-      // 3 ta kelishuvchi bo'lim xodimlariga Telegram orqali xabar yuborish (o'ziga tegishli talab bilan birga!)
+      // Shartli Telegram xabarnoma yuborish (faqat statusi 'pending' bo'lgan bo'limlarga!)
       try {
         const { sendTelegramMessage } = require('../services/telegramService');
-        const departments = [
-          { code: 'dep_xb', name: "Xo'jalik bo'limi", reqNote: finalReqXb || "Zal, stol, stul va moddiy baza imkoniyatlari" },
-          { code: 'dep_atm', name: "Axborot texnologiyalari markazi", reqNote: finalReqAtm || "Mikrofon, proyektor, internet va IT jihozlar" },
-          { code: 'dep_ob', name: "O'quv bo'limi", reqNote: finalReqOb || "Bo'sh xona/zal va dars jadvaliga xalaqit bermaslik" }
-        ];
+        const departments = [];
+
+        if (xbStatus === 'pending') {
+          departments.push({ code: 'dep_xb', name: "Xo'jalik bo'limi", reqNote: finalReqXb });
+        }
+        if (atmStatus === 'pending') {
+          departments.push({ code: 'dep_atm', name: "Axborot texnologiyalari markazi", reqNote: finalReqAtm });
+        }
+        if (obStatus === 'pending') {
+          departments.push({ code: 'dep_ob', name: "O'quv bo'limi", reqNote: finalReqOb });
+        }
+
         const startsStr = new Date(starts_at).toLocaleString('uz-UZ', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         
         for (const dept of departments) {
@@ -260,6 +294,21 @@ router.post('/', (req, res) => {
               `👤 <b>Tashabbuskor:</b> ${finalLeadName || req.staffUser.full_name}\n\n` +
               `📋 <b>Sizning bo'limdan so'ralgan talab:</b>\n<i>${dept.reqNote}</i>\n\n` +
               `⚡️ <i>Iltimos, tizimga kirib o'z bo'limingiz qarorini bildiring (Tasdiqlash yoki Rad etish).</i>`
+            ).catch(() => {});
+          }
+        }
+
+        // Agar hech qanday bo'limga talab bo'lmasa (barchasi not_required), darhol Ish yurituvchiga xabar boradi:
+        if (departments.length === 0) {
+          const iyUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE (roles LIKE '%dep_iy%' OR roles LIKE '%superadmin%') AND active = 1 AND telegram_user_id IS NOT NULL`).all();
+          for (const u of iyUsers) {
+            sendTelegramMessage(u.telegram_user_id,
+              `📑 <b>Yangi Tadbir Ish Yurituvchi Tasdig'iga Tayyor!</b>\n\n` +
+              `📌 <b>Tadbir:</b> ${title}\n` +
+              `📍 <b>Joyi:</b> ${place}\n` +
+              `⏰ <b>Vaqti:</b> ${startsStr}\n` +
+              `👤 <b>Tashabbuskor:</b> ${finalLeadName || req.staffUser.full_name}\n\n` +
+              `ℹ️ <i>Ushbu tadbir bo'yicha boshqa bo'limlarga moddiy-texnik talablar qo'yilmagan. Ish yurituvchi sifatida tadbirni yakuniy tasdiqlab, chop etishingiz mumkin.</i>`
             ).catch(() => {});
           }
         }
@@ -357,11 +406,12 @@ router.post('/:id/agree', (req, res) => {
       } catch (e) {}
     }
 
-    // Agar 3 ta bo'lim ham rozi bo'lgan bo'lsa (agreed), Ish yurituvchi (dep_iy) ga Telegram orqali xabar yuborish
-    if (updated.agreement_xb_status === 'agreed' && 
-        updated.agreement_atm_status === 'agreed' && 
-        updated.agreement_ob_status === 'agreed' &&
-        updated.approval_final_status === 'pending') {
+    // Agar barcha talab etilgan bo'limlar rozi bo'lgan bo'lsa (yoki talab etilmagan bo'lsa), Ish yurituvchi (dep_iy) ga Telegram orqali xabar yuborish
+    const xbDone = updated.agreement_xb_status === 'agreed' || updated.agreement_xb_status === 'not_required';
+    const atmDone = updated.agreement_atm_status === 'agreed' || updated.agreement_atm_status === 'not_required';
+    const obDone = updated.agreement_ob_status === 'agreed' || updated.agreement_ob_status === 'not_required';
+
+    if (xbDone && atmDone && obDone && updated.approval_final_status === 'pending') {
       try {
         const { sendTelegramMessage } = require('../services/telegramService');
         const iyUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE (roles LIKE '%dep_iy%' OR roles LIKE '%superadmin%') AND active = 1 AND telegram_user_id IS NOT NULL`).all();
@@ -369,9 +419,9 @@ router.post('/:id/agree', (req, res) => {
           sendTelegramMessage(u.telegram_user_id,
             `📑 <b>Tadbir Yakuniy Tasdiqqa Tayyor!</b>\n\n` +
             `📌 <b>Tadbir:</b> ${updated.title}\n` +
-            `✅ <b>Xo'jalik bo'limi:</b> Kelishilgan\n` +
-            `✅ <b>Axborot texnologiyalari:</b> Kelishilgan\n` +
-            `✅ <b>O'quv bo'limi:</b> Kelishilgan\n\n` +
+            `🏢 <b>Xo'jalik:</b> ${updated.agreement_xb_status === 'agreed' ? '✅ Kelishilgan' : '⚪️ Talab etilmagan'}\n` +
+            `💻 <b>ATM (IT):</b> ${updated.agreement_atm_status === 'agreed' ? '✅ Kelishilgan' : '⚪️ Talab etilmagan'}\n` +
+            `📚 <b>O'quv bo'limi:</b> ${updated.agreement_ob_status === 'agreed' ? '✅ Kelishilgan' : '⚪️ Talab etilmagan'}\n\n` +
             `<i>Ish yurituvchi sifatida tadbirni yakuniy tasdiqlab, chop etishingiz mumkin.</i>`
           ).catch(() => {});
         }
@@ -492,6 +542,14 @@ router.post('/:id/final-approve', (req, res) => {
 
     if (!isSuperadmin && !isIshYurituvchi) {
       return res.status(403).json({ error: "Yakuniy tasdiqlash huquqi faqat Ish yurituvchi yoki Superadminga tegishli!" });
+    }
+
+    const xbDone = event.agreement_xb_status === 'agreed' || event.agreement_xb_status === 'not_required';
+    const atmDone = event.agreement_atm_status === 'agreed' || event.agreement_atm_status === 'not_required';
+    const obDone = event.agreement_ob_status === 'agreed' || event.agreement_ob_status === 'not_required';
+
+    if (!isSuperadmin && status === 'approved' && (!xbDone || !atmDone || !obDone)) {
+      return res.status(400).json({ error: "Barcha talab etilgan bo'limlar kelishuvi to'liq yakunlanmagan! Avval bo'limlar o'z xulosalarini berishi kerak." });
     }
 
     const now = new Date().toISOString();

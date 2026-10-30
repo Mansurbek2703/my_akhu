@@ -2994,3 +2994,20 @@ body {
   transform: translateY(-2px);
 }
 
+/* Kengaytirilgan Katta Modallar (Tadbir yaratish, 4 bo'lim kelishuvi va h.k.) */
+.modal-content.modal-xl {
+  max-width: 980px !important;
+  width: 95vw !important;
+}
+
+@media (max-width: 900px) {
+  .modal-content.modal-xl {
+    max-width: 98vw !important;
+    width: 98vw !important;
+    margin: 8px;
+  }
+  .event-modal-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
