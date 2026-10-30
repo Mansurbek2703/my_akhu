@@ -1237,6 +1237,7 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
     const meaningful = roles.filter(r => r && r !== 'staff');
     if (meaningful.length === 0) return 0;
     if (meaningful.includes('superadmin')) return 100;
+    if (meaningful.includes('rector')) return 95;
     if (meaningful.includes('prorektor')) return 90;
     if (meaningful.some(r => r.startsWith('dep_'))) return 80;
     if (meaningful.includes('tutor')) return 70;

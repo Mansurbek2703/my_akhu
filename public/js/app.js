@@ -13,6 +13,7 @@ const AppState = {
 
 const ROLE_META = {
   'superadmin': { label: 'Superadmin', color: '#EF4444', bg: '#FEF2F2' },
+  'rector': { label: 'Rektor (Rektorat)', color: '#4338CA', bg: '#EEF2FF' },
   'prorektor': { label: 'Prorektor', color: '#8B5CF6', bg: '#F5F3FF' },
   'tutor': { label: 'Tyutor', color: '#10B981', bg: '#ECFDF5' },
   'dep_yb': { label: 'Yoshlar bo\'limi', color: '#3B82F6', bg: '#EFF6FF' },
@@ -30,6 +31,7 @@ const ROLE_META = {
 function formatApproverRole(role) {
   if (!role || role === '-') return '-';
   const roleNames = {
+    'rector': "Rektor (Rektorat)",
     'dep_yb': "Yoshlar bo'limi",
     'dep_mb': "Ma'naviyat bo'limi",
     'dep_ob': "O'quv bo'limi",
@@ -542,7 +544,10 @@ function updateSidebarPermissions() {
         visible = true; // Superadmin Super Mode da barcha bo'limlarni ko'radi
       } else if (isSuper) {
         // Superadmin Normal Mode (IT Bo'limi) da:
-        if (forRole === 'superadmin' || forRole === 'students' || forRole === 'leadership') {
+        // TIZIM SOZLAMALARI (superadmin) NORMAL MODEDA KO'RINMAYDI! Faqat Super Mode da ko'rinadi!
+        if (forRole === 'superadmin') {
+          visible = false;
+        } else if (forRole === 'students' || forRole === 'leadership') {
           visible = true;
         } else if (forRole === 'approver') {
           visible = true; // IT bo'limi kelishuvlari uchun
@@ -640,25 +645,16 @@ function renderModuleSubNav(pageName) {
     tabs = [
       { id: 'dept-events', label: 'Barcha Tadbirlar' }
     ];
-    if (AppState.isLoggedIn) {
-      extraActions = `
-        <div class="module-nav-actions">
-          <button class="btn btn-primary btn-sm" onclick="openCreateEventModal()" style="display:inline-flex; align-items:center; gap:6px;">
-            ${icon('calendar', 14)} <span>+ Yangi Tadbir Qo'shish</span>
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="showStudentCheckinModal()" style="display:inline-flex; align-items:center; gap:6px; border-color:#3B82F6; color:#2563EB; background:#EFF6FF;">
-            ${icon('qrCode', 14)} <span>Talaba QR Check-in</span>
-          </button>
-        </div>
-      `;
-    }
   } else if (sectionKey === 'dept-approvals') {
     tabs = [
-      { id: 'dept-approvals', label: 'Tasdiq Navbati' },
-      { id: 'prorektor-queue', label: 'Prorektor 25+ / -30' },
-      { id: 'prorektor-risks', label: 'Xavf va Monitoring' },
-      { id: 'prorektor-appeals', label: 'E\'tirozlar (Apellyatsiya)' }
+      { id: 'dept-approvals', label: 'Tasdiq Navbati' }
     ];
+    const canSeeRector = isSuperadmin || userRoles.includes('rector') || userRoles.includes('prorektor');
+    if (canSeeRector) {
+      tabs.push({ id: 'prorektor-queue', label: 'Rektorat (25+ / -30)' });
+      tabs.push({ id: 'prorektor-risks', label: 'Xavf va Monitoring' });
+      tabs.push({ id: 'prorektor-appeals', label: 'E\'tirozlar (Apellyatsiya)' });
+    }
   } else if (sectionKey === 'tutor-my-students') {
     tabs = [
       { id: 'tutor-my-students', label: 'Mening Talabalarim' },
@@ -3239,14 +3235,11 @@ async function renderDeptEvents(container) {
             return `
               <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
                 <div>
-                  <!-- BANNER HEADER (16:9 STANDART PROPORSIYA, AMBIENT BLUR FON + TO'LIQ MARKAZIY BANNER) -->
+                  <!-- BANNER HEADER (AMBIENT BLUR FON + KESILMAYDIGAN TO'LIQ BANNER) -->
                   ${imgSrc ? `
-                    <div style="height: 200px; width: 100%; position: relative; overflow: hidden; background: #0B0F19; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
-                      <div style="position: absolute; inset: -15px; background-image: url('${imgSrc}'); background-size: cover; background-position: center; filter: blur(20px); opacity: 0.40; transform: scale(1.15);"></div>
-                      <img src="${imgSrc}" alt="${ev.title}" style="position: relative; max-height: 100%; max-width: 100%; width: 100%; height: 100%; object-fit: contain; z-index: 2; display: block;" onerror="this.parentElement.style.display='none';">
-                      <div style="position: absolute; top: 8px; right: 8px; z-index: 3; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); color: #E2E8F0; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);">
-                        16:9
-                      </div>
+                    <div style="height: 190px; width: 100%; position: relative; overflow: hidden; background: #0F172A; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                      <div style="position: absolute; inset: -20px; background-image: url('${imgSrc}'); background-size: cover; background-position: center; filter: blur(24px) brightness(0.65); transform: scale(1.15);"></div>
+                      <img src="${imgSrc}" alt="${ev.title}" style="position: relative; max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain; z-index: 2; display: block; box-shadow: 0 4px 20px rgba(0,0,0,0.4);" onerror="this.parentElement.style.display='none';">
                     </div>
                   ` : `
                     <div style="height: 105px; width: 100%; background: linear-gradient(135deg, ${ev.category_color || '#3B82F6'}25 0%, #0F172A 100%); display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.06);">
