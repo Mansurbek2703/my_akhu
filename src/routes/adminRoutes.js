@@ -1256,6 +1256,44 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
 });
 
 /**
+ * POST /api/admin/users/sync-photos
+ * Barcha xodimlarning rasmlarini HikCentral turniket serveridan yuklab to'ldirish
+ */
+router.post('/users/sync-photos', authenticateSuperadmin, async (req, res) => {
+  try {
+    const { syncStaffPhotos } = require('../services/hikcentralService');
+    const forceAll = Boolean(req.body && req.body.force_all);
+    const result = await syncStaffPhotos(null, forceAll);
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: 'superadmin',
+      action: 'SYNC_STAFF_PHOTOS',
+      object_type: 'staff_user',
+      object_id: 'ALL',
+      after: { downloaded: result.downloadedCount, failed: result.failedCount },
+      ip: req.ip || '127.0.0.1'
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/sync-photo
+ * Bitta xodimning rasmini HikCentral turniket serveridan yuklab to'ldirish
+ */
+router.post('/users/:id/sync-photo', authenticateSuperadmin, async (req, res) => {
+  try {
+    const { syncStaffPhotos } = require('../services/hikcentralService');
+    const result = await syncStaffPhotos(req.params.id, true);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/admin/users/:id/monitoring
  * Xodimning to'liq faoliyati, Telegram bot holati va o'zgarmas audit tarixi (Superadmin Nazorati)
  */
@@ -2539,6 +2577,47 @@ router.post('/sync-student-photos', authenticateSuperadmin, async (req, res) => 
     const { syncMissingStudentPhotos } = require('../services/hikcentralService');
     const result = await syncMissingStudentPhotos();
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/sync-hik-photos
+ * Turniket serveridan barcha xodimlar rasmlarini sinxronlash
+ */
+router.post('/users/sync-hik-photos', authenticateAdmin, async (req, res) => {
+  try {
+    const { syncStaffPhotosFromHikCentral } = require('../services/hikcentralService');
+    const result = await syncStaffPhotosFromHikCentral({ forceAll: true });
+    res.json({
+      success: true,
+      message: `HikCentral'dan ${result.downloadedCount || 0} ta xodim rasmi muvaffaqiyatli sinxronlashtirildi!`,
+      result
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/sync-hik-photo
+ * Bitta xodimning rasmini HikCentral serveridan yuklab olish
+ */
+router.post('/users/:id/sync-hik-photo', authenticateAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { syncStaffPhotosFromHikCentral } = require('../services/hikcentralService');
+    const result = await syncStaffPhotosFromHikCentral({ specificStaffId: userId, forceAll: true });
+    
+    // Yangilangan xodimni olish
+    const updatedUser = db.prepare('SELECT id, photo_url, full_name, passport_id FROM app_user WHERE id = ?').get(userId);
+    res.json({
+      success: true,
+      message: updatedUser?.photo_url ? "Rasm muvaffaqiyatli yangilandi!" : "Ushbu xodim uchun HikCentral'da rasm topilmadi",
+      photo_url: updatedUser?.photo_url || null,
+      result
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -9874,6 +9874,9 @@ async function renderStaffUsersManagement(container) {
           </p>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <button class="btn btn-outline" id="btn-sync-staff-photos" onclick="syncAllStaffPhotosFromHikCentral()" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border-color: #3B82F6; color: #2563EB; font-weight: 600;" title="Barcha xodimlarning Face ID fotosuratlarini HikCentral turniket serveridan tortib olish">
+            ${icon('refresh', 14)} <span>🔄 Turniket Rasmlarini Yangilash</span>
+          </button>
           <button class="btn btn-primary" onclick="showCreateStaffModal()" style="display: inline-flex; align-items: center; gap: 6px;">
             ${icon('userPlus', 14)} <span>Yangi Xodim Qo'shish</span>
           </button>
@@ -10812,10 +10815,13 @@ async function renderStaffEditPage(container, targetUserId) {
               <!-- Fotosurat yuklash -->
               <div class="form-group mb-3">
                 <label class="form-label" style="font-weight:600; font-size:13px;">Profil Fotosurati (Face ID Turniket)</label>
-                <div style="display:flex; gap:10px; align-items:center;">
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                   <input type="file" id="edit-staff-file-input" accept="image/*" style="display:none;" onchange="handleAdminStaffPhotoUpload(this, 'edit-staff-photourl', 'edit-staff-photo-preview')">
                   <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('edit-staff-file-input').click()" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; background:#F8FAFC;">
                     ${icon('upload', 13)} <span>Kompyuterdan Yuklash</span>
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="syncSingleStaffPhotoFromHik('${user.id}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE;" title="Turniket Face ID bazasidan fotosuratni tortib olish">
+                    <span>🔄 Turniketdan Tortish</span>
                   </button>
                   <span style="font-size:11px; color:var(--text-muted);">JPG / PNG (max 5MB)</span>
                 </div>
@@ -11415,6 +11421,47 @@ function updateAdminStaffPhotoPreview(url, previewId) {
     preview.style.display = 'none';
   }
 }
+window.handleAdminStaffPhotoUpload = handleAdminStaffPhotoUpload;
+window.updateAdminStaffPhotoPreview = updateAdminStaffPhotoPreview;
+window.generateStaffPassword = generateStaffPassword;
+
+async function syncSingleStaffPhotoFromHik(userId) {
+  try {
+    showToast("HikCentral'dan rasm yuklanmoqda...", "info");
+    const res = await apiFetch(`/api/admin/users/${userId}/sync-hik-photo`, {
+      method: 'POST'
+    });
+    if (res && res.photo_url) {
+      showToast("Xodim rasmi HikCentral'dan muvaffaqiyatli yuklandi!", "success");
+      const urlInp = document.getElementById('edit-staff-photourl');
+      if (urlInp) {
+        urlInp.value = res.photo_url;
+        updateAdminStaffPhotoPreview(res.photo_url, 'edit-staff-photo-preview');
+      }
+      await loadStaffUsersList();
+    } else {
+      showToast(res?.message || "HikCentral'da bu xodim uchun rasm topilmadi", "warning");
+    }
+  } catch (err) {
+    showToast(err.message || "HikCentral rasm sinxronizatsiyasida xatolik yuz berdi", "error");
+  }
+}
+window.syncSingleStaffPhotoFromHik = syncSingleStaffPhotoFromHik;
+
+async function syncStaffPhotosFromHikCentral() {
+  if (!confirm("Barcha xodimlarning rasmlarini HikCentral turniket bazasidan sinxronizatsiya qilasizmi? Bu biroz vaqt olishi mumkin.")) return;
+  try {
+    showToast("HikCentral'dan barcha xodimlar rasmlari sinxronizatsiya qilinmoqda...", "info");
+    const res = await apiFetch('/api/admin/users/sync-hik-photos', {
+      method: 'POST'
+    });
+    showToast(res?.message || "Xodimlar rasmlari yangilandi!", "success");
+    await loadStaffUsersList();
+  } catch (err) {
+    showToast(err.message || "HikCentral sinxronizatsiyasida xatolik", "error");
+  }
+}
+window.syncStaffPhotosFromHikCentral = syncStaffPhotosFromHikCentral;
 
 // Universal xodim saqlash funksiyasi
 const handleEditStaffSubmit = submitStaffEditPage;

@@ -294,12 +294,13 @@ function initBackgroundJobs() {
       }
 
       if (shouldRun) {
-        console.log('[Cron] Haftalik talabalar rasmlari sinxronizatsiyasi avtomatik ishga tushirildi (HikCentral)...');
-        const { syncMissingStudentPhotos } = require('./hikcentralService');
+        console.log('[Cron] Haftalik talabalar va xodimlar rasmlari sinxronizatsiyasi avtomatik ishga tushirildi (HikCentral)...');
+        const { syncMissingStudentPhotos, syncStaffPhotos } = require('./hikcentralService');
         await syncMissingStudentPhotos();
+        await syncStaffPhotos();
       }
     } catch (photoCronErr) {
-      console.error('[Cron] Haftalik talabalar rasmlari sinxronizatsiyasida xatolik:', photoCronErr.message);
+      console.error('[Cron] Haftalik talabalar va xodimlar rasmlari sinxronizatsiyasida xatolik:', photoCronErr.message);
     }
   }, 10 * 60 * 1000);
 }

@@ -1453,6 +1453,188 @@ async function syncMissingStudentPhotos() {
   };
 }
 
+/**
+ * Tizimdagi xodimlarning rasmlarini HikCentral turniket serveridan yuklab olib profillarini to'ldirish
+ * @param {string|null} specificStaffId - Bitta xodim uchun yoki butun xodimlar uchun null
+ * @param {boolean} forceAll - Agar true bo'lsa, mavjud rasmlarni ham qayta yuklaydi
+ */
+async function syncStaffPhotos(specificStaffId = null, forceAll = false) {
+  const cfg = getHikConfig();
+  if (!cfg || !cfg.enabled) {
+    return { success: false, error: "HikCentral o'chirilgan (disabled)" };
+  }
+
+  console.log(`[HikCentral] Xodimlar rasmlarini turniket serverdan sinxronlash boshlandi... (ID: ${specificStaffId || 'BARCHA'}, Force: ${forceAll})`);
+
+  // 1. Bazadagi xodimlarni olish
+  let staffList = [];
+  if (specificStaffId) {
+    const single = db.prepare('SELECT id, full_name, passport_id, photo_url FROM staff_user WHERE id = ?').get(specificStaffId);
+    if (!single) {
+      return { success: false, error: "Xodim topilmadi: " + specificStaffId };
+    }
+    staffList = [single];
+  } else {
+    staffList = db.prepare('SELECT id, full_name, passport_id, photo_url FROM staff_user').all();
+  }
+
+  if (!staffList || staffList.length === 0) {
+    return { success: true, message: "Xodimlar topilmadi", downloadedCount: 0, total: 0 };
+  }
+
+  const uploadDir = config.uploadDir || path.join(__dirname, '../../uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  // 2. Qaysi xodimlarga rasm kerakligini aniqlash
+  const staffNeedingPhoto = [];
+  for (const s of staffList) {
+    let needsPhoto = forceAll;
+    if (!needsPhoto) {
+      if (!s.photo_url) {
+        needsPhoto = true;
+      } else {
+        const localFileName = s.photo_url.replace(/^\/api\/files\//, '');
+        const fullLocalPath = path.join(uploadDir, localFileName);
+        if (!fs.existsSync(fullLocalPath) || fs.statSync(fullLocalPath).size === 0) {
+          needsPhoto = true;
+        }
+      }
+    }
+    if (needsPhoto) {
+      staffNeedingPhoto.push(s);
+    }
+  }
+
+  console.log(`[HikCentral] Jami xodimlar: ${staffList.length}, Rasmi yuklanishi kerak bo'lganlar: ${staffNeedingPhoto.length}`);
+
+  if (staffNeedingPhoto.length === 0) {
+    return {
+      success: true,
+      message: "Barcha xodimlarning rasmlari diskda to'liq va yaroqli holatda mavjud.",
+      total: staffList.length,
+      downloadedCount: 0,
+      failedCount: 0,
+      updatedStaff: []
+    };
+  }
+
+  // 3. Xodimlarni pasporti bo'yicha indekslash
+  const staffByPassport = new Map();
+  for (const s of staffNeedingPhoto) {
+    const norm = normalizePassport(s.passport_id || s.id);
+    if (norm) {
+      staffByPassport.set(norm, s);
+    }
+  }
+
+  // 4. HikCentral personList dan qidirish
+  let pageNo = 1;
+  const pageSize = 100;
+  let hasMore = true;
+  const matchedStaff = [];
+
+  while (hasMore) {
+    let res;
+    try {
+      res = await makeHikRequest('/artemis/api/resource/v1/person/personList', { pageNo, pageSize });
+    } catch (apiErr) {
+      console.error(`[HikCentral] personList olishda xatolik (sahifa ${pageNo}):`, apiErr.message);
+      break;
+    }
+
+    if (res && res.data && Array.isArray(res.data.list)) {
+      const list = res.data.list;
+      for (const p of list) {
+        const normPass = normalizePassport(p.personCode || p.certificateNo || '');
+        if (normPass && staffByPassport.has(normPass)) {
+          const staffMember = staffByPassport.get(normPass);
+          const picUri = p.personPhoto ? p.personPhoto.picUri : null;
+          if (picUri) {
+            matchedStaff.push({
+              staff: staffMember,
+              personId: p.personId,
+              picUri,
+              personName: p.personName
+            });
+          }
+        }
+      }
+
+      if (list.length < pageSize || (res.data.total && pageNo * pageSize >= res.data.total)) {
+        hasMore = false;
+      } else {
+        pageNo++;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  console.log(`[HikCentral] Turniket serverida ${matchedStaff.length} nafar xodimning rasmi topildi.`);
+
+  // 5. Rasmlarni yuklab olish va saqlash
+  let downloadedCount = 0;
+  let failedCount = 0;
+  const updatedStaff = [];
+
+  for (const item of matchedStaff) {
+    const { staff, personId, picUri } = item;
+    try {
+      const picResult = await downloadPersonPicture(personId, picUri);
+      if (picResult.success && picResult.buffer) {
+        const filename = `avatar_staff_${staff.id}_turniket${picResult.ext || '.jpg'}`;
+        const savePath = path.join(uploadDir, filename);
+        fs.writeFileSync(savePath, picResult.buffer);
+
+        const photoUrl = `/api/files/${filename}`;
+        const nowIso = new Date().toISOString();
+
+        db.prepare('UPDATE staff_user SET photo_url = ? WHERE id = ?').run(photoUrl, staff.id);
+
+        downloadedCount++;
+        updatedStaff.push({
+          staff_id: staff.id,
+          name: staff.full_name,
+          passport_id: staff.passport_id,
+          photo_url: photoUrl,
+          size_bytes: picResult.size
+        });
+        console.log(`[HikCentral] Xodim rasmi saqlandi: ${staff.full_name} (${staff.passport_id}) -> ${photoUrl}`);
+      } else {
+        console.warn(`[HikCentral] Xodim rasmi yuklanmadi (${staff.full_name}):`, picResult.error);
+        failedCount++;
+      }
+    } catch (dlErr) {
+      console.error(`[HikCentral] Xodim rasmini yuklashda xatolik (${staff.full_name}):`, dlErr.message);
+      failedCount++;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 80));
+  }
+
+  const syncFinishIso = new Date().toISOString();
+  try {
+    db.prepare(`
+      INSERT INTO setting (key, value, updated_by, updated_at)
+      VALUES ('last_staff_photos_sync_at', ?, 'system', ?)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
+    `).run(syncFinishIso, syncFinishIso);
+  } catch (settingErr) {}
+
+  console.log(`[HikCentral] Xodimlar rasmlari sinxronizatsiyasi yakunlandi: ${downloadedCount} ta yangilandi, ${failedCount} ta xato.`);
+
+  return {
+    success: true,
+    total: staffList.length,
+    needingCount: staffNeedingPhoto.length,
+    downloadedCount,
+    failedCount,
+    updatedStaff
+  };
+}
+
 module.exports = {
   getHikConfig,
   makeHikRequest,
@@ -1463,6 +1645,7 @@ module.exports = {
   normalizePassport,
   downloadPersonPicture,
   syncMissingStudentPhotos,
+  syncStaffPhotos,
   syncCampusAttendance,
   getCampusAttendanceSummary,
   getCampusAttendanceList,
@@ -1471,3 +1654,4 @@ module.exports = {
   getLmsTurniketAudit,
   getDeepCrossAudit
 };
+
