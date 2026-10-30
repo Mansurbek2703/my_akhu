@@ -69,8 +69,39 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * GET /api/events/search-leads
+ * Tashabbuskor xodim yoki talabani qidirish
+ */
+router.get('/search-leads', (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q || q.length < 2) {
+      return res.json({ staff: [], students: [] });
+    }
+
+    const staff = db.prepare(`
+      SELECT id, full_name, username, roles, photo_url 
+      FROM staff_user 
+      WHERE (LOWER(full_name) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?)) AND active = 1 
+      LIMIT 10
+    `).all(`%${q}%`, `%${q}%`);
+
+    const students = db.prepare(`
+      SELECT id, first_name, last_name, group_code, photo_url 
+      FROM student 
+      WHERE (LOWER(first_name || ' ' || last_name) LIKE LOWER(?) OR LOWER(id) LIKE LOWER(?)) AND status = 'active'
+      LIMIT 10
+    `).all(`%${q}%`, `%${q}%`);
+
+    res.json({ staff, students });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/events
- * Yangi tadbir yaratish (Tizimning o'zida yaratiladi va boshqariladi)
+ * Yangi tadbir yaratish (Tashabbuskor va 4 ta bo'lim kelishuvi bilan)
  */
 router.post('/', (req, res) => {
   try {
@@ -83,7 +114,14 @@ router.post('/', (req, res) => {
       category_id,
       level,
       capacity,
-      requires_registration
+      requires_registration,
+      attendance_open_minutes_before,
+      lead_type = 'self',
+      lead_id = null,
+      lead_name = null,
+      lead_group = null,
+      lead_points = 0,
+      is_direct_publish = false
     } = req.body;
 
     if (!title || !starts_at || !ends_at || !place || !category_id || !level) {
@@ -100,6 +138,9 @@ router.post('/', (req, res) => {
       });
     }
 
+    const isSuperadmin = (req.staffUser.roles || []).includes('superadmin');
+    const shouldDirectPublish = Boolean(is_direct_publish && isSuperadmin);
+
     const points = LEVEL_POINTS[level] || 5;
     const eventId = 'ev_' + crypto.randomBytes(6).toString('hex');
     const qrSecret = 'sec_' + crypto.randomBytes(12).toString('hex');
@@ -107,12 +148,24 @@ router.post('/', (req, res) => {
     const createdBy = req.staffUser.id;
     const photoUrl = (req.body.photo_url || req.body.image_url) ? String(req.body.photo_url || req.body.image_url).trim() : null;
 
+    const finalLeadType = lead_type || 'self';
+    const finalLeadId = lead_id || (finalLeadType === 'self' ? req.staffUser.id : null);
+    const finalLeadName = lead_name || (finalLeadType === 'self' ? req.staffUser.full_name : null);
+    const finalLeadGroup = lead_group || null;
+    const finalLeadPoints = Number(lead_points) || 0;
+
+    const initialStatus = shouldDirectPublish ? 'published' : 'pending_agreement';
+    const initialDeptStatus = shouldDirectPublish ? 'agreed' : 'pending';
+    const initialFinalStatus = shouldDirectPublish ? 'approved' : 'pending';
+
     db.prepare(`
       INSERT INTO event (
         id, title, starts_at, ends_at, place, photo_url, image_url, organizer_unit, category_id,
         level, points, capacity, requires_registration, status, qr_secret,
-        qr_refresh_seconds, attendance_open_minutes_before, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, 60, 0, ?, ?)
+        qr_refresh_seconds, attendance_open_minutes_before, created_by, created_at,
+        lead_type, lead_id, lead_name, lead_group, lead_points, lead_rewarded,
+        agreement_xb_status, agreement_atm_status, agreement_ob_status, approval_final_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 60, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
     `).run(
       eventId,
       title,
@@ -127,9 +180,20 @@ router.post('/', (req, res) => {
       points,
       capacity ? Number(capacity) : null,
       requires_registration ? 1 : 0,
+      initialStatus,
       qrSecret,
+      attendance_open_minutes_before !== undefined ? Number(attendance_open_minutes_before) : 5,
       createdBy,
-      nowIso
+      nowIso,
+      finalLeadType,
+      finalLeadId,
+      finalLeadName,
+      finalLeadGroup,
+      finalLeadPoints,
+      initialDeptStatus,
+      initialDeptStatus,
+      initialDeptStatus,
+      initialFinalStatus
     );
 
     logAudit({
@@ -138,33 +202,289 @@ router.post('/', (req, res) => {
       action: 'CREATE_EVENT',
       object_type: 'event',
       object_id: eventId,
-      after: { title, level, points, qr_refresh_seconds: 60 },
+      after: { title, level, points, status: initialStatus, lead_name: finalLeadName },
       ip: req.ip || '127.0.0.1'
     });
 
-    // Barcha talabalarga Telegram bot orqali xabar yuborish
-    try {
-      const { broadcastNewEventToStudents } = require('../services/telegramService');
-      broadcastNewEventToStudents({
-        id: eventId,
-        title,
-        starts_at,
-        ends_at,
-        place,
-        photo_url: photoUrl,
-        image_url: photoUrl,
-        points,
-        attendance_open_minutes_before: 0
-      });
-    } catch (e) {
-      console.error('Broadcast notification error:', e.message);
+    // Agar darhol chop etilgan bo'lsa (superadmin)
+    if (shouldDirectPublish) {
+      try {
+        const { broadcastNewEventToStudents } = require('../services/telegramService');
+        broadcastNewEventToStudents({
+          id: eventId,
+          title,
+          starts_at,
+          ends_at,
+          place,
+          photo_url: photoUrl,
+          image_url: photoUrl,
+          points,
+          attendance_open_minutes_before: 5
+        });
+      } catch (e) {}
+    } else {
+      // 3 ta kelishuvchi bo'lim xodimlariga Telegram orqali xabar yuborish
+      try {
+        const { sendTelegramMessage } = require('../services/telegramService');
+        const departments = ['dep_xb', 'dep_atm', 'dep_ob'];
+        const deptNames = {
+          dep_xb: "Xo'jalik bo'limi",
+          dep_atm: "Axborot texnologiyalari markazi",
+          dep_ob: "O'quv bo'limi"
+        };
+        const startsStr = new Date(starts_at).toLocaleString('uz-UZ', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        for (const dept of departments) {
+          const staffUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE roles LIKE ? AND active = 1 AND telegram_user_id IS NOT NULL`).all(`%${dept}%`);
+          for (const su of staffUsers) {
+            sendTelegramMessage(su.telegram_user_id, 
+              `📅 <b>Yangi Tadbir Kelishuvi!</b>\n\n` +
+              `🏢 <b>Bo'lim:</b> ${deptNames[dept]}\n` +
+              `📌 <b>Tadbir:</b> ${title}\n` +
+              `📍 <b>Joyi:</b> ${place}\n` +
+              `⏰ <b>Vaqti:</b> ${startsStr}\n` +
+              `👤 <b>Tashabbuskor:</b> ${finalLeadName || req.staffUser.full_name}\n\n` +
+              `<i>Iltimos, tizimga kirib moddiy/texnik/joy imkoniyatini ko'rib chiqing va kelishing.</i>`
+            ).catch(() => {});
+          }
+        }
+      } catch (e) {}
     }
 
     res.json({
       success: true,
       event_id: eventId,
+      status: initialStatus,
       points,
-      message: `Tadbir muvaffaqiyatli yaratildi (${points} ball, 60s dinamik QR).`
+      message: shouldDirectPublish 
+        ? `Tadbir to'g'ridan-to'g'ri e'lon qilindi (${points} ball).` 
+        : `Tadbir yaratildi va 4 ta bo'lim kelishuviga yuborildi.`
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/events/:id/agree
+ * Xo'jalik bo'limi (xb), Axborot texnologiyalari markazi (atm) yoki O'quv bo'limi (ob) kelishuvi
+ */
+router.post('/:id/agree', (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { department, status, note } = req.body; // department: 'xb' | 'atm' | 'ob', status: 'agreed' | 'rejected'
+
+    if (!['xb', 'atm', 'ob'].includes(department)) {
+      return res.status(400).json({ error: "Noto'g'ri bo'lim ko'rsatildi (xb, atm yoki ob bo'lishi kerak)" });
+    }
+    if (!['agreed', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: "Holat 'agreed' yoki 'rejected' bo'lishi kerak" });
+    }
+    if (!note || !note.trim()) {
+      return res.status(400).json({ error: "Kelishuv yoki rad etish bo'yicha izoh yozilishi shart!" });
+    }
+
+    const event = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
+
+    // Ruxsat tekshiruvi: faqat tegishli bo'lim yoki superadmin
+    const roles = req.staffUser.roles || [];
+    const targetRole = `dep_${department}`;
+    const isSuperadmin = roles.includes('superadmin');
+    const isAuthorized = isSuperadmin || roles.includes(targetRole);
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: `Ushbu kelishuvni tasdiqlash uchun sizda ${targetRole} roli bo'lishi kerak!` });
+    }
+
+    const now = new Date().toISOString();
+    const approverName = req.staffUser.full_name || req.staffUser.username || req.staffUser.id;
+
+    db.prepare(`
+      UPDATE event 
+      SET agreement_${department}_status = ?,
+          agreement_${department}_note = ?,
+          agreement_${department}_by = ?,
+          agreement_${department}_at = ?
+      WHERE id = ?
+    `).run(status, note.trim(), approverName, now, eventId);
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: targetRole,
+      action: `EVENT_AGREEMENT_${department.toUpperCase()}`,
+      object_type: 'event',
+      object_id: eventId,
+      after: { department, status, note },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    // Yangilangan tadbirni o'qish
+    const updated = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
+
+    // Agar 3 ta bo'lim ham rozi bo'lgan bo'lsa (agreed), Ish yurituvchi (dep_iy) ga Telegram orqali xabar yuborish
+    if (updated.agreement_xb_status === 'agreed' && 
+        updated.agreement_atm_status === 'agreed' && 
+        updated.agreement_ob_status === 'agreed' &&
+        updated.approval_final_status === 'pending') {
+      try {
+        const { sendTelegramMessage } = require('../services/telegramService');
+        const iyUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE (roles LIKE '%dep_iy%' OR roles LIKE '%superadmin%') AND active = 1 AND telegram_user_id IS NOT NULL`).all();
+        for (const u of iyUsers) {
+          sendTelegramMessage(u.telegram_user_id,
+            `📑 <b>Tadbir Yakuniy Tasdiqqa Tayyor!</b>\n\n` +
+            `📌 <b>Tadbir:</b> ${updated.title}\n` +
+            `✅ <b>Xo'jalik bo'limi:</b> Kelishilgan\n` +
+            `✅ <b>Axborot texnologiyalari:</b> Kelishilgan\n` +
+            `✅ <b>O'quv bo'limi:</b> Kelishilgan\n\n` +
+            `<i>Ish yurituvchi sifatida tadbirni yakuniy tasdiqlab, chop etishingiz mumkin.</i>`
+          ).catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      message: `${department.toUpperCase()} bo'limi kelishuvi muvaffaqiyatli saqlandi.`
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/events/:id/final-approve
+ * Ish yurituvchi (dep_iy) yoki Superadmin tomonidan tadbirni yakuniy tasdiqlash
+ */
+router.post('/:id/final-approve', (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { status, note } = req.body; // status: 'approved' | 'rejected'
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: "Holat 'approved' yoki 'rejected' bo'lishi kerak" });
+    }
+
+    const event = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
+
+    // Ruxsat tekshiruvi: faqat Ish yurituvchi yoki superadmin
+    const roles = req.staffUser.roles || [];
+    const isSuperadmin = roles.includes('superadmin');
+    const isIshYurituvchi = roles.includes('dep_iy');
+
+    if (!isSuperadmin && !isIshYurituvchi) {
+      return res.status(403).json({ error: "Yakuniy tasdiqlash huquqi faqat Ish yurituvchi yoki Superadminga tegishli!" });
+    }
+
+    const now = new Date().toISOString();
+    const approverName = req.staffUser.full_name || req.staffUser.username || req.staffUser.id;
+    const finalEventStatus = status === 'approved' ? 'published' : 'cancelled';
+
+    db.prepare(`
+      UPDATE event 
+      SET approval_final_status = ?,
+          approval_final_note = ?,
+          approved_by = ?,
+          approved_at = ?,
+          status = ?
+      WHERE id = ?
+    `).run(status, (note || '').trim(), approverName, now, finalEventStatus, eventId);
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: isSuperadmin ? 'superadmin' : 'dep_iy',
+      action: status === 'approved' ? 'EVENT_FINAL_APPROVED' : 'EVENT_FINAL_REJECTED',
+      object_type: 'event',
+      object_id: eventId,
+      after: { status, finalEventStatus, note },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    if (status === 'approved') {
+      // 1. Agar talaba tashabbuskor (lead_type === 'student') bo'lsa va ball berilmagan bo'lsa
+      if (event.lead_type === 'student' && event.lead_id && (Number(event.lead_points) > 0) && event.lead_rewarded !== 1) {
+        try {
+          const student = db.prepare('SELECT * FROM student WHERE id = ?').get(event.lead_id);
+          if (student) {
+            const season = db.prepare('SELECT * FROM season WHERE is_current = 1 LIMIT 1').get() || { id: '2026-2027' };
+            const entryId = 'pe_' + crypto.randomBytes(8).toString('hex');
+            const leadPts = Number(event.lead_points);
+
+            // Katalog bandini aniqlash: masalan i6 (20 ball) yoki i3 (10 ball) yoki i7 (30 ball)
+            let itemId = 'i3';
+            let catId = '1';
+            if (leadPts >= 30) itemId = 'i7';
+            else if (leadPts >= 20) itemId = 'i6';
+            else if (leadPts >= 15) { itemId = 'm3'; catId = '2'; }
+
+            db.prepare(`
+              INSERT INTO point_entry (
+                id, student_id, item_id, item_version, category_id, base_points, points,
+                note, event_date, source, created_by, created_at, status, approver_role,
+                approved_by, approved_at, event_id, season_id
+              ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, 'system', ?, ?, 'approved', 'dep_iy', ?, ?, ?, ?)
+            `).run(
+              entryId,
+              student.id,
+              itemId,
+              catId,
+              leadPts,
+              leadPts,
+              `Tadbir tashabbuskori va tashkilotchisi: "${event.title}"`,
+              event.starts_at.slice(0, 10),
+              req.staffUser.id,
+              now,
+              req.staffUser.id,
+              now,
+              eventId,
+              season.id
+            );
+
+            db.prepare('UPDATE event SET lead_rewarded = 1 WHERE id = ?').run(eventId);
+
+            // Reytingni qayta hisoblash
+            const { recalculateStudentScores } = require('../services/ratingService');
+            recalculateStudentScores();
+
+            // Talabaga xabar
+            const { notifyStudent } = require('../services/telegramService');
+            notifyStudent(student.id, 'N-01', {
+              points: leadPts,
+              item_name: `Tadbir tashabbuskori ("${event.title}")`,
+              category_name: 'Ijtimoiy faollik & Tashkilotchilik',
+              dept_name: "Ish yurituvchi"
+            });
+          }
+        } catch (e) {
+          console.error('Lead student reward error:', e.message);
+        }
+      }
+
+      // 2. Barcha talabalarga Telegram orqali xabar yuborish
+      try {
+        const { broadcastNewEventToStudents } = require('../services/telegramService');
+        broadcastNewEventToStudents({
+          id: eventId,
+          title: event.title,
+          starts_at: event.starts_at,
+          ends_at: event.ends_at,
+          place: event.place,
+          photo_url: event.photo_url || event.image_url,
+          image_url: event.image_url || event.photo_url,
+          points: event.points,
+          attendance_open_minutes_before: event.attendance_open_minutes_before || 5
+        });
+      } catch (e) {
+        console.error('Broadcast error:', e.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: status === 'approved' 
+        ? "Tadbir muvaffaqiyatli tasdiqlandi va barcha talabalarga e'lon qilindi!" 
+        : "Tadbir rad etildi va bekor qilindi."
     });
   } catch (err) {
     res.status(400).json({ error: err.message });

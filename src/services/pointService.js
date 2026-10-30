@@ -352,6 +352,10 @@ function rejectEntry(entryId, approver_user, { reason_code, reject_note = '' }, 
     throw new Error('Rad etishda sabab kodi majburiy (R-08)');
   }
 
+  if (!reject_note || !reject_note.trim()) {
+    throw new Error('Rad etishda sababni tushuntiruvchi batafsil izoh yozilishi shart!');
+  }
+
   const now = new Date().toISOString();
 
   db.prepare(`

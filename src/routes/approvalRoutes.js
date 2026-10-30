@@ -140,8 +140,16 @@ router.post('/:id/approve', authenticateStaff, (req, res) => {
  */
 router.post('/:id/reject', authenticateStaff, (req, res) => {
   try {
-    const { reason_code, reject_note } = req.body;
-    const result = rejectEntry(req.params.id, req.staffUser, { reason_code, reject_note }, req.ip || '127.0.0.1');
+    const { reason_code, reject_note, note } = req.body;
+    const finalNote = (reject_note || note || '').trim();
+    if (!reason_code) {
+      return res.status(400).json({ error: "Rad etish sababi tanlanishi shart (R-08)" });
+    }
+    if (!finalNote) {
+      return res.status(400).json({ error: "Rad etish sababini tushuntiruvchi batafsil izoh yozilishi shart!" });
+    }
+
+    const result = rejectEntry(req.params.id, req.staffUser, { reason_code, reject_note: finalNote }, req.ip || '127.0.0.1');
 
     // Talabaga N-03 bildirishnoma
     const entry = db.prepare(`SELECT pe.*, ci.name as item_name FROM point_entry pe JOIN catalog_item ci ON pe.item_id = ci.id WHERE pe.id = ?`).get(req.params.id);
@@ -149,7 +157,7 @@ router.post('/:id/reject', authenticateStaff, (req, res) => {
       notifyStudent(entry.student_id, 'N-03', {
         item_name: entry.item_name,
         points: entry.points,
-        reason: `${reason_code}: ${reject_note || ''}`
+        reason: `${reason_code}: ${finalNote}`
       });
     }
 

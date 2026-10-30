@@ -1232,6 +1232,25 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
     };
   });
 
+  const getRoleWeight = (roles) => {
+    if (!Array.isArray(roles) || roles.length === 0) return 0;
+    const meaningful = roles.filter(r => r && r !== 'staff');
+    if (meaningful.length === 0) return 0;
+    if (meaningful.includes('superadmin')) return 100;
+    if (meaningful.includes('prorektor')) return 90;
+    if (meaningful.some(r => r.startsWith('dep_'))) return 80;
+    if (meaningful.includes('tutor')) return 70;
+    if (meaningful.includes('observer')) return 60;
+    return 50;
+  };
+
+  parsed.sort((a, b) => {
+    const wa = getRoleWeight(a.roles);
+    const wb = getRoleWeight(b.roles);
+    if (wa !== wb) return wb - wa;
+    return (a.full_name || '').localeCompare(b.full_name || '', 'uz');
+  });
+
   res.json({ users: parsed });
 });
 

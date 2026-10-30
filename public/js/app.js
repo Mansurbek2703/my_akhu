@@ -2948,11 +2948,11 @@ function showRejectModal(id) {
   const modalTitle = document.getElementById('modal-title');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.textContent = 'Arizani Rad Etish';
+  modalTitle.innerHTML = `<span style="color:#DC2626; display:flex; align-items:center; gap:6px;">⚠️ Arizani Rad Etish</span>`;
   modalBody.innerHTML = `
     <div class="form-group mb-3">
-      <label class="form-label">Rad etish sababi kodi:</label>
-      <select id="reject-reason-code" class="form-control">
+      <label class="form-label" style="font-weight:700;">Rad etish sababi toifasi *:</label>
+      <select id="reject-reason-code" class="form-control" style="font-weight:600;">
         <option value="evidence_missing">Dalil hujjati mavjud emas</option>
         <option value="fake_evidence">Dalil asossiz yoki soxta</option>
         <option value="wrong_item">Noto'g'ri katalog bandi tanlangan</option>
@@ -2962,31 +2962,47 @@ function showRejectModal(id) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">Batafsil izoh (Talaba va tyutorga ko'rinadi):</label>
-      <textarea id="reject-note-text" class="form-control" rows="3" placeholder="Rad etish sababini aniq ko'rsating..."></textarea>
+      <label class="form-label" style="font-weight:700; color:#DC2626;">Batafsil izoh (Majburiy) *:</label>
+      <textarea id="reject-note-text" class="form-control" rows="3" placeholder="Rad etish sababini aniq va to'liq yozing (Talaba va tyutorga ko'rinadi)..." required style="border-color:#FCA5A5; font-size:13.5px;"></textarea>
+      <small style="color:#64748B; font-size:11.5px; margin-top:4px; display:block;">
+        ⚠️ Talaba va tyutor arizaning nima sababdan rad etilganini bilishi va tuzatishi uchun izoh yozish shart.
+      </small>
     </div>
   `;
 
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-    <button class="btn btn-danger" onclick="submitReject('${id}')">Rad Etishni Tasdiqlash</button>
+    <button class="btn btn-danger" onclick="submitReject('${id}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+      Rad Etishni Tasdiqlash
+    </button>
   `;
 
   openModal();
 }
 
 async function submitReject(id) {
-  const code = document.getElementById('reject-reason-code').value;
-  const note = document.getElementById('reject-note-text').value;
+  const code = document.getElementById('reject-reason-code')?.value;
+  const noteEl = document.getElementById('reject-note-text');
+  const note = (noteEl?.value || '').trim();
+
+  if (!note || note.length < 5) {
+    alert("Iltimos, rad etish sababini batafsil izohlab yozing (kamida 5 ta belgi kiritilishi shart)!");
+    if (noteEl) noteEl.focus();
+    return;
+  }
 
   try {
     await apiFetch(`/api/approvals/${id}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ reason_code: code, note })
+      body: JSON.stringify({ reason_code: code, reject_note: note, note: note })
     });
     closeModal();
-    alert('Ariza rad etildi');
-    navigateTo('dept-approvals');
+    alert('Ariza muvaffaqiyatli rad etildi va kiritilgan izoh talaba hamda tyutorga yuborildi.');
+    if (AppState.currentPage === 'prorektor-queue') {
+      renderProrektorQueue(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+    } else {
+      navigateTo('dept-approvals');
+    }
     checkPendingBadge();
   } catch (e) {
     alert(e.message);
@@ -3004,11 +3020,13 @@ async function renderDeptEvents(container) {
     const events = data.events || [];
 
     const isStaffOrAdmin = AppState.isLoggedIn && (
+      (AppState.user.user_type === 'staff') ||
       (AppState.user.roles && (
         AppState.user.roles.includes('superadmin') ||
         AppState.user.roles.includes('prorektor') ||
         AppState.user.roles.includes('staff') ||
         AppState.user.roles.includes('organizer') ||
+        AppState.user.roles.includes('tutor') ||
         AppState.user.roles.some(r => r.startsWith('dep_'))
       )) ||
       (AppState.user.permissions && (
@@ -3017,25 +3035,32 @@ async function renderDeptEvents(container) {
       ))
     );
 
+    const userRoles = (AppState.user && AppState.user.roles) || [];
+    const isSuperadmin = userRoles.includes('superadmin');
+    const isXb = isSuperadmin || userRoles.includes('dep_xb');
+    const isAtm = isSuperadmin || userRoles.includes('dep_atm');
+    const isOb = isSuperadmin || userRoles.includes('dep_ob');
+    const isIy = isSuperadmin || userRoles.includes('dep_iy');
+
     let html = `
       <div class="admin-hero-card" style="margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
           <div>
             <div class="admin-hero-title">
               <span style="color: #60A5FA;">${icon('calendar', 22)}</span>
-              <span>Universitet Tadbirlari & QR Check-in Tizimi</span>
+              <span>Universitet Tadbirlari, 4 Bo'lim Kelishuvi & QR Check-in</span>
             </div>
             <p class="admin-hero-desc">
-              Tadbirlarni e'lon qilish, umumiy Tadbir QR kodlarini chiqarish (talaba skanerlaydi) yoki talabalarning shaxsiy QR kodlarini skanerlash (xodim qabul qiladi).
+              Har bir xodim tadbir tashabbusi bilan chiqa oladi. Tadbir sanasi va moddiy-texnik ta'minoti 4 ta bo'lim (Xo'jalik, ATM, O'quv, Ish yurituvchi) tomonidan kelishilib, rasman tasdiqlangach talabalarga e'lon qilinadi va tashabbuskor talabaga avtomatik ball beriladi.
             </p>
           </div>
           ${isStaffOrAdmin ? `
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
               <button class="btn btn-primary" onclick="openCreateEventModal()" style="display: inline-flex; align-items: center; gap: 6px;">
-                ${icon('calendar', 15)} <span>+ Yangi Tadbir Yaratish</span>
+                ${icon('calendar', 15)} <span>+ Yangi Tadbir Uyushtirish</span>
               </button>
               <button class="btn btn-outline" onclick="showStudentCheckinModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF;">
-                ${icon('qrCode', 15)} <span>📷 Talaba QR Skanerlash / Qabul Qilish</span>
+                ${icon('qrCode', 15)} <span>📷 Talaba QR Skanerlash</span>
               </button>
             </div>
           ` : ''}
@@ -3047,14 +3072,14 @@ async function renderDeptEvents(container) {
       html += `
         <div class="card" style="text-align: center; padding: 48px 24px; border-radius: var(--radius-xl);">
           <div style="font-size: 40px; margin-bottom: 12px; color: #3B82F6;">${icon('calendar', 42)}</div>
-          <h3 style="margin-bottom: 8px;">Hozircha tizimda e'lon qilingan tadbirlar mavjud emas</h3>
+          <h3 style="margin-bottom: 8px;">Hozircha tizimda tadbirlar mavjud emas</h3>
           <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 20px; font-size: 13.5px; line-height: 1.5;">
-            Universitet talabalari uchun yangi ilmiy, madaniy, sport yoki ijtimoiy tadbir e'lon qiling va talabalar uchun QR kodlarini yarating.
+            Universitet talabalari uchun yangi tadbir uyushtiring. Bo'limlar kelishuvidan so'ng talabalar uchun QR kodlar faollashadi.
           </p>
           ${isStaffOrAdmin ? `
             <div style="display: flex; justify-content: center; gap: 10px;">
               <button class="btn btn-primary" onclick="openCreateEventModal()">
-                ${icon('calendar', 15)} + Yangi Tadbir Yaratish
+                ${icon('calendar', 15)} + Yangi Tadbir Uyushtirish
               </button>
             </div>
           ` : ''}
@@ -3068,27 +3093,65 @@ async function renderDeptEvents(container) {
             const endsFormatted = new Date(ev.ends_at).toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             const isEnded = new Date() > new Date(ev.ends_at);
             const isCreator = (ev.created_by === AppState.user.id || ev.organizer_unit === AppState.user.id);
-            const isSuperadmin = AppState.user.roles.includes('superadmin');
             const canManage = isStaffOrAdmin && (isSuperadmin || isCreator);
             const canEdit = canManage && !isEnded;
             const attOpenMin = ev.attendance_open_minutes_before ?? 5;
+            const isPublished = (ev.status === 'published' || !ev.status);
+            const isPendingAgreement = (ev.status === 'pending_agreement');
+            const imgSrc = ev.photo_url || ev.image_url;
+
+            // Bo'limlar status helperi
+            const renderDeptBadge = (title, iconEmoji, status, note, by) => {
+              let bg = '#FEF3C7', color = '#B45309', label = 'Kutilmoqda';
+              if (status === 'agreed' || status === 'approved') {
+                bg = '#ECFDF5'; color = '#059669'; label = 'Kelishildi';
+              } else if (status === 'rejected') {
+                bg = '#FEF2F2'; color = '#DC2626'; label = 'E\'tiroz';
+              }
+              const tooltip = note ? `${title}: ${label} (${note} - ${by || ''})` : `${title}: ${label}`;
+              return `
+                <div style="background:${bg}; color:${color}; border-radius:6px; padding:4px 7px; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px; border:1px solid rgba(0,0,0,0.06);" title="${tooltip}">
+                  <span>${iconEmoji}</span> <span>${title}:</span> <span>${label}</span>
+                </div>
+              `;
+            };
 
             return `
               <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
                 <div>
-                  ${(ev.photo_url || ev.image_url) ? `
-                    <div style="height: 140px; width: 100%; overflow: hidden; background: #0F172A; position: relative;">
-                      <img src="${ev.photo_url || ev.image_url}" alt="${ev.title}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.parentElement.style.display='none';">
-                      <span style="position: absolute; bottom: 8px; right: 10px; background: rgba(0,0,0,0.7); color: white; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600;">16:9 Banner</span>
+                  <!-- BANNER HEADER (AMBIENT BLUR FON + TO'LIQ MARKAZIY BANNER, MATNLAR KESILMAYDI) -->
+                  ${imgSrc ? `
+                    <div style="height: 180px; width: 100%; position: relative; overflow: hidden; background: #0B0F19; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                      <div style="position: absolute; inset: -15px; background-image: url('${imgSrc}'); background-size: cover; background-position: center; filter: blur(16px); opacity: 0.38; transform: scale(1.18);"></div>
+                      <img src="${imgSrc}" alt="${ev.title}" style="position: relative; max-height: 100%; max-width: 100%; object-fit: contain; z-index: 2; display: block;" onerror="this.parentElement.style.display='none';">
                     </div>
-                  ` : ''}
+                  ` : `
+                    <div style="height: 105px; width: 100%; background: linear-gradient(135deg, ${ev.category_color || '#3B82F6'}25 0%, #0F172A 100%); display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                      <div>
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: ${ev.category_color || '#60A5FA'};">
+                          ${ev.category_name || 'Universitet Tadbiri'}
+                        </span>
+                        <div style="font-weight: 800; color: #F8FAFC; font-size: 14.5px; margin-top: 4px;">
+                          ${ev.level ? ev.level.toUpperCase() + ' DARAJALI TADBIR' : 'RASMIY UNIVERSITET TADBIRI'}
+                        </div>
+                      </div>
+                      <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                        📅
+                      </div>
+                    </div>
+                  `}
+
                   <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
                     <div>
                       <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                         <span class="badge" style="background: ${ev.category_color}20; color: ${ev.category_color}; border: 1px solid ${ev.category_color}40; font-weight: 600;">
                           ${ev.category_name}
                         </span>
-                        ${isEnded ? `
+                        ${isPendingAgreement ? `
+                          <span class="badge" style="background: #FEF3C7; color: #D97706; border: 1px solid #FCD34D; font-size: 11px; font-weight: 700;">
+                            ⏳ 4 Bo'lim Kelishuvi Kutilmoqda
+                          </span>
+                        ` : isEnded ? `
                           <span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 700;">⚠️ Yakunlangan (Davomat yopiq)</span>
                         ` : `
                           <span class="badge" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; font-weight: 600;">⏱️ Davomat: ${attOpenMin} daq oldin</span>
@@ -3098,26 +3161,83 @@ async function renderDeptEvents(container) {
                     </div>
                     <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px;">+${ev.points} ball</span>
                   </div>
+
                   <div class="card-body" style="padding: 14px 18px;">
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <!-- ASOSIY TASHABBUSKOR TALABA / XODIM BLOKI -->
+                    ${ev.lead_type === 'student' && ev.lead_name ? `
+                      <div style="background: #EFF6FF; border: 1px dashed #93C5FD; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                        <span style="font-size: 12px; color: #1E40AF; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                          <span>🎯</span> <strong>Asosiy Tashabbuskor:</strong> ${ev.lead_name} ${ev.lead_group ? `(${ev.lead_group})` : ''}
+                        </span>
+                        <span class="badge" style="background: #2563EB; color: white; font-weight: 700; font-size: 11px;">
+                          +${ev.lead_points || 20} tashabbuskorlik bali
+                        </span>
+                      </div>
+                    ` : (ev.lead_name && ev.lead_name !== ev.organizer_unit) ? `
+                      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 12px; margin-bottom: 12px; font-size: 12px; color: #475569;">
+                        <strong>Asosiy Tashabbuskor:</strong> ${ev.lead_name}
+                      </div>
+                    ` : ''}
+
+                    <!-- 4 TA BO'LIM KELISHUVI GRIDI -->
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+                      <div style="font-size: 11.5px; font-weight: 700; color: #334155; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                        <span>📋 4 Ta Bo'lim Kelishuvi & Tasdig'i:</span>
+                        ${isPendingAgreement ? `<span style="color:#D97706; font-size:10.5px; font-weight:600;">Jarayonda</span>` : `<span style="color:#059669; font-size:10.5px; font-weight:600;">✓ Tasdiqlangan</span>`}
+                      </div>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px;">
+                        ${renderDeptBadge('Xo\'jalik', '🏢', ev.agreement_xb_status, ev.agreement_xb_note, ev.agreement_xb_by)}
+                        ${renderDeptBadge('ATM (IT)', '💻', ev.agreement_atm_status, ev.agreement_atm_note, ev.agreement_atm_by)}
+                        ${renderDeptBadge('O\'quv', '📚', ev.agreement_ob_status, ev.agreement_ob_note, ev.agreement_ob_by)}
+                        ${renderDeptBadge('Ish yurituvchi', '📑', ev.approval_final_status || (ev.status === 'published' ? 'approved' : 'pending'), ev.approval_final_note, ev.approved_by)}
+                      </div>
+                    </div>
+
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
                       ${icon('mapPin', 14)} <span><strong>O'tkazilish joyi:</strong> ${ev.place}</span>
                     </p>
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
                       ${icon('clock', 14)} <span><strong>Vaqti:</strong> ${startsFormatted} &mdash; ${endsFormatted}</span>
                     </p>
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
                       ${icon('building', 14)} <span><strong>Tashkilotchi:</strong> ${ev.organizer_unit}</span>
                     </p>
-                    <div style="background: #F8FAFC; border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+                    <div style="background: #F8FAFC; border-radius: 8px; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
                       <span style="color: var(--text-secondary);">Qabul qilingan talabalar:</span>
                       <span style="font-weight: 700; color: #1E293B;">${ev.checkins_count || 0} nafar ${ev.capacity ? `/ ${ev.capacity} ta o'rin` : ''}</span>
                     </div>
+
+                    <!-- BO'LIM KELISHUV TUGMALARI -->
+                    ${isPendingAgreement ? `
+                      <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8F0; display: flex; flex-wrap: wrap; gap: 6px;">
+                        ${isXb && ev.agreement_xb_status !== 'agreed' ? `
+                          <button class="btn btn-sm btn-outline" onclick="openEventAgreementModal('${ev.id}', 'xb')" style="background:#FEF3C7; color:#B45309; border-color:#FCD34D; font-weight:700;">
+                            🏢 Xo'jalik: Kelishish
+                          </button>
+                        ` : ''}
+                        ${isAtm && ev.agreement_atm_status !== 'agreed' ? `
+                          <button class="btn btn-sm btn-outline" onclick="openEventAgreementModal('${ev.id}', 'atm')" style="background:#E0F2FE; color:#0369A1; border-color:#BAE6FD; font-weight:700;">
+                            💻 ATM: Kelishish
+                          </button>
+                        ` : ''}
+                        ${isOb && ev.agreement_ob_status !== 'agreed' ? `
+                          <button class="btn btn-sm btn-outline" onclick="openEventAgreementModal('${ev.id}', 'ob')" style="background:#F0FDF4; color:#15803D; border-color:#BBF7D0; font-weight:700;">
+                            📚 O'quv: Kelishish
+                          </button>
+                        ` : ''}
+                        ${isIy ? `
+                          <button class="btn btn-sm btn-primary" onclick="openFinalEventApproveModal('${ev.id}')" style="background:#4F46E5; border-color:#4F46E5; font-weight:700;">
+                            📑 Ish Yurituvchi: Tasdiqlash
+                          </button>
+                        ` : ''}
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
 
                 <div class="card-footer" style="background: #FAFAFA; border-top: 1px solid var(--border-light); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                   <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                    ${!isEnded ? `
+                    ${isPublished && !isEnded ? `
                       <button class="btn btn-outline btn-sm" onclick="showEventQrModal('${ev.id}')" title="1-Usul: Jonli Tadbir QR kodini chiqarish (talaba skanerlaydi, har 5s yangilanadi)" style="display: inline-flex; align-items: center; gap: 5px;">
                         ${icon('qrCode', 13)} <span>Tadbir QR (5s Dinamik)</span>
                       </button>
@@ -3126,6 +3246,10 @@ async function renderDeptEvents(container) {
                           ${icon('checkCircle', 13)} <span>Qabul Qilish</span>
                         </button>
                       ` : ''}
+                    ` : isPendingAgreement ? `
+                      <span style="font-size: 11.5px; color: #D97706; font-weight: 700; background: #FEF3C7; padding: 4px 8px; border-radius: 6px;">
+                        ⏳ 4 Bo'lim tasdiqlagach QR kodlar ochiladi
+                      </span>
                     ` : `
                       <span style="font-size: 12px; color: #94A3B8; font-weight: 600; padding: 4px 6px;">Tadbir vaqti tugagan</span>
                     `}
@@ -3633,13 +3757,138 @@ async function syncKpiEventsManually() {
 }
 window.syncKpiEventsManually = syncKpiEventsManually;
 
+// ====================================================================
+// TADBIK YARATISH, ASOSIY TASHABBUSKOR TALABA & 4 TA BO'LIM KELISHUVI
+// ====================================================================
+
+let createEventLeadState = {
+  type: 'self', // 'self' | 'student' | 'staff'
+  selectedLead: null,
+  points: 20
+};
+
+function onEventLeadTypeChange(val) {
+  createEventLeadState.type = val;
+  createEventLeadState.selectedLead = null;
+  const searchWrap = document.getElementById('ev-lead-search-wrap');
+  const studentPointsWrap = document.getElementById('ev-lead-points-wrap');
+  const selectedDisplay = document.getElementById('ev-lead-selected-display');
+  const resultsBox = document.getElementById('ev-lead-results');
+
+  if (resultsBox) resultsBox.innerHTML = '';
+  if (selectedDisplay) selectedDisplay.style.display = 'none';
+
+  if (val === 'self') {
+    if (searchWrap) searchWrap.style.display = 'none';
+    if (studentPointsWrap) studentPointsWrap.style.display = 'none';
+  } else if (val === 'student') {
+    if (searchWrap) {
+      searchWrap.style.display = 'block';
+      const input = document.getElementById('ev-lead-search-input');
+      if (input) {
+        input.placeholder = "Talaba F.I.Sh, guruhi yoki ID bo'yicha qidiring...";
+        input.value = '';
+      }
+    }
+    if (studentPointsWrap) studentPointsWrap.style.display = 'block';
+  } else if (val === 'staff') {
+    if (searchWrap) {
+      searchWrap.style.display = 'block';
+      const input = document.getElementById('ev-lead-search-input');
+      if (input) {
+        input.placeholder = "Xodim F.I.Sh yoki logini bo'yicha qidiring...";
+        input.value = '';
+      }
+    }
+    if (studentPointsWrap) studentPointsWrap.style.display = 'none';
+  }
+}
+
+let eventLeadSearchTimer = null;
+async function onEventLeadSearchInput(query) {
+  clearTimeout(eventLeadSearchTimer);
+  const q = (query || '').trim();
+  const resultsBox = document.getElementById('ev-lead-results');
+  if (!resultsBox) return;
+
+  if (q.length < 2) {
+    resultsBox.innerHTML = '';
+    return;
+  }
+
+  eventLeadSearchTimer = setTimeout(async () => {
+    try {
+      resultsBox.innerHTML = `<div style="padding:8px 12px; font-size:12px; color:#64748B;">Qidirilmoqda...</div>`;
+      const data = await apiFetch(`/api/events/search-leads?q=${encodeURIComponent(q)}`);
+      const list = createEventLeadState.type === 'student' ? (data.students || []) : (data.staff || []);
+
+      if (list.length === 0) {
+        resultsBox.innerHTML = `<div style="padding:8px 12px; font-size:12px; color:#DC2626;">Topilmadi</div>`;
+        return;
+      }
+
+      resultsBox.innerHTML = list.slice(0, 7).map(item => `
+        <div class="lead-search-item" onclick="selectEventLeadItem('${item.id}', '${item.type}', '${item.name.replace(/'/g, "\\'")}', '${(item.group || '').replace(/'/g, "\\'")}')" style="padding:8px 12px; border-bottom:1px solid #F1F5F9; cursor:pointer; font-size:12.5px; transition:background 0.15s ease;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+          <div style="font-weight:700; color:#1E293B;">${item.name}</div>
+          <div style="font-size:11px; color:#64748B;">
+            ${item.group ? `Guruh: <strong>${item.group}</strong> &bull; ` : ''} ID: ${item.id}
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      resultsBox.innerHTML = `<div style="padding:8px 12px; font-size:12px; color:#DC2626;">${e.message}</div>`;
+    }
+  }, 250);
+}
+
+function selectEventLeadItem(id, type, name, group) {
+  createEventLeadState.selectedLead = { id, type, name, group };
+  const resultsBox = document.getElementById('ev-lead-results');
+  if (resultsBox) resultsBox.innerHTML = '';
+
+  const selectedDisplay = document.getElementById('ev-lead-selected-display');
+  if (selectedDisplay) {
+    selectedDisplay.style.display = 'block';
+    selectedDisplay.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:#ECFDF5; border:1.5px solid #A7F3D0; border-radius:8px; padding:8px 12px;">
+        <div>
+          <span style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase;">Tanlangan Tashabbuskor:</span>
+          <div style="font-weight:800; color:#065F46; font-size:13.5px;">${name}</div>
+          <div style="font-size:11.5px; color:#047857;">${group ? `Guruhi: ${group} &bull; ` : ''}ID: ${id}</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline text-danger" onclick="clearSelectedEventLead()" style="padding:3px 8px; font-size:11px;">✕ Bekor qilish</button>
+      </div>
+    `;
+  }
+}
+
+function clearSelectedEventLead() {
+  createEventLeadState.selectedLead = null;
+  const selectedDisplay = document.getElementById('ev-lead-selected-display');
+  if (selectedDisplay) {
+    selectedDisplay.style.display = 'none';
+    selectedDisplay.innerHTML = '';
+  }
+  const input = document.getElementById('ev-lead-search-input');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+}
+
 // Yangi Tadbir Yaratish Modali
 async function openCreateEventModal() {
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('calendar', 18)} Yangi Tadbir Yaratish</span>`;
+  createEventLeadState = {
+    type: 'self',
+    selectedLead: null,
+    points: 20
+  };
+
+  modalTitle.innerHTML = `<span style="display: flex; align-items: center; gap: 8px;">${icon('calendar', 18)} Yangi Tadbir Uyushtirish (4 Bo'lim Kelishuvi)</span>`;
 
   let categories = [];
   try {
@@ -3652,20 +3901,19 @@ async function openCreateEventModal() {
   modalBody.innerHTML = `
     <form id="dept-create-event-form" onsubmit="event.preventDefault(); submitCreateEvent();">
       <div class="form-group mb-3">
-        <label class="form-label">Tadbir Nomi *</label>
-        <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026'" required style="font-size: 15px; font-weight: 600;">
+        <label class="form-label" style="font-weight:700;">Tadbir Nomi *</label>
+        <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026' yoki 'Zakovat Intellektual Turniri'" required style="font-size: 14.5px; font-weight: 600;">
       </div>
 
       <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
       <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <label style="font-weight: 800; font-size: 14px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
+          <label style="font-weight: 800; font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
             📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
           </label>
           <span style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: 700;">Kamida +10 daqiqa keyin</span>
         </div>
 
-        <!-- 1. SANA (KALENDAR KO'RINISHI - O'TGAN KUNLAR BLOKLANGAN) -->
         <div style="margin-bottom: 12px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni (O'tgan kunlar tanlanmaydi):</span>
@@ -3678,7 +3926,6 @@ async function openCreateEventModal() {
           <div id="cal-container" class="custom-calendar-widget"></div>
         </div>
 
-        <!-- 2. BOSHLANISH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
         <div class="time-scroll-track-wrapper">
           <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
             <span>⏰ 2. Boshlanish vaqti</span>
@@ -3687,7 +3934,6 @@ async function openCreateEventModal() {
           <div class="time-scroll-track" id="start-time-track"></div>
         </div>
 
-        <!-- 3. TUGASH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
         <div class="time-scroll-track-wrapper">
           <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
             <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
@@ -3696,52 +3942,131 @@ async function openCreateEventModal() {
           <div class="time-scroll-track" id="end-time-track"></div>
         </div>
 
-        <!-- 4. TASDIQ XULOSASI VA OK TUGMASI -->
         <div id="ev-datetime-summary"></div>
       </div>
 
       <div class="form-group mb-3">
-        <label class="form-label">O'tkazilish joyi (Bino / Zal) *</label>
-        <input type="text" id="ev-place" class="form-control" placeholder="Masalan: Bosh bino, Aktlar zali" required>
+        <label class="form-label" style="font-weight:700;">O'tkazilish joyi (Bino / Zal / Auditoriya) *</label>
+        <input type="text" id="ev-place" class="form-control" placeholder="Masalan: Bosh bino, 2-qavat Katta Aktlar Zali" required>
       </div>
 
-      <!-- TADBIK RASMI (BANNER) VA TAVSIYA ETILGAN O'LCHAM -->
+      <!-- ASOSIY TASHABBUSKOR TANLOVI (TALABA / HODIM / O'ZIM) -->
+      <div class="form-group mb-3" style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 12px; padding: 14px;">
+        <label class="form-label" style="font-weight: 800; color: #166534; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <span>🎯</span> Asosiy Tashabbuskor (Tadbirni o'ylab topgan shaxs) *
+        </label>
+        <p style="font-size: 12px; color: #15803D; margin-bottom: 10px; line-height: 1.4;">
+          Agar tadbir tashabbuskori <strong>talaba</strong> bo'lsa, uni belgilang. Ish yurituvchi tasdiqlaganidan keyin <strong>tizim ushbu talabaga avtomatik ravishda baholash mezonlari bo'yicha ball</strong> hisoblaydi!
+        </p>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
+            <input type="radio" name="ev_lead_type_radio" value="self" checked onchange="onEventLeadTypeChange(this.value)">
+            Men o'zim (Tashkilotchi xodim)
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; font-size:13px; color:#15803D;">
+            <input type="radio" name="ev_lead_type_radio" value="student" onchange="onEventLeadTypeChange(this.value)">
+            ⭐ Talaba (Asosiy Tashabbuskor - Avtomatik Ball)
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
+            <input type="radio" name="ev_lead_type_radio" value="staff" onchange="onEventLeadTypeChange(this.value)">
+            Boshqa xodim
+          </label>
+        </div>
+
+        <!-- Talaba yoki Xodim qidiruv qismi -->
+        <div id="ev-lead-search-wrap" style="display: none; position: relative; margin-bottom: 10px;">
+          <input type="text" id="ev-lead-search-input" class="form-control" placeholder="Talaba F.I.Sh yoki ID bo'yicha qidiring..." oninput="onEventLeadSearchInput(this.value)" autocomplete="off">
+          <div id="ev-lead-results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <div id="ev-lead-selected-display" style="display: none; margin-bottom: 10px;"></div>
+
+        <!-- Talaba uchun baholash mezonlari bo'yicha ball tanlash -->
+        <div id="ev-lead-points-wrap" style="display: none; background: #FFFFFF; border: 1px solid #A7F3D0; border-radius: 8px; padding: 10px 12px;">
+          <label class="form-label" style="font-weight: 700; color: #065F46; font-size: 12px; margin-bottom: 4px;">
+            🏆 Talabaga beriladigan tashkilotchilik bali (Baholash mezoni bo'yicha):
+          </label>
+          <select id="ev-lead-points-select" class="form-control" style="font-weight:600; font-size:13px;" onchange="createEventLeadState.points = Number(this.value)">
+            <option value="10">i3: 10 ball &mdash; Tadbir tashkiliy guruhida faoliyat</option>
+            <option value="15">m3: 15 ball &mdash; Ma'naviy-ma'rifiy tadbir tashkiloti</option>
+            <option value="20" selected>i6: 20 ball &mdash; Universitet tadbirini o'zi tashkil etdi (30+ ishtirokchi)</option>
+            <option value="30">i7: 30 ball &mdash; Katta universitet tadbirini o'zi tashkil etdi (100+ ishtirokchi)</option>
+          </select>
+          <small style="color: #047857; font-size: 11px; display: block; margin-top: 4px;">
+            ✓ Ushbu ball tadbir Ish yurituvchi tomonidan tasdiqlangach avtomatik ravishda talabaning hisobiga qo'shiladi.
+          </small>
+        </div>
+      </div>
+
+      <!-- 4 TA BO'LIMNING MODDIY-TEXNIK JARAYONLARI VA KELISHUVI -->
+      <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 14px;">
+        <label class="form-label" style="font-weight: 800; color: #1E293B; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <span>📑</span> 4 Ta Bo'lim uchun Moddiy-Texnik Talablar va Jarayonlar
+        </label>
+        <p style="font-size: 12px; color: #64748B; margin-bottom: 10px;">
+          Tadbir o'tkazish uchun bo'limlardan zarur bo'ladigan imkoniyatlarni ko'rsating (har bir bo'lim ko'rib chiqib kelishadi):
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #B45309; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+              🏢 Xo'jalik bo'limi:
+            </label>
+            <input type="text" id="ev-note-xb" class="form-control" placeholder="Stol, stul, zal tayyorlash, moddiy baza bo'yicha talablar..." style="font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+              💻 Axborot texnologiyalari markazi (ATM):
+            </label>
+            <input type="text" id="ev-note-atm" class="form-control" placeholder="Speaker, mikrofonlar soni, kompyuter/noutbuk, interaktiv panel, Wi-Fi..." style="font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #16A34A; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+              📚 O'quv bo'limi:
+            </label>
+            <input type="text" id="ev-note-ob" class="form-control" placeholder="Bo'sh xona/zal ajratish va dars jadvaliga xalaqit bermasligini kelishish..." style="font-size: 12.5px;">
+          </div>
+        </div>
+      </div>
+
+      <!-- TADBIK BANNERI (PREMIUM AMBIENT PREVIEW) -->
       <div class="form-group mb-3" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <label class="form-label" style="font-weight: 700; color: #1E293B; margin: 0; display: flex; align-items: center; gap: 6px;">
             🖼️ Tadbir Rasmi / Banneri (TV va Ilova uchun)
           </label>
           <span style="font-size: 11px; background: #EFF6FF; color: #2563EB; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
-            Recommended: 16:9
+            16:9 Nisbatda
           </span>
         </div>
         <p style="font-size: 11.5px; color: #64748B; margin-bottom: 10px; line-height: 1.4;">
-          📐 <strong>Tavsiya etilgan o'lcham:</strong> <strong>16:9 nisbatda</strong> (masalan, <strong>1200×675 px</strong> yoki <strong>800×450 px</strong>). TV ekranida va Talaba ilovasida to'liq mos va chiroyli chiqishi uchun sifatli gorizontal rasm yuklang.
+          📐 <strong>Tavsiya etilgan o'lcham:</strong> 16:9 nisbatda sifatli rasm yuklang. Tizim avtomatik ambient blur va to'liq nisbatda harflar kesilmasdan chiroyli ko'rsatadi.
         </p>
 
         <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-          <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili yoki fayl tanlang..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 13px;">
+          <input type="text" id="ev-photo-url" class="form-control" placeholder="Rasm URL manzili yoki quyidagi tugma orqali rasm tanlang..." oninput="handleEventPhotoUrlChange(this.value, 'ev-photo-preview', 'ev-photo-preview-wrap')" style="font-size: 13px;">
           <label class="btn btn-outline" style="white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; font-size: 12.5px;">
             📁 Fayl tanlash
             <input type="file" accept="image/*" style="display: none;" onchange="handleEventPhotoUpload(this, 'ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')">
           </label>
         </div>
 
-        <div id="ev-photo-preview-wrap" style="display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; max-height: 200px; background: #0F172A; text-align: center; position: relative;">
-          <img id="ev-photo-preview" src="" alt="Banner ko'rinishi" style="width: 100%; max-height: 200px; object-fit: cover; display: block;">
-          <button type="button" onclick="clearEventPhoto('ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
+        <div id="ev-photo-preview-wrap" style="display: none; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #E2E8F0; height: 180px; background: #0B0F19; position: relative; text-align: center;">
+          <img id="ev-photo-preview" src="" alt="Banner ko'rinishi" style="max-height: 100%; max-width: 100%; object-fit: contain; margin: 0 auto; display: block;">
+          <button type="button" onclick="clearEventPhoto('ev-photo-url', 'ev-photo-preview', 'ev-photo-preview-wrap')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕ O'chirish</button>
         </div>
       </div>
 
       <div class="grid grid-2 mb-3">
         <div class="form-group">
-          <label class="form-label">Soha / Kategoriya *</label>
+          <label class="form-label" style="font-weight:700;">Soha / Kategoriya *</label>
           <select id="ev-cat-id" class="form-control" required>
             ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Miqyos / Daraja (Ball avtomatik) *</label>
+          <label class="form-label" style="font-weight:700;">Miqyos / Daraja (Ball avtomatik) *</label>
           <select id="ev-level" class="form-control" required>
             <option value="klub">Klub miqyosida (+3 ball)</option>
             <option value="universitet" selected>Universitet miqyosida (+5 ball)</option>
@@ -3764,47 +4089,25 @@ async function openCreateEventModal() {
         </div>
       </div>
 
-      <!-- DAVOMAT BOSHLANISH VAQTI SOZLAMASI (DEFAULT 5 DAQIQA) -->
       <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px;">
         <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px;">
           ⏱️ Davomat Boshlanish Vaqti (Attendance Window) *
         </label>
         <p style="font-size: 12px; color: #64748B; margin-bottom: 8px;">
-          Default holatda davomat tadbirdan 5 daqiqa oldin boshlanadi. Zarurat bo'lsa o'zgartirishingiz mumkin:
+          Default holatda davomat tadbirdan 5 daqiqa oldin boshlanadi:
         </p>
         <div style="display: flex; gap: 10px; align-items: center;">
           <input type="number" id="ev-att-open-minutes" class="form-control" min="0" max="180" value="5" style="max-width: 130px; font-weight: 700; font-size: 14px;">
           <span style="font-size: 13px; font-weight: 600; color: #334155;">daqiqa oldin boshlanadi</span>
         </div>
-        <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=0">0 daq (Boshlanganda)</button>
-          <button type="button" class="btn btn-sm btn-outline" style="background: #EFF6FF; border-color: #BFDBFE; font-weight: 700; color: #1D4ED8;" onclick="document.getElementById('ev-att-open-minutes').value=5">5 daq (Standart)</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=10">10 daqiqa oldin</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=15">15 daqiqa oldin</button>
-          <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ev-att-open-minutes').value=30">30 daqiqa oldin</button>
-        </div>
-        <p style="font-size: 11.5px; color: #DC2626; margin-top: 8px; margin-bottom: 0;">
-          ⚠️ <strong>Muhim:</strong> Tadbir tugashi bilan attendance checking avtomatik yakunlanadi!
-        </p>
-      </div>
-
-      <!-- TELEGRAM BILDIRISHNOMA VA ANTI-FRAUD QR QOIDASI -->
-      <div class="form-group mb-3" style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 12px 14px;">
-        <label class="form-label" style="font-weight: 700; color: #1E40AF; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-          📢 Avtomatik Telegram Bildirishnoma & 🛡️ 5s Dinamik QR
-        </label>
-        <p style="font-size: 12px; color: #1E3A8A; margin-bottom: 0; line-height: 1.45;">
-          • Tadbir yaratilishi bilan Telegram botga ulangan <strong>barcha talabalarga avtomatik xabar</strong> boradi.<br>
-          • Skrinshot tarqatishdan himoya uchun QR kod <strong>har 5 sekundda majburiy yangilanadi</strong>.
-        </p>
       </div>
     </form>
   `;
 
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Bekor Qilish</button>
-    <button class="btn btn-primary" onclick="submitCreateEvent()" style="display: inline-flex; align-items: center; gap: 6px;">
-      ${icon('check', 14)} E'lon Qilish va Talabalarga Yuborish
+    <button class="btn btn-primary" onclick="submitCreateEvent()" style="display: inline-flex; align-items: center; gap: 6px; font-weight:700;">
+      ${icon('check', 14)} Tadbirni Yaratish & 4 Bo'limga Kelishuvga Yuborish
     </button>
   `;
 
@@ -3832,11 +4135,39 @@ async function submitCreateEvent() {
     return;
   }
 
+  // Tashabbuskor tekshiruvi
+  let leadType = createEventLeadState.type || 'self';
+  let leadId = AppState.user.id;
+  let leadName = AppState.user.full_name || AppState.user.username;
+  let leadGroup = null;
+  let leadPoints = 0;
+
+  if (leadType === 'student') {
+    if (!createEventLeadState.selectedLead) {
+      alert("Iltimos, asosiy tashabbuskor bo'lgan talabani qidirib tanlang!");
+      const inp = document.getElementById('ev-lead-search-input');
+      if (inp) inp.focus();
+      return;
+    }
+    leadId = createEventLeadState.selectedLead.id;
+    leadName = createEventLeadState.selectedLead.name;
+    leadGroup = createEventLeadState.selectedLead.group || null;
+    const ptsSelect = document.getElementById('ev-lead-points-select');
+    leadPoints = Number(ptsSelect ? ptsSelect.value : createEventLeadState.points) || 20;
+  } else if (leadType === 'staff') {
+    if (createEventLeadState.selectedLead) {
+      leadId = createEventLeadState.selectedLead.id;
+      leadName = createEventLeadState.selectedLead.name;
+    }
+  }
+
   const attOpenMinutes = Math.max(0, Number(att_open_val) || 5);
+  const photo_url = document.getElementById('ev-photo-url')?.value.trim() || null;
+  const noteXb = document.getElementById('ev-note-xb')?.value.trim() || null;
+  const noteAtm = document.getElementById('ev-note-atm')?.value.trim() || null;
+  const noteOb = document.getElementById('ev-note-ob')?.value.trim() || null;
 
   try {
-    const photo_url = document.getElementById('ev-photo-url')?.value.trim() || null;
-
     const payload = {
       title,
       starts_at: dtResult.starts_at,
@@ -3849,7 +4180,15 @@ async function submitCreateEvent() {
       level,
       capacity: capacity ? Number(capacity) : null,
       requires_registration: Boolean(req_reg),
-      attendance_open_minutes_before: attOpenMinutes
+      attendance_open_minutes_before: attOpenMinutes,
+      lead_type: leadType,
+      lead_id: leadId,
+      lead_name: leadName,
+      lead_group: leadGroup,
+      lead_points: leadPoints,
+      agreement_xb_note: noteXb,
+      agreement_atm_note: noteAtm,
+      agreement_ob_note: noteOb
     };
 
     const res = await apiFetch('/api/events', {
@@ -3858,13 +4197,157 @@ async function submitCreateEvent() {
     });
 
     closeModal();
-    alert(`🎉 Tadbir muvaffaqiyatli e'lon qilindi (+${res.points} ball)!\nBarcha talabalarga Telegram bot orqali bildirishnoma yuborildi.`);
+    if (res.status === 'published') {
+      alert(`🎉 Tadbir muvaffaqiyatli chop etildi (+${res.points} ball)!\nBarcha talabalarga Telegram bot orqali bildirishnoma yuborildi.`);
+    } else {
+      alert(`✅ Tadbir yaratildi!\n4 ta bo'limga (Xo'jalik, ATM, O'quv, Ish yurituvchi) kelishuv xabarnomalari yuborildi.\nIsh yurituvchi tasdiqlaganidan keyin tadbir e'lon qilinadi${leadType === 'student' ? ' va talabaga +' + leadPoints + ' ball avtomatik hisoblanadi.' : '.'}`);
+    }
+
     renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
-    showEventQrModal(res.event_id);
   } catch (err) {
     alert(err.message);
   }
 }
+
+// 4 Ta Bo'lim Kelishuvi Modali (Xo'jalik, ATM, O'quv)
+function openEventAgreementModal(eventId, deptCode) {
+  const deptNames = {
+    'xb': { name: 'Xo\'jalik Bo\'limi', icon: '🏢', role: 'stol, stul, zal, moddiy baza' },
+    'atm': { name: 'Axborot Texnologiyalari Markazi (ATM)', icon: '💻', role: 'speaker, mikrofon, monitor, IT jihozlar' },
+    'ob': { name: 'O\'quv Bo\'limi', icon: '📚', role: 'bo\'sh xona/zal ajratish va dars jadvali' }
+  };
+  const dInfo = deptNames[deptCode] || { name: 'Bo\'lim', icon: '📋', role: 'texnik jarayonlar' };
+
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${dInfo.icon} ${dInfo.name} &mdash; Tadbirni Kelishish</span>`;
+  modalBody.innerHTML = `
+    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+      <p style="margin:0; font-size:13px; color:#334155; line-height:1.45;">
+        Siz <strong>${dInfo.name}</strong> vakili sifatida ushbu tadbirning moddiy-texnik va tashkiliy jarayonlarini (<strong>${dInfo.role}</strong>) ko'rib chiqib, kelishuv berasiz yoki e'tiroz bilan rad etasiz.
+      </p>
+    </div>
+
+    <div class="form-group mb-3">
+      <label class="form-label" style="font-weight:700;">Kelishuv Qaroringiz *:</label>
+      <select id="event-agree-status" class="form-control" style="font-weight:700;">
+        <option value="agreed" selected>✅ Kelishildi (Moddiy-texnik imkoniyatlar mavjud, roziman)</option>
+        <option value="rejected">❌ E'tiroz bilan rad etish (Zal band, jihozlar yetarli emas yoki boshqa sabab)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" style="font-weight:700;">Izoh / Ta'minot bo'yicha ko'rsatma:</label>
+      <textarea id="event-agree-note" class="form-control" rows="3" placeholder="Zal, jihozlar yoki e'tiroz sababini aniq yozing..."></textarea>
+      <small style="color:#64748B; font-size:11.5px; margin-top:4px; display:block;">
+        ⚠️ E'tiroz bildirilsa, rad etish sababi tadbir tashabbuskoriga ko'rsatiladi.
+      </small>
+    </div>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+    <button class="btn btn-primary" onclick="submitEventAgreement('${eventId}', '${deptCode}')" style="font-weight:700;">
+      Qarorni Tasdiqlash
+    </button>
+  `;
+
+  openModal();
+}
+
+async function submitEventAgreement(eventId, deptCode) {
+  const status = document.getElementById('event-agree-status')?.value;
+  const noteEl = document.getElementById('event-agree-note');
+  const note = (noteEl?.value || '').trim();
+
+  if (status === 'rejected' && (!note || note.length < 5)) {
+    alert("Iltimos, rad etish sababini batafsil izohlab yozing (kamida 5 ta belgi)!");
+    if (noteEl) noteEl.focus();
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`/api/events/${eventId}/agree`, {
+      method: 'POST',
+      body: JSON.stringify({ dept: deptCode, status, note })
+    });
+
+    closeModal();
+    alert(res.message || "Kelishuv qarori muvaffaqiyatli saqlandi!");
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// Ish Yurituvchi Yakuniy Tasdiqlash Modali
+function openFinalEventApproveModal(eventId) {
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">📑 Ish Yurituvchi &mdash; Tadbirni Yakuniy Tasdiqlash & Chop Etish</span>`;
+  modalBody.innerHTML = `
+    <div style="background:#EEF2FF; border:1px solid #C7D2FE; border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+      <p style="margin:0; font-size:13px; color:#3730A3; line-height:1.45;">
+        Ushbu tadbir 3 ta bo'lim (Xo'jalik, ATM, O'quv) tomonidan ko'rib chiqilgan.<br>
+        <strong>Ish yurituvchi tasdiqlashi bilan tadbir rasman e'lon qilinadi, talabalarga Telegram xabar yuboriladi va agar tashabbuskor talaba bo'lsa, unga avtomatik tashkilotchilik bali taqdim etiladi!</strong>
+      </p>
+    </div>
+
+    <div class="form-group mb-3">
+      <label class="form-label" style="font-weight:700;">Yakuniy Qaror *:</label>
+      <select id="event-final-status" class="form-control" style="font-weight:700;">
+        <option value="approved" selected>✓ Tasdiqlash va Rasman E'lon Qilish (Publish)</option>
+        <option value="rejected">✗ Bekor qilish / Rad etish</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" style="font-weight:700;">Buyruq raqami yoki yakuniy izoh:</label>
+      <textarea id="event-final-note" class="form-control" rows="2" placeholder="Masalan: 42-sonli ichki buyruq asosida tasdiqlandi..."></textarea>
+    </div>
+  `;
+
+  modalFooter.innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
+    <button class="btn btn-primary" onclick="submitFinalEventApprove('${eventId}')" style="background:#4F46E5; border-color:#4F46E5; font-weight:700;">
+      Yakuniy Tasdiqlash & Chop Etish
+    </button>
+  `;
+
+  openModal();
+}
+
+async function submitFinalEventApprove(eventId) {
+  const status = document.getElementById('event-final-status')?.value;
+  const noteEl = document.getElementById('event-final-note');
+  const note = (noteEl?.value || '').trim();
+
+  try {
+    const res = await apiFetch(`/api/events/${eventId}/final-approve`, {
+      method: 'POST',
+      body: JSON.stringify({ status, note })
+    });
+
+    closeModal();
+    alert(res.message || "Tadbir muvaffaqiyatli tasdiqlandi va rasman chop etildi!");
+    renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+window.openEventAgreementModal = openEventAgreementModal;
+window.submitEventAgreement = submitEventAgreement;
+window.openFinalEventApproveModal = openFinalEventApproveModal;
+window.submitFinalEventApprove = submitFinalEventApprove;
+window.onEventLeadTypeChange = onEventLeadTypeChange;
+window.onEventLeadSearchInput = onEventLeadSearchInput;
+window.selectEventLeadItem = selectEventLeadItem;
+window.clearSelectedEventLead = clearSelectedEventLead;
 
 // Tadbirni Tahrirlash Modali (Faqat yaratuvchi xodim va Superadmin, tadbir tugaguncha)
 async function openEditEventModal(eventId) {
@@ -9203,6 +9686,24 @@ function renderStaffTableRows() {
       return true;
     });
   }
+
+  // Muhim: Biriktirilgan rollarga ega xodimlar (Superadmin, Prorektor, Bo'limlar, Tyutorlar) ro'yxatning eng yuqorisida chiqishi shart!
+  const getStaffRoleWeight = (u) => {
+    const roles = Array.isArray(u.roles) ? u.roles : [];
+    if (roles.includes('superadmin')) return 1000;
+    if (roles.includes('prorektor')) return 900;
+    if (roles.some(r => r.startsWith('dep_'))) return 800;
+    if (roles.includes('tutor')) return 700;
+    if (roles.includes('observer')) return 600;
+    if (roles.some(r => r && r !== 'staff' && r !== 'undefined')) return 500;
+    return 0; // Faqat oddiy turniket xodimlari
+  };
+
+  filtered = [...filtered].sort((a, b) => {
+    const weightDiff = getStaffRoleWeight(b) - getStaffRoleWeight(a);
+    if (weightDiff !== 0) return weightDiff;
+    return (a.full_name || '').localeCompare(b.full_name || '');
+  });
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
