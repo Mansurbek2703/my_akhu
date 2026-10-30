@@ -123,6 +123,16 @@ const ROLE_DEFAULT_PERMISSIONS = {
   ],
   kengash: [
     'points_approve_dept', 'points_enter', 'events_view', 'events_create', 'attendance_view'
+  ],
+  dep_atm: [
+    'attendance_view', 'attendance_view_history', 'events_view', 'events_create', 'events_edit', 'events_qr_manage',
+    'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_bot_manage', 'students_view'
+  ],
+  dep_xb: [
+    'attendance_view', 'attendance_view_history', 'observe_analytics', 'events_view'
+  ],
+  dep_iy: [
+    'attendance_view', 'observe_analytics', 'events_view', 'points_approve_dept', 'points_enter'
   ]
 };
 

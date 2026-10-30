@@ -651,6 +651,9 @@ async function notifyApproversForNewPoints(entryIds, creatorUser) {
       'dep_ib': "Ilmiy va innovatsiyalar bo'limi",
       'dep_sb': "Sanoat bilan hamkorlik bo'limi",
       'dep_pb': "Matbuot xizmati (PR)",
+      'dep_atm': "Axborot texnologiyalari markazi",
+      'dep_xb': "Xo'jalik bo'limi",
+      'dep_iy': "Ish yurituvchi",
       'prorektor': "Yoshlar masalalari bo'yicha prorektor"
     };
 
@@ -1154,6 +1157,9 @@ async function sendStaffGreetingAndMenu(chatId, staffUser, rawUsername, formatte
     'dep_ib': "Ilmiy va innovatsiyalar bo'limi",
     'dep_sb': "Sanoat bilan hamkorlik bo'limi",
     'dep_pb': "Matbuot xizmati (PR)",
+    'dep_atm': "Axborot texnologiyalari markazi",
+    'dep_xb': "Xo'jalik bo'limi",
+    'dep_iy': "Ish yurituvchi",
     'prorektor': "Yoshlar masalalari bo'yicha prorektor",
     'observer': "Kuzatuvchi / Rektorat"
   };

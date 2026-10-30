@@ -20,6 +20,9 @@ const ROLE_META = {
   'dep_ib': { label: 'Ilmiy bo\'lim', color: '#3B82F6', bg: '#EFF6FF' },
   'dep_sb': { label: 'Sanoat hamkorlik', color: '#3B82F6', bg: '#EFF6FF' },
   'dep_pb': { label: 'Matbuot (PR)', color: '#3B82F6', bg: '#EFF6FF' },
+  'dep_atm': { label: 'Axborot texnologiyalari markazi', color: '#0284C7', bg: '#E0F2FE' },
+  'dep_xb': { label: 'Xo\'jalik bo\'limi', color: '#D97706', bg: '#FEF3C7' },
+  'dep_iy': { label: 'Ish yurituvchi', color: '#7C3AED', bg: '#F5F3FF' },
   'staff': { label: 'Xodim', color: '#3B82F6', bg: '#EFF6FF' }
 };
 
@@ -32,6 +35,9 @@ function formatApproverRole(role) {
     'dep_ib': "Ilmiy bo'lim",
     'dep_sb': "Sanoat hamkorlik",
     'dep_pb': "Matbuot (PR)",
+    'dep_atm': "Axborot texnologiyalari markazi",
+    'dep_xb': "Xo'jalik bo'limi",
+    'dep_iy': "Ish yurituvchi",
     'prorektor': "Prorektor",
     'tutor': "Tyutor",
     'superadmin': "Superadmin",
@@ -5371,6 +5377,9 @@ function showAddCatalogModal() {
             <option value="dep_ib">Ilmiy bo'lim (dep_ib)</option>
             <option value="dep_sb">Sanoat hamkorlik (dep_sb)</option>
             <option value="dep_pb">Matbuot (PR) (dep_pb)</option>
+            <option value="dep_atm">Axborot texnologiyalari markazi (dep_atm)</option>
+            <option value="dep_xb">Xo'jalik bo'limi (dep_xb)</option>
+            <option value="dep_iy">Ish yurituvchi (dep_iy)</option>
             <option value="prorektor">Prorektor</option>
             <option value="tutor">Tyutor</option>
           </select>
@@ -5495,6 +5504,9 @@ async function showEditCatalogModal(id, version_from) {
             <option value="dep_ib" ${item.approver_role === 'dep_ib' ? 'selected' : ''}>Ilmiy bo'lim (dep_ib)</option>
             <option value="dep_sb" ${item.approver_role === 'dep_sb' ? 'selected' : ''}>Sanoat hamkorlik (dep_sb)</option>
             <option value="dep_pb" ${item.approver_role === 'dep_pb' ? 'selected' : ''}>Matbuot (PR) (dep_pb)</option>
+            <option value="dep_atm" ${item.approver_role === 'dep_atm' ? 'selected' : ''}>Axborot texnologiyalari markazi (dep_atm)</option>
+            <option value="dep_xb" ${item.approver_role === 'dep_xb' ? 'selected' : ''}>Xo'jalik bo'limi (dep_xb)</option>
+            <option value="dep_iy" ${item.approver_role === 'dep_iy' ? 'selected' : ''}>Ish yurituvchi (dep_iy)</option>
             <option value="prorektor" ${item.approver_role === 'prorektor' ? 'selected' : ''}>Prorektor</option>
             <option value="tutor" ${item.approver_role === 'tutor' ? 'selected' : ''}>Tyutor</option>
           </select>
@@ -9034,6 +9046,9 @@ async function renderStaffUsersManagement(container) {
           <option value="dep_ib">Ilmiy bo'lim</option>
           <option value="dep_sb">Sanoat hamkorlik</option>
           <option value="dep_pb">Matbuot (PR)</option>
+          <option value="dep_atm">Axborot texnologiyalari markazi</option>
+          <option value="dep_xb">Xo'jalik bo'limi</option>
+          <option value="dep_iy">Ish yurituvchi</option>
           <option value="observer">Kuzatuvchi</option>
         </select>
         <select id="filter-staff-bot" class="admin-filter-select">
@@ -9218,6 +9233,9 @@ function renderStaffTableRows() {
       else if (r === 'dep_ib') { bg = '#FFFBEB'; color = '#D97706'; label = 'Ilmiy bo\'lim'; }
       else if (r === 'dep_sb') { bg = '#ECFEFF'; color = '#0891B2'; label = 'Sanoat hamkorlik'; }
       else if (r === 'dep_pb') { bg = '#FDF2F8'; color = '#DB2777'; label = 'Matbuot (PR)'; }
+      else if (r === 'dep_atm') { bg = '#E0F2FE'; color = '#0284C7'; label = 'Axborot texnologiyalari markazi'; }
+      else if (r === 'dep_xb') { bg = '#FEF3C7'; color = '#D97706'; label = 'Xo\'jalik bo\'limi'; }
+      else if (r === 'dep_iy') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Ish yurituvchi'; }
       else if (r === 'observer') { bg = '#F8FAFC'; color = '#475569'; label = 'Kuzatuvchi (Rektorat)'; }
       return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.08); font-weight: 600;">${label}</span>`;
     }).join('');
@@ -9347,6 +9365,9 @@ async function showCreateStaffModal() {
       { key: 'dep_ib', id: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi", desc: 'Ilmiy maqolalar, anjumanlar, grantlar' },
       { key: 'dep_sb', id: 'dep_sb', name: "Sanoat bilan hamkorlik", desc: 'Startaplar, Hackathonlar, ko\'rgazmalar' },
       { key: 'dep_pb', id: 'dep_pb', name: "Matbuot xizmati (PR)", desc: 'OAV va ijtimoiy tarmoqlar materiallari' },
+      { key: 'dep_atm', id: 'dep_atm', name: "Axborot texnologiyalari markazi", desc: 'Axborot tizimlari, texnik ta\'minot va IT xizmatlari' },
+      { key: 'dep_xb', id: 'dep_xb', name: "Xo'jalik bo'limi", desc: 'Xo\'jalik va moddiy-texnik ta\'minot, kampus infratuzilmasi' },
+      { key: 'dep_iy', id: 'dep_iy', name: "Ish yurituvchi", desc: 'Hujjatlar aylanmasi, devonxona va ijro intizomi' },
       { key: 'tutor', id: 'tutor', name: 'Tyutor', desc: 'Talabalarga ball kiritish va monitoring' },
       { key: 'observer', id: 'observer', name: 'Kuzatuvchi (Rektorat)', desc: 'Monitoring va Katta ekran (TV)' }
     ];
@@ -9691,6 +9712,9 @@ const ROLE_PERMISSIONS_PRESET = {
   dep_ob: ['students_view', 'students_create', 'students_edit', 'students_import_excel', 'students_import_gpa', 'students_export_zip', 'students_sync_turniket_photos', 'attendance_view', 'attendance_export_excel', 'observe_analytics'],
   tutor: ['tutor_my_students', 'tutor_enter_points', 'attendance_view', 'attendance_view_history', 'events_view'],
   prorektor: ['points_approve_prorektor', 'points_history_view', 'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_risk_monitoring', 'attendance_view', 'events_view'],
+  dep_atm: ['attendance_view', 'attendance_view_history', 'events_view', 'events_create', 'events_edit', 'events_qr_manage', 'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_bot_manage', 'students_view'],
+  dep_xb: ['attendance_view', 'attendance_view_history', 'observe_analytics', 'events_view'],
+  dep_iy: ['attendance_view', 'observe_analytics', 'events_view', 'points_approve_dept', 'points_enter'],
   observer: ['observe_analytics', 'observe_tv_screen', 'attendance_view', 'events_view']
 };
 
@@ -9753,6 +9777,9 @@ async function renderStaffEditPage(container, targetUserId) {
       { key: 'dep_ib', id: 'dep_ib', name: "Ilmiy tadqiqotlar bo'limi", desc: 'Ilmiy maqolalar, anjumanlar, grantlar' },
       { key: 'dep_sb', id: 'dep_sb', name: "Sanoat bilan hamkorlik", desc: 'Startaplar, Hackathonlar, ko\'rgazmalar' },
       { key: 'dep_pb', id: 'dep_pb', name: "Matbuot xizmati (PR)", desc: 'OAV va ijtimoiy tarmoqlar materiallari' },
+      { key: 'dep_atm', id: 'dep_atm', name: "Axborot texnologiyalari markazi", desc: 'Axborot tizimlari, texnik ta\'minot va IT xizmatlari' },
+      { key: 'dep_xb', id: 'dep_xb', name: "Xo'jalik bo'limi", desc: 'Xo\'jalik va moddiy-texnik ta\'minot, kampus infratuzilmasi' },
+      { key: 'dep_iy', id: 'dep_iy', name: "Ish yurituvchi", desc: 'Hujjatlar aylanmasi, devonxona va ijro intizomi' },
       { key: 'tutor', id: 'tutor', name: 'Tyutor', desc: 'Talabalarga ball kiritish va monitoring' },
       { key: 'observer', id: 'observer', name: 'Kuzatuvchi (Rektorat)', desc: 'Monitoring va Katta ekran (TV)' }
     ];
@@ -10561,6 +10588,9 @@ async function showStaffMonitoringModal(userId) {
       else if (r === 'dep_ib') { bg = '#FFFBEB'; color = '#D97706'; label = 'Ilmiy bo\'lim'; }
       else if (r === 'dep_sb') { bg = '#ECFEFF'; color = '#0891B2'; label = 'Sanoat hamkorlik'; }
       else if (r === 'dep_pb') { bg = '#FDF2F8'; color = '#DB2777'; label = 'Matbuot (PR)'; }
+      else if (r === 'dep_atm') { bg = '#E0F2FE'; color = '#0284C7'; label = 'Axborot texnologiyalari markazi'; }
+      else if (r === 'dep_xb') { bg = '#FEF3C7'; color = '#D97706'; label = 'Xo\'jalik bo\'limi'; }
+      else if (r === 'dep_iy') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Ish yurituvchi'; }
       else if (r === 'observer') { bg = '#F8FAFC'; color = '#475569'; label = 'Kuzatuvchi'; }
       return `<span class="badge" style="background:${bg}; color:${color}; margin-right:4px; margin-bottom:4px; border:1px solid rgba(0,0,0,0.08); font-weight:600;">${label}</span>`;
     }).join('') || '<span class="text-muted">Rollar biriktirilmagan</span>';

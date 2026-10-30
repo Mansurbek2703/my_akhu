@@ -1128,6 +1128,9 @@ router.get('/roles-list', authenticateSuperadmin, (req, res) => {
     { id: 'dep_ib', key: 'dep_ib', name: 'Ilmiy tadqiqotlar bo\'limi', desc: 'Ilmiy maqolalar, konferensiyalar, grantlar va to\'garaklar arizalari tasdig\'i' },
     { id: 'dep_sb', key: 'dep_sb', name: 'Sanoat bilan hamkorlik bo\'limi', desc: 'Startaplar, Hackathonlar, innovatsion ko\'rgazmalar tasdig\'i' },
     { id: 'dep_pb', key: 'dep_pb', name: 'Matbuot xizmati (PR va Media)', desc: 'OAV va ijtimoiy tarmoqlardagi materiallarni tekshirish va tasdiqlash' },
+    { id: 'dep_atm', key: 'dep_atm', name: 'Axborot texnologiyalari markazi', desc: 'Axborot tizimlari, texnik ta\'minot, tarmoq va IT xizmatlari markazi' },
+    { id: 'dep_xb', key: 'dep_xb', name: 'Xo\'jalik bo\'limi', desc: 'Xo\'jalik va moddiy-texnik ta\'minot, kampus infratuzilmasi boshqaruvi' },
+    { id: 'dep_iy', key: 'dep_iy', name: 'Ish yurituvchi', desc: 'Hujjatlar aylanmasi, devonxona, ijro intizomi va rasmiy xatlar monitoringi' },
     { id: 'tutor', key: 'tutor', name: 'Tyutor', desc: 'Biriktirilgan guruh talabalariga ball kiritish, dalil yuklash va monitoring' },
     { id: 'observer', key: 'observer', name: 'Universitet Kuzatuvchisi (Rektorat)', desc: 'Faqat monitoring va statistika ko\'rish, Katta ekran (TV) rejimi' }
   ];
