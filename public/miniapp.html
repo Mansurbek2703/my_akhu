@@ -264,10 +264,10 @@
 
     <div style="margin-top: 4px;">
       <span class="badge" id="student-qr-timer-badge" style="background: #EFF6FF; color: #2563EB; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;">
-        ⏱️ QR yangilanishiga: 60s
+        ⏱️ QR yangilanishiga: 10s
       </span>
       <div style="font-size: 11.5px; color: #64748B; margin-top: 6px;">
-        🛡️ Har 60 sekundda dinamik yangilanadi (HMAC-SHA256)
+        🛡️ Har 10 sekundda dinamik yangilanadi (HMAC-SHA256)
       </div>
     </div>
   </div>
@@ -372,10 +372,10 @@
       </div>
       <div style="margin-top: 10px;">
         <span class="badge" id="modal-qr-timer-badge" style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11.5px; padding: 5px 12px; border-radius: 12px;">
-          ⏱️ QR yangilanishiga: 60s
+          ⏱️ QR yangilanishiga: 10s
         </span>
         <div style="font-size: 11px; color: #64748B; margin-top: 4px;">
-          Har 60 soniyada yangilanadi
+          Har 10 soniyada yangilanadi
         </div>
       </div>
       <button onclick="switchScanMethod('camera')" style="margin-top: 12px; width: 100%; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
@@ -592,11 +592,11 @@
     }
 
     let studentQrInterval = null;
-    let studentQrRemainingSeconds = 60;
+    let studentQrRemainingSeconds = 10;
 
     function startStudentQrCountdown(initialSeconds) {
       if (studentQrInterval) clearInterval(studentQrInterval);
-      studentQrRemainingSeconds = initialSeconds || 60;
+      studentQrRemainingSeconds = initialSeconds || 10;
 
       const updateBadges = () => {
         const badge1 = document.getElementById('student-qr-timer-badge');

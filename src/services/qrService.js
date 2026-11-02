@@ -76,7 +76,7 @@ function generateStudentQrPayload(studentId) {
 async function generateStudentQrDataUrl(studentId) {
   const payload = generateStudentQrPayload(studentId);
   const payloadStr = JSON.stringify(payload);
-  const validForSeconds = 60 - (payload.ts % 60);
+  const validForSeconds = 10 - (payload.ts % 10);
   const dataUrl = await QRCode.toDataURL(payloadStr, {
     width: 360,
     margin: 2,
@@ -86,9 +86,9 @@ async function generateStudentQrDataUrl(studentId) {
   return {
     payload,
     dataUrl,
-    ttl: 60,
+    ttl: 10,
     valid_for_seconds: validForSeconds,
-    expires_at: new Date((Math.floor(payload.ts / 60) + 1) * 60 * 1000).toISOString()
+    expires_at: new Date((Math.floor(payload.ts / 10) + 1) * 10 * 1000).toISOString()
   };
 }
 
@@ -136,13 +136,15 @@ function checkinEventQr(studentId, qrPayloadStr, { deviceHint = null, ip = '127.
   const endsAt = new Date(event.ends_at);
   const opensAt = new Date(startsAt.getTime() - 5 * 60 * 1000);
 
+  const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
+
   if (now < opensAt) {
     const diffSec = Math.ceil((opensAt.getTime() - now.getTime()) / 1000);
     const diffMin = Math.ceil(diffSec / 60);
     throw new Error(`Tadbir davomati va QR kodi tadbir boshlanishidan 5 daqiqa oldin ochiladi. Hali ${diffMin} daqiqa bor.`);
   }
-  if (now > endsAt) {
-    throw new Error('Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.');
+  if (now > closesAt) {
+    throw new Error('Tadbir va davomat vaqti yakunlangan (tadbirdan keyingi 5 daqiqalik qo\'shimcha vaqt ham tugadi).');
   }
 
   // Q-04: Bir talaba — bir tadbir — bir check-in
@@ -274,9 +276,9 @@ function checkinStudentQr(staffUser, eventId, studentQrPayloadStr, ip = '127.0.0
   if (!student_id || !ts || !sig) throw new Error('Talaba QR kodi to\'liq emas');
 
   const nowTs = Math.floor(Date.now() / 1000);
-  // 60 soniya + 15 soniya bufer (jami 75 soniya)
-  if (Math.abs(nowTs - ts) > 75) {
-    throw new Error('Talaba QR kodi eskirgan (amal qilish muddati 60 soniya). Talaba ilovasida yangilangan QR kodni skanerlang.');
+  // 10 soniya TTL + 15 soniya bufer (jami 25 soniya)
+  if (Math.abs(nowTs - ts) > 25) {
+    throw new Error('Talaba QR kodi eskirgan (amal qilish muddati 10 soniya). Talaba Mini App dagi yangilangan QR kodni skanerlang.');
   }
 
   // Imzo tekshiruvi (nonce bilan yoki nonce-siz orqaga moslik)
@@ -290,17 +292,18 @@ function checkinStudentQr(staffUser, eventId, studentQrPayloadStr, ip = '127.0.0
   const event = db.prepare(`SELECT * FROM event WHERE id = ?`).get(eventId);
   if (!event) throw new Error('Tadbir topilmadi');
 
-  // Davomat vaqti tekshiruvi (tadbir boshlanishidan to yakunidan keyingi 5 daqiqagacha)
+  // Davomat vaqti tekshiruvi: tadbir boshlanishidan 5 daqiqa oldin to yakunidan keyingi 5 daqiqagacha
   const now = new Date();
   const startsAt = new Date(event.starts_at);
   const endsAt = new Date(event.ends_at);
+  const opensAt = new Date(startsAt.getTime() - 5 * 60 * 1000);
   const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
 
-  if (now < startsAt) {
-    throw new Error('Tadbir davomati hali boshlanmagan. Davomat faqat tadbir rejalashtirilgan boshlanish vaqtida ochiladi.');
+  if (now < opensAt) {
+    throw new Error('Tadbir davomati tadbir boshlanishidan 5 daqiqa oldin ochiladi.');
   }
   if (now > closesAt) {
-    throw new Error('Tadbir davomat vaqti yakunlangan (tadbirdan so\'ng 5 daqiqalik qo\'shimcha vaqt tugadi).');
+    throw new Error('Tadbir davomat vaqti yakunlangan (tadbirdan so\'ng 5 daqiqalik qo\'shimcha vaqt ham tugadi).');
   }
 
   const student = db.prepare(`SELECT * FROM student WHERE id = ? AND status = 'active'`).get(student_id);

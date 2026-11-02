@@ -352,6 +352,15 @@ router.post('/:id/agree', (req, res) => {
     const event = db.prepare('SELECT * FROM event WHERE id = ?').get(eventId);
     if (!event) return res.status(404).json({ error: 'Tadbir topilmadi' });
 
+    // QAT'IY QOIDA: Tadbir boshlanishiga 10 daqiqadan kam vaqt qolguncha kelishilmasa, tadbir boshlanmaydi!
+    const startsAtDate = new Date(event.starts_at);
+    const minutesToStart = (startsAtDate.getTime() - Date.now()) / (60 * 1000);
+    if (minutesToStart < 10) {
+      return res.status(400).json({
+        error: "Tadbir boshlanishiga 10 daqiqadan kam vaqt qolganligi sababli kelishuv to'xtatildi va tadbir boshlanmaydi! Tashabbuskor tadbir boshlanish vaqtini keyinroqqa o'zgartirishi lozim."
+      });
+    }
+
     // Ruxsat tekshiruvi: faqat tegishli bo'lim yoki superadmin
     const roles = req.staffUser.roles || [];
     const targetRole = `dep_${department}`;
@@ -550,6 +559,17 @@ router.post('/:id/final-approve', (req, res) => {
 
     if (!isSuperadmin && status === 'approved' && (!xbDone || !atmDone || !obDone)) {
       return res.status(400).json({ error: "Barcha talab etilgan bo'limlar kelishuvi to'liq yakunlanmagan! Avval bo'limlar o'z xulosalarini berishi kerak." });
+    }
+
+    // QAT'IY QOIDA: Tadbir boshlanishiga 10 daqiqadan kam vaqt qolsa, tasdiqlab bo'lmaydi (boshlanmaydi)
+    if (status === 'approved') {
+      const startsAtDate = new Date(event.starts_at);
+      const minutesToStart = (startsAtDate.getTime() - Date.now()) / (60 * 1000);
+      if (minutesToStart < 10) {
+        return res.status(400).json({
+          error: "Tadbir boshlanishiga 10 daqiqadan kam vaqt qoldi! Reglamentga ko'ra, tadbir boshlanish vaqti kechiktirilishi yoki qayta belgilanishi shart."
+        });
+      }
     }
 
     const now = new Date().toISOString();
@@ -837,8 +857,9 @@ router.get('/:id/qr', async (req, res) => {
       });
     }
 
-    if (now > endsAt) {
-      return res.status(400).json({ error: 'Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.' });
+    const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
+    if (now > closesAt) {
+      return res.status(400).json({ error: 'Tadbir va davomat vaqti tugagan (tadbirdan keyingi 5 daqiqalik qo\'shimcha vaqt ham yakunlandi).' });
     }
 
     const data = await generateEventQrDataUrl(req.params.id);
@@ -946,8 +967,9 @@ router.post('/:id/checkin-student', (req, res) => {
         wait_seconds: waitSeconds
       });
     }
-    if (now > endsAt) {
-      return res.status(400).json({ error: 'Tadbir vaqti tugagan. Davomat tekshiruvi (attendance checking) yakunlangan.' });
+    const closesAt = new Date(endsAt.getTime() + 5 * 60 * 1000);
+    if (now > closesAt) {
+      return res.status(400).json({ error: 'Tadbir va davomat vaqti tugagan (tadbirdan keyingi 5 daqiqalik qo\'shimcha vaqt ham yakunlandi).' });
     }
 
     let targetStudentId = student_id;
