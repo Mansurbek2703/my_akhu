@@ -3643,6 +3643,71 @@ const eventDtState = {
   }
 };
 
+function renderDateTimeControlsHtml(prefix = '') {
+  return `
+    <div style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+        <label style="font-weight: 800; font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
+          📅 Tadbir Sanasi va Vaqti *
+        </label>
+        <div style="display: flex; gap: 4px;">
+          <button type="button" id="${prefix}date-btn-today" class="btn btn-sm btn-outline ${prefix}date-quick-btn" onclick="setEventQuickDate('today', '${prefix}');" style="font-size: 11px; padding: 2px 9px;">Bugun</button>
+          <button type="button" id="${prefix}date-btn-tomorrow" class="btn btn-sm btn-outline ${prefix}date-quick-btn" onclick="setEventQuickDate('tomorrow', '${prefix}');" style="font-size: 11px; padding: 2px 9px;">Ertaga</button>
+          <button type="button" id="${prefix}date-btn-afterTomorrow" class="btn btn-sm btn-outline ${prefix}date-quick-btn" onclick="setEventQuickDate('afterTomorrow', '${prefix}');" style="font-size: 11px; padding: 2px 9px;">Indinga</button>
+        </div>
+      </div>
+
+      <!-- 1. INTERAKTIV KALENDAR (Jahon standarti - sanani bosib tanlash) -->
+      <div style="margin-bottom: 10px;">
+        <div id="${prefix}cal-container" class="custom-calendar-widget"></div>
+      </div>
+
+      <!-- SANA TANLASH VA HAFTA KUNI BADGE -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap;">Tanlangan sana:</span>
+          <input type="date" id="${prefix}ev-date-input" class="form-control" style="font-weight: 700; font-size: 13px; padding: 4px 10px; background: white; width: auto; min-width: 150px;" onchange="onEventDateInputChange(this.value, '${prefix}')">
+        </div>
+        <span id="${prefix}ev-date-weekday-badge" style="font-size: 12px; font-weight: 700; color: #2563EB; background: #EFF6FF; padding: 4px 10px; border-radius: 6px; border: 1px solid #BFDBFE;"></span>
+      </div>
+
+      <!-- 2. VAQT BOSHQARUVI (Boshlanish va Tugash vaqtlari) -->
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #1E293B; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+              ⏰ Boshlanish vaqti *
+            </label>
+            <select id="${prefix}ev-start-time" class="form-control" onchange="onEventStartTimeSelect(this.value, '${prefix}')" style="font-size: 13px; font-weight: 700; background: white; border: 1.5px solid #CBD5E1;">
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #1E293B; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+              ⌛ Tugash vaqti *
+            </label>
+            <select id="${prefix}ev-end-time" class="form-control" onchange="onEventEndTimeSelect(this.value, '${prefix}')" style="font-size: 13px; font-weight: 700; background: white; border: 1.5px solid #CBD5E1;">
+            </select>
+          </div>
+        </div>
+
+        <!-- TEZKOR DAVOMIYLIK CHIPLARI -->
+        <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+          <span style="font-size: 11px; font-weight: 700; color: #64748B;">⏱️ Davomiyligi:</span>
+          <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(30, '${prefix}')" data-dur="30">30 daq</button>
+          <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(45, '${prefix}')" data-dur="45">45 daq</button>
+          <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(60, '${prefix}')" data-dur="60">1 soat</button>
+          <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(90, '${prefix}')" data-dur="90">1.5 soat</button>
+          <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(120, '${prefix}')" data-dur="120">2 soat</button>
+          <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(180, '${prefix}')" data-dur="180">3 soat</button>
+        </div>
+      </div>
+
+      <!-- 3. TASDIQ XULOSASI -->
+      <div id="${prefix}ev-datetime-summary" style="border-radius: 10px; padding: 10px 12px; font-size: 12.5px;"></div>
+    </div>
+  `;
+}
+
 function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialEndsAt = null) {
   const now = new Date();
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
@@ -3657,9 +3722,8 @@ function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialE
     st.calMonth = sDate.getMonth();
     st.durationMinutes = Math.max(15, Math.round((eDate - sDate) / (60 * 1000)));
   } else {
-    // Default: Bugun, hozirdan kamida 15 daqiqa keyin
     const defaultStart = new Date(now.getTime() + 15 * 60 * 1000);
-    defaultStart.setMinutes(Math.ceil(defaultStart.getMinutes() / 5) * 5);
+    defaultStart.setMinutes(Math.ceil(defaultStart.getMinutes() / 15) * 15);
     const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
 
     st.selectedDate = `${defaultStart.getFullYear()}-${String(defaultStart.getMonth() + 1).padStart(2, '0')}-${String(defaultStart.getDate()).padStart(2, '0')}`;
@@ -3671,9 +3735,17 @@ function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialE
   }
   st.confirmed = true;
 
+  const dateInput = document.getElementById(`${prefix}ev-date-input`);
+  if (dateInput) {
+    dateInput.value = st.selectedDate;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    dateInput.min = todayStr;
+  }
+
+  updateDateWeekdayBadge(st.selectedDate, prefix);
+  updateQuickDateButtons(st.selectedDate, prefix);
   renderEventCalendar(prefix);
-  renderEventStartTimeTrack(prefix);
-  renderEventEndTimeTrack(prefix);
+  renderEventTimeSelects(prefix);
   updateEventDateTimeSummary(prefix);
 }
 
@@ -3681,7 +3753,7 @@ function renderEventCalendar(prefix = '') {
   const container = document.getElementById(`${prefix}cal-container`);
   if (!container) return;
 
-  const st = eventDtState[prefix];
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   const now = new Date();
   const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -3690,20 +3762,20 @@ function renderEventCalendar(prefix = '') {
     'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
   ];
 
-  const year = st.calYear;
-  const month = st.calMonth;
+  const year = st.calYear || now.getFullYear();
+  const month = (st.calMonth !== undefined) ? st.calMonth : now.getMonth();
 
-  // Birinchi kun (0=Du, 6=Ya)
   const firstDayObj = new Date(year, month, 1);
   let firstDayIndex = firstDayObj.getDay() - 1;
   if (firstDayIndex === -1) firstDayIndex = 6;
 
   const totalDays = new Date(year, month + 1, 0).getDate();
+  const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const isCurrentMonthOrPast = (year < now.getFullYear()) || (year === now.getFullYear() && month <= now.getMonth());
 
   let daysHtml = '';
   for (let i = 0; i < firstDayIndex; i++) {
-    daysHtml += `<div class="cal-day-cell" style="background:transparent; cursor:default;"></div>`;
+    daysHtml += `<div class="cal-day-cell empty"></div>`;
   }
 
   for (let day = 1; day <= totalDays; day++) {
@@ -3711,7 +3783,7 @@ function renderEventCalendar(prefix = '') {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     const isToday = (dateStr === todayDateStr);
-    const isPast = (dayDate < new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    const isPast = (dayDate < todayZero);
     const isSelected = (dateStr === st.selectedDate);
 
     if (isPast) {
@@ -3730,13 +3802,13 @@ function renderEventCalendar(prefix = '') {
 
   container.innerHTML = `
     <div class="custom-calendar-header">
-      <button type="button" class="custom-calendar-nav-btn" onclick="changeEventCalendarMonth(-1, '${prefix}')" ${isCurrentMonthOrPast ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+      <button type="button" class="custom-calendar-nav-btn" onclick="changeEventCalendarMonth(-1, '${prefix}')" ${isCurrentMonthOrPast ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''} title="Oldingi oy">
         &larr;
       </button>
       <div class="custom-calendar-title">
         📅 ${monthNames[month]} ${year}
       </div>
-      <button type="button" class="custom-calendar-nav-btn" onclick="changeEventCalendarMonth(1, '${prefix}')">
+      <button type="button" class="custom-calendar-nav-btn" onclick="changeEventCalendarMonth(1, '${prefix}')" title="Keyingi oy">
         &rarr;
       </button>
     </div>
@@ -3750,10 +3822,10 @@ function renderEventCalendar(prefix = '') {
 }
 
 function changeEventCalendarMonth(delta, prefix = '') {
-  const st = eventDtState[prefix];
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   const now = new Date();
-  let newMonth = st.calMonth + delta;
-  let newYear = st.calYear;
+  let newMonth = (st.calMonth !== undefined ? st.calMonth : now.getMonth()) + delta;
+  let newYear = st.calYear || now.getFullYear();
 
   if (newMonth < 0) {
     newMonth = 11;
@@ -3773,7 +3845,7 @@ function changeEventCalendarMonth(delta, prefix = '') {
 }
 
 function selectEventCalendarDate(dateStr, prefix = '') {
-  const st = eventDtState[prefix];
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.selectedDate = dateStr;
 
   const now = new Date();
@@ -3781,19 +3853,83 @@ function selectEventCalendarDate(dateStr, prefix = '') {
 
   if (dateStr === todayStr) {
     const minStartMs = now.getTime() + 10 * 60 * 1000;
-    const currentStartDt = new Date(`${dateStr}T${st.selectedStartTime}:00`);
+    const currentStartDt = new Date(`${dateStr}T${st.selectedStartTime || '08:00'}:00`);
     if (currentStartDt.getTime() < minStartMs) {
-      const newStartDt = new Date(minStartMs + 5 * 60 * 1000);
-      newStartDt.setMinutes(Math.ceil(newStartDt.getMinutes() / 5) * 5);
-      st.selectedStartTime = `${String(newStartDt.getHours()).padStart(2, '0')}:${String(newStartDt.getMinutes()).padStart(2, '0')}`;
+      const nextSlot = new Date(minStartMs + 5 * 60 * 1000);
+      nextSlot.setMinutes(Math.ceil(nextSlot.getMinutes() / 15) * 15);
+      st.selectedStartTime = `${String(nextSlot.getHours()).padStart(2, '0')}:${String(nextSlot.getMinutes()).padStart(2, '0')}`;
       recalcEndTime(prefix);
     }
   }
 
+  const inp = document.getElementById(`${prefix}ev-date-input`);
+  if (inp) inp.value = dateStr;
+
+  updateDateWeekdayBadge(dateStr, prefix);
+  updateQuickDateButtons(dateStr, prefix);
   renderEventCalendar(prefix);
-  renderEventStartTimeTrack(prefix);
-  renderEventEndTimeTrack(prefix);
+  renderEventTimeSelects(prefix);
   updateEventDateTimeSummary(prefix);
+
+  if (prefix === '' && typeof syncEventObNoteAuto === 'function') { syncEventObNoteAuto(); }
+}
+
+function updateDateWeekdayBadge(dateStr, prefix = '') {
+  const badge = document.getElementById(`${prefix}ev-date-weekday-badge`);
+  if (!badge || !dateStr) return;
+  const d = new Date(dateStr + 'T00:00:00');
+  const dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+  badge.textContent = dayNames[d.getDay()];
+}
+
+function updateQuickDateButtons(dateStr, prefix = '') {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const tmr = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tmrStr = `${tmr.getFullYear()}-${String(tmr.getMonth() + 1).padStart(2, '0')}-${String(tmr.getDate()).padStart(2, '0')}`;
+  const aft = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  const aftStr = `${aft.getFullYear()}-${String(aft.getMonth() + 1).padStart(2, '0')}-${String(aft.getDate()).padStart(2, '0')}`;
+
+  const btnToday = document.getElementById(`${prefix}date-btn-today`);
+  const btnTmr = document.getElementById(`${prefix}date-btn-tomorrow`);
+  const btnAft = document.getElementById(`${prefix}date-btn-afterTomorrow`);
+
+  [btnToday, btnTmr, btnAft].forEach(b => {
+    if (b) {
+      b.classList.remove('btn-primary');
+      b.classList.add('btn-outline');
+    }
+  });
+
+  if (dateStr === todayStr && btnToday) {
+    btnToday.classList.add('btn-primary');
+    btnToday.classList.remove('btn-outline');
+  } else if (dateStr === tmrStr && btnTmr) {
+    btnTmr.classList.add('btn-primary');
+    btnTmr.classList.remove('btn-outline');
+  } else if (dateStr === aftStr && btnAft) {
+    btnAft.classList.add('btn-primary');
+    btnAft.classList.remove('btn-outline');
+  }
+}
+
+function onEventDateInputChange(val, prefix = '') {
+  if (!val) return;
+  const now = new Date();
+  const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const selectedD = new Date(val + 'T00:00:00');
+
+  if (selectedD < todayZero) {
+    alert("Bugundan oldingi sanalarni tanlash mumkin emas!");
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    setEventQuickDate('today', prefix);
+    return;
+  }
+
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
+  st.calYear = selectedD.getFullYear();
+  st.calMonth = selectedD.getMonth();
+  selectEventCalendarDate(val, prefix);
 }
 
 function setEventQuickDate(type, prefix = '') {
@@ -3808,29 +3944,30 @@ function setEventQuickDate(type, prefix = '') {
   }
 
   const dateStr = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
-  const st = eventDtState[prefix];
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.calYear = target.getFullYear();
   st.calMonth = target.getMonth();
   selectEventCalendarDate(dateStr, prefix);
-
-  document.querySelectorAll(`.${prefix}date-quick-btn`).forEach(b => b.classList.remove('btn-primary'));
-  const clicked = document.getElementById(`${prefix}date-btn-${type}`);
-  if (clicked) clicked.classList.add('btn-primary');
 }
 
-function renderEventStartTimeTrack(prefix = '') {
-  const track = document.getElementById(`${prefix}start-time-track`);
-  if (!track) return;
+function renderEventTimeSelects(prefix = '') {
+  const startSelect = document.getElementById(`${prefix}ev-start-time`);
+  const endSelect = document.getElementById(`${prefix}ev-end-time`);
+  if (!startSelect || !endSelect) return;
 
-  const st = eventDtState[prefix];
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const isToday = (st.selectedDate === todayStr);
   const minStartMs = now.getTime() + 10 * 60 * 1000;
 
-  let pillsHtml = '';
-  for (let h = 7; h <= 23; h++) {
-    for (let m = 0; m < 60; m += 15) {
+  if (!st.selectedStartTime) {
+    st.selectedStartTime = '09:00';
+  }
+
+  let startHtml = '';
+  for (let h = 7; h <= 22; h++) {
+    for (let m of [0, 15, 30, 45]) {
       const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       let isDisabled = false;
 
@@ -3842,138 +3979,102 @@ function renderEventStartTimeTrack(prefix = '') {
       }
 
       const isSelected = (timeStr === st.selectedStartTime);
-
-      if (isDisabled) {
-        pillsHtml += `<button type="button" class="time-pill disabled" title="Hozirdan kamida 10 daqiqa keyin bo'lishi shart">${timeStr}</button>`;
-      } else {
-        pillsHtml += `
-          <button type="button" id="${prefix}start-pill-${timeStr.replace(':', '-')}" class="time-pill ${isSelected ? 'active' : ''}" onclick="selectEventStartTime('${timeStr}', '${prefix}')">
-            ${timeStr}
-          </button>
-        `;
-      }
+      startHtml += `<option value="${timeStr}" ${isDisabled ? 'disabled style="color:#94A3B8;"' : ''} ${isSelected ? 'selected' : ''}>${timeStr} ${isDisabled ? '(O\'tgan)' : ''}</option>`;
     }
   }
+  startSelect.innerHTML = startHtml;
+  startSelect.value = st.selectedStartTime;
 
-  track.innerHTML = pillsHtml;
+  const [startH, startM] = (st.selectedStartTime || '09:00').split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
 
-  setTimeout(() => {
-    const activePill = track.querySelector('.time-pill.active');
-    if (activePill) {
-      activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
-  }, 50);
+  let endHtml = '';
+  for (let offset = 15; offset <= 360; offset += 15) {
+    const endMinutes = startMinutes + offset;
+    const endH = Math.floor(endMinutes / 60) % 24;
+    const endM = endMinutes % 60;
+    const timeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+    const durHours = Math.floor(offset / 60);
+    const durMins = offset % 60;
+    let labelDur = '';
+    if (durHours > 0) labelDur += `${durHours} soat `;
+    if (durMins > 0) labelDur += `${durMins} daq`;
+
+    const isSelected = (timeStr === st.selectedEndTime);
+    endHtml += `<option value="${timeStr}" data-offset="${offset}" ${isSelected ? 'selected' : ''}>${timeStr} (${labelDur.trim()})</option>`;
+  }
+  endSelect.innerHTML = endHtml;
+  if (st.selectedEndTime) {
+    endSelect.value = st.selectedEndTime;
+  }
+
+  updateDurationButtons(prefix);
 }
 
-function selectEventStartTime(timeStr, prefix = '') {
-  const st = eventDtState[prefix];
-  st.selectedStartTime = timeStr;
-  recalcEndTime(prefix);
-
-  renderEventStartTimeTrack(prefix);
-  renderEventEndTimeTrack(prefix);
-  updateEventDateTimeSummary(prefix);
+function updateDurationButtons(prefix = '') {
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
+  const btns = document.querySelectorAll(`.${prefix}dur-btn`);
+  btns.forEach(b => {
+    const d = Number(b.getAttribute('data-dur'));
+    if (d === st.durationMinutes) {
+      b.classList.add('active');
+    } else {
+      b.classList.remove('active');
+    }
+  });
 }
 
 function recalcEndTime(prefix = '') {
   const st = eventDtState[prefix];
-  if (!st.selectedDate || !st.selectedStartTime) return;
+  if (!st || !st.selectedDate || !st.selectedStartTime) return;
 
-  const startDt = new Date(`${st.selectedDate}T${st.selectedStartTime}:00`);
-  const endDt = new Date(startDt.getTime() + (st.durationMinutes || 60) * 60 * 1000);
-  st.selectedEndTime = `${String(endDt.getHours()).padStart(2, '0')}:${String(endDt.getMinutes()).padStart(2, '0')}`;
+  const [sH, sM] = st.selectedStartTime.split(':').map(Number);
+  const startMins = sH * 60 + sM;
+  const endMins = startMins + (st.durationMinutes || 60);
+
+  const endH = Math.floor(endMins / 60) % 24;
+  const endM = endMins % 60;
+  st.selectedEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 }
 
-function renderEventEndTimeTrack(prefix = '') {
-  const track = document.getElementById(`${prefix}end-time-track`);
-  if (!track) return;
+function onEventStartTimeSelect(val, prefix = '') {
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
+  st.selectedStartTime = val;
+  recalcEndTime(prefix);
+  renderEventTimeSelects(prefix);
+  updateEventDateTimeSummary(prefix);
+  if (prefix === '' && typeof syncEventObNoteAuto === 'function') syncEventObNoteAuto();
+}
 
-  const st = eventDtState[prefix];
-  if (!st.selectedStartTime) return;
+function onEventEndTimeSelect(val, prefix = '') {
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
+  st.selectedEndTime = val;
 
-  const [startH, startM] = st.selectedStartTime.split(':').map(Number);
-  const startTotalMinutes = startH * 60 + startM;
+  const [sH, sM] = (st.selectedStartTime || '09:00').split(':').map(Number);
+  const [eH, eM] = val.split(':').map(Number);
+  let dur = (eH * 60 + eM) - (sH * 60 + sM);
+  if (dur <= 0) dur += 24 * 60;
+  st.durationMinutes = Math.max(15, dur);
 
-  const durations = [
-    { mins: 30, label: '30 daq' },
-    { mins: 45, label: '45 daq' },
-    { mins: 60, label: '1 soat (Standart)' },
-    { mins: 90, label: '1.5 soat' },
-    { mins: 120, label: '2 soat' },
-    { mins: 180, label: '3 soat' }
-  ];
-
-  let pillsHtml = `
-    <div style="display: flex; gap: 6px; padding-right: 8px; border-right: 1.5px solid #CBD5E1; margin-right: 4px; flex-shrink: 0;">
-  `;
-
-  durations.forEach(d => {
-    const isAct = (st.durationMinutes === d.mins);
-    pillsHtml += `
-      <button type="button" class="time-pill ${isAct ? 'active' : ''}" style="background: ${isAct ? '#2563EB' : '#F1F5F9'}; font-family: inherit; font-size: 12px;" onclick="selectEventDuration(${d.mins}, '${prefix}')">
-        ⏱️ ${d.label}
-      </button>
-    `;
-  });
-  pillsHtml += `</div>`;
-
-  for (let offset = 15; offset <= 360; offset += 15) {
-    const endTotalMinutes = startTotalMinutes + offset;
-    const endH = Math.floor(endTotalMinutes / 60) % 24;
-    const endM = endTotalMinutes % 60;
-    const timeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-
-    const isSelected = (timeStr === st.selectedEndTime);
-
-    pillsHtml += `
-      <button type="button" class="time-pill ${isSelected ? 'active' : ''}" onclick="selectEventEndTime('${timeStr}', ${offset}, '${prefix}')">
-        ${timeStr}
-      </button>
-    `;
-  }
-
-  track.innerHTML = pillsHtml;
-
-  setTimeout(() => {
-    const activePill = track.querySelector('.time-pill.active');
-    if (activePill) {
-      activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
-  }, 50);
+  updateDurationButtons(prefix);
+  updateEventDateTimeSummary(prefix);
+  if (prefix === '' && typeof syncEventObNoteAuto === 'function') syncEventObNoteAuto();
 }
 
 function selectEventDuration(mins, prefix = '') {
-  const st = eventDtState[prefix];
+  const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.durationMinutes = mins;
   recalcEndTime(prefix);
-
-  renderEventEndTimeTrack(prefix);
+  renderEventTimeSelects(prefix);
   updateEventDateTimeSummary(prefix);
+  if (prefix === '' && typeof syncEventObNoteAuto === 'function') syncEventObNoteAuto();
 }
 
-function selectEventEndTime(timeStr, offsetMinutes, prefix = '') {
-  const st = eventDtState[prefix];
-  st.selectedEndTime = timeStr;
-  st.durationMinutes = offsetMinutes;
-
-  renderEventEndTimeTrack(prefix);
-  updateEventDateTimeSummary(prefix);
-}
-
-function confirmEventDateTime(prefix = '') {
-  const res = updateEventDateTimeSummary(prefix);
-  if (res.valid) {
-    eventDtState[prefix].confirmed = true;
-    const summaryBox = document.getElementById(`${prefix}ev-datetime-summary`);
-    if (summaryBox) {
-      summaryBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      summaryBox.style.transform = 'scale(1.02)';
-      setTimeout(() => summaryBox.style.transform = 'scale(1)', 200);
-    }
-  } else {
-    alert(res.error || "Iltimos, sana va vaqtni to'g'ri belgilang!");
-  }
-}
+// Qadimgi moslik funksiyalari (Stub)
+function renderEventStartTimeTrack(prefix = '') { renderEventTimeSelects(prefix); }
+function renderEventEndTimeTrack(prefix = '') { renderEventTimeSelects(prefix); }
+function confirmEventDateTime(prefix = '') { return updateEventDateTimeSummary(prefix); }
 
 function updateEventDateTimeSummary(prefix = '') {
   const st = eventDtState[prefix] || {};
@@ -3988,7 +4089,7 @@ function updateEventDateTimeSummary(prefix = '') {
     return { valid: false, error: "Iltimos, sana va vaqtlarni to'liq belgilang!" };
   }
 
-  const d = new Date(st.selectedDate);
+  const d = new Date(st.selectedDate + 'T00:00:00');
   const monthNames = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
   const dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
   const dateFormatted = `${dayNames[d.getDay()]}, ${d.getDate()}-${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
@@ -4020,7 +4121,7 @@ function updateEventDateTimeSummary(prefix = '') {
       <div style="display:flex; align-items:flex-start; gap:8px;">
         <span style="font-size:20px;">🚫</span>
         <div>
-          <strong>Boshlanish vaqti juda erta!</strong> Tadbir boshlanishi hozirgi vaqtdan <strong>kamida 10 daqiqa keyin</strong> bo'lishi shart.<br>
+          <strong>Boshlanish vaqti juda erta!</strong> Hozirgi vaqtdan kamida 10 daqiqa keyin bo'lishi shart.<br>
           <span style="font-size:12px;">Hozirgi vaqt: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} &bull; Eng erta boshlanish vaqti: <strong>${minStartStr}</strong></span>
         </div>
       </div>
@@ -4038,23 +4139,28 @@ function updateEventDateTimeSummary(prefix = '') {
   }
 
   // Muvaffaqiyatli xulosa
+  const remainMinutes = Math.round((startsAt - now) / (60 * 1000));
+  let remainStr = '';
+  if (remainMinutes < 60) {
+    remainStr = `${remainMinutes} daqiqa qoldi`;
+  } else {
+    const rH = Math.floor(remainMinutes / 60);
+    const rM = remainMinutes % 60;
+    remainStr = `${rH} soat ${rM > 0 ? rM + ' daq' : ''} qoldi`;
+  }
+
   summaryEl.style.background = '#ECFDF5';
   summaryEl.style.border = '1.5px solid #A7F3D0';
   summaryEl.style.color = '#065F46';
   summaryEl.innerHTML = `
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:20px;">✅</span>
-        <div>
-          <div style="font-weight:800; font-size:14px; color:#065F46;">
-            ${dateFormatted} | ${st.selectedStartTime} &mdash; ${st.selectedEndTime}
-          </div>
-          <span style="font-size:12px; color:#047857;">Davomiyligi: <strong>${durStr}</strong> &bull; Boshlanishiga <strong>${Math.round((startsAt - now)/(60*1000))} daqiqa</strong> qoldi.</span>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:20px;">✅</span>
+      <div>
+        <div style="font-weight:800; font-size:14px; color:#065F46;">
+          ${dateFormatted} | ${st.selectedStartTime} &mdash; ${st.selectedEndTime}
         </div>
+        <span style="font-size:12px; color:#047857;">Davomiyligi: <strong>${durStr}</strong> &bull; Boshlanishiga: <strong>${remainStr}</strong></span>
       </div>
-      <button type="button" class="btn btn-sm btn-primary" onclick="confirmEventDateTime('${prefix}')" style="background:#059669; border-color:#059669; padding:5px 12px; font-weight:700;">
-        ✓ OK (Tasdiqlash)
-      </button>
     </div>
   `;
 
@@ -4064,6 +4170,16 @@ function updateEventDateTimeSummary(prefix = '') {
     ends_at: endsAt.toISOString()
   };
 }
+
+window.selectEventCalendarDate = selectEventCalendarDate;
+window.changeEventCalendarMonth = changeEventCalendarMonth;
+window.setEventQuickDate = setEventQuickDate;
+window.onEventDateInputChange = onEventDateInputChange;
+window.onEventStartTimeSelect = onEventStartTimeSelect;
+window.onEventEndTimeSelect = onEventEndTimeSelect;
+window.selectEventDuration = selectEventDuration;
+window.renderEventCalendar = renderEventCalendar;
+window.renderDateTimeControlsHtml = renderDateTimeControlsHtml;
 
 // KPI dan tadbirlarni qo'lda darhol sinxronlash
 async function syncKpiEventsManually() {
@@ -4245,45 +4361,7 @@ async function openCreateEventModal() {
             <input type="text" id="ev-title" class="form-control" placeholder="Masalan: 'AKHU AI Hackathon 2026' yoki 'Zakovat Intellektual Turniri'" required style="font-size: 14.5px; font-weight: 600;">
           </div>
 
-          <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
-          <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <label style="font-weight: 800; font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
-                📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
-              </label>
-              <span style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: 700;">Kamida +10 daqiqa keyin</span>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni:</span>
-                <div style="display: flex; gap: 4px;">
-                  <button type="button" id="date-btn-today" class="btn btn-sm btn-outline date-quick-btn btn-primary" onclick="setEventQuickDate('today', ''); syncEventObNoteAuto();" style="font-size: 11px; padding: 2px 8px;">Bugun</button>
-                  <button type="button" id="date-btn-tomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('tomorrow', ''); syncEventObNoteAuto();" style="font-size: 11px; padding: 2px 8px;">Ertaga</button>
-                  <button type="button" id="date-btn-afterTomorrow" class="btn btn-sm btn-outline date-quick-btn" onclick="setEventQuickDate('afterTomorrow', ''); syncEventObNoteAuto();" style="font-size: 11px; padding: 2px 8px;">Indinga</button>
-                </div>
-              </div>
-              <div id="cal-container" class="custom-calendar-widget"></div>
-            </div>
-
-            <div class="time-scroll-track-wrapper">
-              <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                <span>⏰ 2. Boshlanish vaqti</span>
-                <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
-              </div>
-              <div class="time-scroll-track" id="start-time-track"></div>
-            </div>
-
-            <div class="time-scroll-track-wrapper">
-              <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
-                <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
-              </div>
-              <div class="time-scroll-track" id="end-time-track"></div>
-            </div>
-
-            <div id="ev-datetime-summary"></div>
-          </div>
+          ${renderDateTimeControlsHtml("")}
 
           <div class="form-group mb-3">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -4885,48 +4963,7 @@ async function openEditEventModal(eventId) {
           <input type="text" id="edit-ev-title" class="form-control" value="${safeTitle}" required style="font-size: 15px; font-weight: 600;">
         </div>
 
-        <!-- SANA VA VAQT BOSHQARUVI (MAXSUS KALENDAR & GORIZONTAL SCROLLER) -->
-        <div style="background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <label style="font-weight: 800; font-size: 14px; color: #0F172A; display: flex; align-items: center; gap: 6px; margin: 0;">
-              📅 Tadbir Sanasi va Vaqti (Sodda & Xatosiz) *
-            </label>
-          </div>
-
-          <!-- 1. SANA (KALENDAR KO'RINISHI - O'TGAN KUNLAR BLOKLANGAN) -->
-          <div style="margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <span style="font-size: 12px; font-weight: 700; color: #334155;">1. Tadbir kuni (O'tgan kunlar tanlanmaydi):</span>
-              <div style="display: flex; gap: 4px;">
-                <button type="button" id="edit_date-btn-today" class="btn btn-sm btn-outline edit_date-quick-btn" onclick="setEventQuickDate('today', 'edit_')" style="font-size: 11px; padding: 2px 8px;">Bugun</button>
-                <button type="button" id="edit_date-btn-tomorrow" class="btn btn-sm btn-outline edit_date-quick-btn" onclick="setEventQuickDate('tomorrow', 'edit_')" style="font-size: 11px; padding: 2px 8px;">Ertaga</button>
-                <button type="button" id="edit_date-btn-afterTomorrow" class="btn btn-sm btn-outline edit_date-quick-btn" onclick="setEventQuickDate('afterTomorrow', 'edit_')" style="font-size: 11px; padding: 2px 8px;">Indinga</button>
-              </div>
-            </div>
-            <div id="edit_cal-container" class="custom-calendar-widget"></div>
-          </div>
-
-          <!-- 2. BOSHLANISH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
-          <div class="time-scroll-track-wrapper">
-            <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-              <span>⏰ 2. Boshlanish vaqti</span>
-              <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
-            </div>
-            <div class="time-scroll-track" id="edit_start-time-track"></div>
-          </div>
-
-          <!-- 3. TUGASH VAQTI (BITTA GORIZONTAL SATRDA SCROLL) -->
-          <div class="time-scroll-track-wrapper">
-            <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-              <span>⌛ 3. Davomiyligi va Tugash vaqti</span>
-              <span style="font-size: 11px; color: #64748B; font-weight: normal;">(Gorizontal suring va tanlang):</span>
-            </div>
-            <div class="time-scroll-track" id="edit_end-time-track"></div>
-          </div>
-
-          <!-- 4. TASDIQ XULOSASI VA OK TUGMASI -->
-          <div id="edit_ev-datetime-summary"></div>
-        </div>
+        ${renderDateTimeControlsHtml("edit_")}
 
         <div class="form-group mb-3">
           <label class="form-label">O'tkazilish joyi (Bino / Zal) *</label>
@@ -5013,7 +5050,7 @@ async function openEditEventModal(eventId) {
       </button>
     `;
 
-    openModal();
+    openModal('xl');
     initEventDateTimeControls('edit_', event.starts_at, event.ends_at);
   } catch (err) {
     alert("Xatolik: " + err.message);
