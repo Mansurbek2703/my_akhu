@@ -142,15 +142,16 @@ function getDefaultPageForRoles(roles = []) {
 // Muayyan sahifa foydalanuvchi roliga ruxsat etilganmi?
 function isPagePermittedForUser(pageName, userRoles = []) {
   if (!userRoles || userRoles.length === 0) return false;
+
+  // Tyutor kabineti - faqat tyutorlar uchun (superadmin hisobida ochilmaydi)
+  if (pageName.startsWith('tutor-')) {
+    return !userRoles.includes('superadmin') && userRoles.includes('tutor');
+  }
+
   if (userRoles.includes('superadmin')) return true;
 
   // Barcha xodimlar shaxsiy profilini, davomatni va LMS monitoringni ko'ra oladi
   if (pageName === 'staff-my-profile' || pageName === 'campus-attendance-manage' || pageName === 'lms-monitoring') return true;
-
-  // Tyutor kabineti
-  if (pageName.startsWith('tutor-')) {
-    return userRoles.includes('tutor');
-  }
 
   // Talabalar boshqaruvi (Registrator va Superadmin)
   if (pageName === 'admin-students-manage' || pageName === 'dept-students-manage') {
@@ -544,7 +545,9 @@ function updateSidebarPermissions() {
     let visible = false;
 
     if (AppState.isLoggedIn) {
-      if (forRole === 'staff' || forRole === 'attendance' || forRole === 'events') {
+      if (forRole === 'tutor') {
+        visible = !isSuper && userRoles.includes('tutor'); // Superadmin hisobida tyutor kabineti chiqmaydi
+      } else if (forRole === 'staff' || forRole === 'attendance' || forRole === 'events') {
         visible = true; // Barcha xodimlar shaxsiy profilini, davomatni va tadbirlarni ko'radi
       } else if (isSuperMode) {
         visible = true; // Superadmin Super Mode da barcha bo'limlarni ko'radi
