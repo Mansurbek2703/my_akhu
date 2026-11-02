@@ -630,6 +630,97 @@ async function syncAll() {
 }
 
 /**
+ * Kursning o'quv yilini (1-kurs, 2-kurs va h.k.) aniqlash
+ */
+function getCourseAcademicYear(courseId, courseCode, courseName) {
+  if (courseId === 39) return 0; // Barcha kurslar uchun umumiy (Kelajak Soati)
+  if (courseId === 31 || (courseCode && courseCode.includes('CS111'))) return 2; // CS111 AKHU da 2-kursda o'qitiladi
+
+  // lms_timetable dagi guruhlar orqali aniqlash
+  const sampleGroup = db.prepare(`
+    SELECT group_code FROM lms_timetable 
+    WHERE course_id = ? AND group_code IS NOT NULL AND group_code != '' 
+    LIMIT 1
+  `).get(courseId);
+
+  if (sampleGroup && sampleGroup.group_code) {
+    const gc = sampleGroup.group_code.toUpperCase();
+    if (gc.startsWith('F')) return 1;
+    if (gc.startsWith('S')) return 2;
+    if (gc.startsWith('M')) return 3;
+  }
+
+  // Kod yoki nomdagi raqam bo'yicha aniqlash (1xx -> 1-kurs, 2xx -> 2-kurs)
+  const text = `${courseCode || ''} ${courseName || ''}`;
+  const m = text.match(/\b[A-Za-z]+([1-4])\d{2}\b/);
+  if (m) return parseInt(m[1], 10);
+  return 1;
+}
+
+/**
+ * Talabaning guruhi va o'quv yiliga mos barcha kurs ID lari (LMS Course IDs)
+ */
+function getEligibleCoursesForStudent(student) {
+  const group = (student.group_code || '').trim().toUpperCase();
+  const year = student.course || (group.startsWith('F') ? 1 : (group.startsWith('S') ? 2 : (group.startsWith('M') ? 3 : 1)));
+  const prefix = group.slice(0, 3); // FMC, FDT, SSE, SAI, SDT, MAI
+
+  // 1. Rasmiy yozilgan kurslar
+  let enrolledCourseIds = [];
+  if (student.moodle_id) {
+    enrolledCourseIds = db.prepare(`
+      SELECT DISTINCT course_id FROM lms_course_enrollment WHERE moodle_student_id = ?
+    `).all(student.moodle_id).map(r => r.course_id);
+  }
+  if (enrolledCourseIds.length === 0) {
+    enrolledCourseIds = db.prepare(`
+      SELECT DISTINCT course_id FROM lms_course_enrollment WHERE student_id = ?
+    `).all(student.id).map(r => r.course_id);
+  }
+
+  // 2. Ushbu guruh uchun aniq dars/amaliyot biriktirilgan kurslar
+  const groupCourseIds = db.prepare(`
+    SELECT DISTINCT course_id FROM lms_timetable WHERE group_code = ?
+  `).all(group).map(r => r.course_id);
+
+  // 3. 2026-2027 o'quv yili faol kurslari
+  const allCourses = db.prepare(`
+    SELECT id, code, name FROM lms_course 
+    WHERE id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
+  `).all();
+
+  const finalCourseIds = new Set([...enrolledCourseIds, ...groupCourseIds]);
+
+  for (const c of allCourses) {
+    const cYear = getCourseAcademicYear(c.id, c.code, c.name);
+    if (cYear === 0) {
+      finalCourseIds.add(c.id);
+      continue;
+    }
+    if (cYear !== year) continue;
+
+    const tutGroups = db.prepare(`
+      SELECT DISTINCT group_code FROM lms_timetable 
+      WHERE course_id = ? AND group_code IS NOT NULL AND group_code != ''
+    `).all(c.id).map(r => r.group_code.toUpperCase());
+
+    if (tutGroups.length === 0) {
+      const isAeroOrDroneOnly = [17, 18, 19, 20, 21].includes(c.id);
+      if (isAeroOrDroneOnly) {
+        if (prefix === 'FDT' || prefix === 'SDT') finalCourseIds.add(c.id);
+      } else {
+        finalCourseIds.add(c.id);
+      }
+    } else {
+      const hasPrefixMatch = tutGroups.some(g => g.startsWith(prefix) || (prefix.startsWith('FMC') && g.startsWith('FMC')));
+      if (hasPrefixMatch) finalCourseIds.add(c.id);
+    }
+  }
+
+  return Array.from(finalCourseIds);
+}
+
+/**
  * Talaba uchun Dars Jadvalini olish (Mini App)
  * Har bir talaba faqat o'z guruhi va o'z kurslariga tegishli darslarni ko'radi!
  */
@@ -637,59 +728,77 @@ function getStudentTimetable(studentId) {
   const student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(studentId, studentId);
   if (!student) return { error: 'Talaba topilmadi' };
 
-  const studentGroup = (student.group_code || '').trim();
+  const studentGroup = (student.group_code || '').trim().toUpperCase();
+  const isYear1 = (student.course === 1 || studentGroup.startsWith('F'));
+  const isYear2 = (student.course === 2 || studentGroup.startsWith('S'));
 
-  // 1. Talaba a'zo bo'lgan LMS kurslari
-  let enrolledCourses = [];
-  if (student.moodle_id) {
-    enrolledCourses = db.prepare(`
-      SELECT DISTINCT course_id FROM lms_course_enrollment WHERE moodle_student_id = ?
-    `).all(student.moodle_id).map(r => r.course_id);
-  }
+  // Talaba uchun barcha mos kurslar (o'quv yili, ma'ruzalar va o'z guruhi amaliyotlari)
+  const eligibleCourseIds = getEligibleCoursesForStudent(student);
 
-  if (enrolledCourses.length === 0) {
-    enrolledCourses = db.prepare(`
-      SELECT DISTINCT course_id FROM lms_student_attendance WHERE student_id = ?
-    `).all(student.id).map(r => r.course_id);
-  }
-
-  // 2. Dars jadvalidan talabaning guruhi va kurslariga mos darslarni saralab olish
   let timetableEvents = [];
-
-  if (studentGroup && enrolledCourses.length > 0) {
-    const placeholders = enrolledCourses.map(() => '?').join(',');
-    // Faqat: Talabaning o'z guruhi YOKI (guruh ko'rsatilmagan umumiy ma'ruza va uning kursi)
+  if (studentGroup && eligibleCourseIds.length > 0) {
+    const placeholders = eligibleCourseIds.map(() => '?').join(',');
     const sql = `
       SELECT * FROM lms_timetable 
       WHERE (group_code = ? OR group_name LIKE ?)
          OR ((group_code IS NULL OR group_code = '') AND course_id IN (${placeholders}))
       ORDER BY weekday ASC, timestart ASC
     `;
-    timetableEvents = db.prepare(sql).all(studentGroup, `%${studentGroup}%`, ...enrolledCourses);
+    timetableEvents = db.prepare(sql).all(studentGroup, `%${studentGroup}%`, ...eligibleCourseIds);
   } else if (studentGroup) {
-    // Agar kurs ID lari bo'lmasa, faqat uning guruhi bo'yicha darslar
     const sql = `
       SELECT * FROM lms_timetable 
       WHERE (group_code = ? OR group_name LIKE ?)
       ORDER BY weekday ASC, timestart ASC
     `;
     timetableEvents = db.prepare(sql).all(studentGroup, `%${studentGroup}%`);
-  } else if (enrolledCourses.length > 0) {
-    // Agar guruh bo'lmasa, faqat kursning guruhsiz umumiy ma'ruzalari
-    const placeholders = enrolledCourses.map(() => '?').join(',');
+  } else if (eligibleCourseIds.length > 0) {
+    const placeholders = eligibleCourseIds.map(() => '?').join(',');
     const sql = `
       SELECT * FROM lms_timetable 
       WHERE course_id IN (${placeholders})
         AND (group_code IS NULL OR group_code = '')
       ORDER BY weekday ASC, timestart ASC
     `;
-    timetableEvents = db.prepare(sql).all(...enrolledCourses);
-  } else {
-    // Agar na guruh, na kurs bo'lsa, begona guruh darslarini ko'rsatmaslik uchun bo'sh ro'yxat
-    timetableEvents = [];
+    timetableEvents = db.prepare(sql).all(...eligibleCourseIds);
   }
 
-  // 3. Hafta kunlari bo'yicha guruhlash (1 = Dushanba ... 6 = Shanba)
+  // Hafta kunlari va vaqt slotlari bo'yicha saralash va guruh amaliyotini ustun qo'yish
+  const slotMap = new Map();
+  for (const ev of timetableEvents) {
+    // 1-kurs talabalariga 2-kurs ma'ruzasi tushib qolishini oldini olish
+    if (isYear1 && ev.subject_code && ev.subject_code.startsWith('PHYS111')) continue;
+    if (isYear2 && ev.subject_code && ev.subject_code.startsWith('PHYS101')) continue;
+
+    const slotKey = `${ev.weekday}_${ev.time_str}`;
+    if (!slotMap.has(slotKey)) {
+      slotMap.set(slotKey, []);
+    }
+    slotMap.get(slotKey).push(ev);
+  }
+
+  const resolvedLessons = [];
+  for (const [slotKey, list] of slotMap.entries()) {
+    const specific = list.filter(e => e.group_code && (e.group_code.toUpperCase() === studentGroup || (e.group_name && e.group_name.toUpperCase().includes(studentGroup))));
+    if (specific.length > 0) {
+      resolvedLessons.push(...specific);
+    } else {
+      const seenNames = new Set();
+      for (const gen of list) {
+        if (!seenNames.has(gen.subject_name)) {
+          seenNames.add(gen.subject_name);
+          resolvedLessons.push(gen);
+        }
+      }
+    }
+  }
+
+  resolvedLessons.sort((a, b) => {
+    if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+    return a.timestart - b.timestart;
+  });
+
+  // Hafta kunlari bo'yicha guruhlash (1 = Dushanba ... 6 = Shanba)
   const weekdaysMap = {
     1: { day: 1, name: 'Dushanba', lessons: [] },
     2: { day: 2, name: 'Seshanba', lessons: [] },
@@ -699,17 +808,15 @@ function getStudentTimetable(studentId) {
     6: { day: 6, name: 'Shanba', lessons: [] }
   };
 
-  // Toshkent vaqti bo'yicha joriy hafta kunini aniqlash (1..7, 7 = Yakshanba)
   const nowTashkent = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }));
-  const rawDay = nowTashkent.getDay(); // 0 = Yakshanba, 1 = Dushanba ...
+  const rawDay = nowTashkent.getDay();
   const currentDay = rawDay === 0 ? 7 : rawDay;
   const tomorrowDay = (currentDay % 7) + 1;
 
-  // Unikal dars slotlarini ajratish (hafta kuni + vaqt + fan nomi)
   const seenClassKeys = new Set();
   const allUniqueLessons = [];
 
-  for (const ev of timetableEvents) {
+  for (const ev of resolvedLessons) {
     const key = `${ev.weekday}_${ev.time_str}_${ev.subject_name}`;
     if (!seenClassKeys.has(key)) {
       seenClassKeys.add(key);

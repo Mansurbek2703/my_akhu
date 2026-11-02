@@ -26,12 +26,12 @@ console.log("TALABALAR BOSQICHLARI:", db.prepare("SELECT level, count(*) as coun
 console.log("TUTOR GURUHLARI:", db.prepare("SELECT * FROM tutor_group").all());
 console.log("TALABA-TYUTOR TAQSIMOTI:", db.prepare("SELECT tutor_id, count(*) as count FROM student GROUP BY tutor_id").all());
 
-const { awardWelcomeBonus } = require("./src/services/pointService");
-const linkedStudents = db.prepare("SELECT id FROM student WHERE telegram_user_id IS NOT NULL").all();
-for (const s of linkedStudents) {
-  awardWelcomeBonus(s.id);
-}
-console.log("TELEGRAM BOGLANGAN TALABALARGA ILK BONUS TEKSHIRILDI VA TAQDIM ETILDI");
+// const { awardWelcomeBonus } = require("./src/services/pointService");
+// const linkedStudents = db.prepare("SELECT id FROM student WHERE telegram_user_id IS NOT NULL").all();
+// for (const s of linkedStudents) {
+//   awardWelcomeBonus(s.id);
+// }
+
 '
 
 pm2 restart akhu-talabalar

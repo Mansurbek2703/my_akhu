@@ -84,8 +84,22 @@ router.get('/timetable', (req, res) => {
       params.push(Number(course_id));
     }
     if (group) {
-      query += ` AND (group_code = ? OR group_name ILIKE ?)`;
-      params.push(group, `%${group}%`);
+      const g = group.trim().toUpperCase();
+      const prefix = g.slice(0, 3);
+      let yearCourses = [];
+      if (prefix === 'FMC') yearCourses = [22, 23, 24, 25, 26, 39];
+      else if (prefix === 'FDT') yearCourses = [21, 23, 24, 25, 26, 39];
+      else if (prefix === 'SSE' || prefix === 'SAI') yearCourses = [17, 29, 30, 31, 32, 33, 39];
+      else if (prefix === 'SDT') yearCourses = [17, 18, 19, 20, 21, 39];
+
+      if (yearCourses.length > 0) {
+        const ph = yearCourses.map(() => '?').join(',');
+        query += ` AND ((group_code = ? OR group_name ILIKE ?) OR ((group_code IS NULL OR group_code = '') AND course_id IN (${ph})))`;
+        params.push(group, `%${group}%`, ...yearCourses);
+      } else {
+        query += ` AND (group_code = ? OR group_name ILIKE ?)`;
+        params.push(group, `%${group}%`);
+      }
     }
     if (search) {
       query += ` AND (subject_name ILIKE ? OR teacher_name ILIKE ? OR room ILIKE ? OR group_name ILIKE ?)`;
