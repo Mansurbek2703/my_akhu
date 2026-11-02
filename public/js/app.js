@@ -3239,18 +3239,42 @@ async function renderDeptEvents(container) {
             // Bo'limlar status helperi
             const renderDeptBadge = (title, iconEmoji, status, note, by) => {
               let bg = '#FEF3C7', color = '#B45309', label = 'Kutilmoqda';
+              let ic = iconEmoji;
               if (status === 'agreed' || status === 'approved') {
-                bg = '#ECFDF5'; color = '#059669'; label = 'Kelishildi';
+                bg = '#ECFDF5'; color = '#059669'; label = 'Kelishildi'; ic = '✅';
               } else if (status === 'rejected') {
-                bg = '#FEF2F2'; color = '#DC2626'; label = 'E\'tiroz';
+                bg = '#FEF2F2'; color = '#DC2626'; label = 'E\'tiroz'; ic = '❌';
+              } else if (status === 'not_required') {
+                bg = '#F1F5F9'; color = '#64748B'; label = 'Talab etilmagan'; ic = '⚪️';
               }
               const tooltip = note ? `${title}: ${label} (${note} - ${by || ''})` : `${title}: ${label}`;
               return `
                 <div style="background:${bg}; color:${color}; border-radius:6px; padding:4px 7px; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px; border:1px solid rgba(0,0,0,0.06);" title="${tooltip}">
-                  <span>${iconEmoji}</span> <span>${title}:</span> <span>${label}</span>
+                  <span>${ic}</span> <span>${title}:</span> <span>${label}</span>
                 </div>
               `;
             };
+
+            // Qaysi bo'limlar haqiqatda talab etilgan va tasdiqlanishi kutilmoqda
+            const deptsNeeded = [];
+            if (ev.agreement_xb_status !== 'not_required') deptsNeeded.push({ name: "Xo'jalik", done: ev.agreement_xb_status === 'agreed' });
+            if (ev.agreement_atm_status !== 'not_required') deptsNeeded.push({ name: "IT (ATM)", done: ev.agreement_atm_status === 'agreed' });
+            if (ev.agreement_ob_status !== 'not_required') deptsNeeded.push({ name: "O'quv bo'limi", done: ev.agreement_ob_status === 'agreed' });
+            deptsNeeded.push({ name: "Ish yurituvchi", done: ev.approval_final_status === 'approved' || ev.status === 'published' });
+
+            const pendingDepts = deptsNeeded.filter(d => !d.done);
+            let pendingBadgeText = "";
+            if (pendingDepts.length === 1) {
+              pendingBadgeText = `⏳ ${pendingDepts[0].name} tasdig'i kutilmoqda`;
+            } else if (pendingDepts.length > 1) {
+              if (pendingDepts.length === deptsNeeded.length) {
+                pendingBadgeText = `⏳ ${deptsNeeded.length} ta bo'lim kelishuvi kutilmoqda`;
+              } else {
+                pendingBadgeText = `⏳ ${pendingDepts.length} ta tasdiq kutilmoqda`;
+              }
+            } else {
+              pendingBadgeText = `✅ Tasdiqlangan`;
+            }
 
             return `
               <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${isEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
@@ -3285,7 +3309,7 @@ async function renderDeptEvents(container) {
                         </span>
                         ${isPendingAgreement ? `
                           <span class="badge" style="background: #FEF3C7; color: #D97706; border: 1px solid #FCD34D; font-size: 11px; font-weight: 700;">
-                            ⏳ 4 Bo'lim Kelishuvi Kutilmoqda
+                            ${pendingBadgeText}
                           </span>
                         ` : isEnded ? `
                           <span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 700;">⚠️ Yakunlangan (Davomat yopiq)</span>
@@ -3324,31 +3348,41 @@ async function renderDeptEvents(container) {
 
                       // 1. XO'JALIK BO'LIMI XODIMI KO'RADIGAN MAXSUS QISM
                       if (isOnlyXb) {
+                        const isXbNotReq = ev.agreement_xb_status === 'not_required';
+                        const isXbAgreed = ev.agreement_xb_status === 'agreed';
+                        const isXbRejected = ev.agreement_xb_status === 'rejected';
+                        const isXbPending = ev.agreement_xb_status === 'pending';
+
                         return `
-                          <div style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border: 1.5px solid #F59E0B; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.12);">
+                          <div style="background: ${isXbNotReq ? '#F8FAFC' : 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)'}; border: 1.5px solid ${isXbNotReq ? '#CBD5E1' : '#F59E0B'}; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                              <span style="font-size:12px; font-weight:800; color:#B45309; display:flex; align-items:center; gap:5px;">
+                              <span style="font-size:12px; font-weight:800; color:${isXbNotReq ? '#475569' : '#B45309'}; display:flex; align-items:center; gap:5px;">
                                 <span>🏢</span> SIZNING BO'LIM: XO'JALIK BO'LIMI KELISHUVI
                               </span>
-                              ${ev.agreement_xb_status === 'agreed' ? '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">✓ KELISHILGAN</span>' :
-                                ev.agreement_xb_status === 'rejected' ? '<span class="badge" style="background:#EF4444; color:white; font-size:10.5px; font-weight:700;">✗ RAD ETILGAN</span>' :
+                              ${isXbAgreed ? '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">✓ KELISHILGAN</span>' :
+                                isXbNotReq ? '<span class="badge" style="background:#64748B; color:white; font-size:10.5px; font-weight:700;">⚪️ TALAB ETILMAGAN</span>' :
+                                isXbRejected ? '<span class="badge" style="background:#EF4444; color:white; font-size:10.5px; font-weight:700;">✗ RAD ETILGAN</span>' :
                                 '<span class="badge" style="background:#F59E0B; color:white; font-size:10.5px; font-weight:700;">⏳ SIZNING QARORINGIZ KUTILMOQDA</span>'}
                             </div>
                             
-                            <div style="background:white; border:1px solid #FDE68A; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
-                              <div style="font-size:10.5px; font-weight:700; color:#92400E; text-transform:uppercase; letter-spacing:0.04em;">
+                            <div style="background:white; border:1px solid ${isXbNotReq ? '#E2E8F0' : '#FDE68A'}; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+                              <div style="font-size:10.5px; font-weight:700; color:${isXbNotReq ? '#64748B' : '#92400E'}; text-transform:uppercase; letter-spacing:0.04em;">
                                 📋 Sizning bo'limdan so'ralgan moddiy baza:
                               </div>
-                              <div style="font-size:13px; font-weight:700; color:#1E293B; margin-top:2px; line-height:1.4;">
-                                ${ev.req_xb_note || 'Zal, stol, stul va moddiy-texnik ta\'minot'}
+                              <div style="font-size:13px; font-weight:700; color:${isXbNotReq ? '#64748B' : '#1E293B'}; margin-top:2px; line-height:1.4;">
+                                ${ev.req_xb_note || (isXbNotReq ? 'Moddiy baza yoki jihozlar so\'ralmagan (Zarurat yo\'q)' : 'Zal, stol, stul va moddiy-texnik ta\'minot')}
                               </div>
                             </div>
 
-                            ${ev.agreement_xb_status === 'pending' ? `
+                            ${isXbNotReq ? `
+                              <div style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px;">
+                                <span>⚪️ Ushbu tadbir uchun Sizning bo'lim kelishuvi talab etilmaydi (kerakli jihozlar ko'rsatilmagan).</span>
+                              </div>
+                            ` : isXbPending ? `
                               <button class="btn btn-block" onclick="openEventAgreementModal('${ev.id}', 'xb')" style="width:100%; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color:white; font-weight:800; font-size:13.5px; padding:10px 14px; border-radius:8px; border:none; box-shadow:0 4px 12px rgba(217,119,6,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 ⚡️ 🏢 XO'JALIK BO'LIMI: QARORNI BILDIRISH (TASDIQLASH / RAD ETISH)
                               </button>
-                            ` : ev.agreement_xb_status === 'agreed' ? `
+                            ` : isXbAgreed ? `
                               <div style="font-size:12px; color:#065F46; display:flex; justify-content:space-between; align-items:center;">
                                 <span>✅ Siz tomoningizdan kelishildi ${ev.agreement_xb_by ? `(${ev.agreement_xb_by})` : ''} ${ev.agreement_xb_note ? `&mdash; "${ev.agreement_xb_note}"` : ''}</span>
                                 <button class="btn btn-sm btn-link" onclick="openEventAgreementModal('${ev.id}', 'xb')" style="font-size:11px; color:#059669; font-weight:700; padding:0;">[O'zgartirish]</button>
@@ -3360,10 +3394,10 @@ async function renderDeptEvents(container) {
                               </div>
                             `}
 
-                            <div style="margin-top:8px; font-size:11px; color:#78350F; display:flex; gap:10px; border-top:1px dashed #FDE68A; padding-top:6px;">
+                            <div style="margin-top:8px; font-size:11px; color:#64748B; display:flex; gap:10px; border-top:1px dashed ${isXbNotReq ? '#E2E8F0' : '#FDE68A'}; padding-top:6px; flex-wrap:wrap;">
                               <span>Boshqa bo'limlar:</span>
-                              <span>IT: ${ev.agreement_atm_status === 'agreed' ? '✅' : ev.agreement_atm_status === 'rejected' ? '❌' : '⏳'}</span>
-                              <span>O'quv: ${ev.agreement_ob_status === 'agreed' ? '✅' : ev.agreement_ob_status === 'rejected' ? '❌' : '⏳'}</span>
+                              <span>IT: ${ev.agreement_atm_status === 'agreed' ? '✅' : ev.agreement_atm_status === 'not_required' ? '⚪️ Kerakmas' : ev.agreement_atm_status === 'rejected' ? '❌' : '⏳'}</span>
+                              <span>O'quv: ${ev.agreement_ob_status === 'agreed' ? '✅' : ev.agreement_ob_status === 'not_required' ? '⚪️ Kerakmas' : ev.agreement_ob_status === 'rejected' ? '❌' : '⏳'}</span>
                               <span>Ish yurituvchi: ${ev.approval_final_status === 'approved' ? '✅' : '⏳'}</span>
                             </div>
                           </div>
@@ -3372,31 +3406,41 @@ async function renderDeptEvents(container) {
 
                       // 2. AXBOROT TEXNOLOGIYALARI MARKAZI XODIMI KO'RADIGAN MAXSUS QISM
                       if (isOnlyAtm) {
+                        const isAtmNotReq = ev.agreement_atm_status === 'not_required';
+                        const isAtmAgreed = ev.agreement_atm_status === 'agreed';
+                        const isAtmRejected = ev.agreement_atm_status === 'rejected';
+                        const isAtmPending = ev.agreement_atm_status === 'pending';
+
                         return `
-                          <div style="background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%); border: 1.5px solid #0284C7; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);">
+                          <div style="background: ${isAtmNotReq ? '#F8FAFC' : 'linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%)'}; border: 1.5px solid ${isAtmNotReq ? '#CBD5E1' : '#0284C7'}; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                              <span style="font-size:12px; font-weight:800; color:#0369A1; display:flex; align-items:center; gap:5px;">
+                              <span style="font-size:12px; font-weight:800; color:${isAtmNotReq ? '#475569' : '#0369A1'}; display:flex; align-items:center; gap:5px;">
                                 <span>💻</span> SIZNING BO'LIM: AXBOROT TEXNOLOGIYALARI MARKAZI (IT) KELISHUVI
                               </span>
-                              ${ev.agreement_atm_status === 'agreed' ? '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">✓ KELISHILGAN</span>' :
-                                ev.agreement_atm_status === 'rejected' ? '<span class="badge" style="background:#EF4444; color:white; font-size:10.5px; font-weight:700;">✗ RAD ETILGAN</span>' :
+                              ${isAtmAgreed ? '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">✓ KELISHILGAN</span>' :
+                                isAtmNotReq ? '<span class="badge" style="background:#64748B; color:white; font-size:10.5px; font-weight:700;">⚪️ TALAB ETILMAGAN</span>' :
+                                isAtmRejected ? '<span class="badge" style="background:#EF4444; color:white; font-size:10.5px; font-weight:700;">✗ RAD ETILGAN</span>' :
                                 '<span class="badge" style="background:#0284C7; color:white; font-size:10.5px; font-weight:700;">⏳ SIZNING QARORINGIZ KUTILMOQDA</span>'}
                             </div>
                             
-                            <div style="background:white; border:1px solid #BAE6FD; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
-                              <div style="font-size:10.5px; font-weight:700; color:#0369A1; text-transform:uppercase; letter-spacing:0.04em;">
+                            <div style="background:white; border:1px solid ${isAtmNotReq ? '#E2E8F0' : '#BAE6FD'}; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+                              <div style="font-size:10.5px; font-weight:700; color:${isAtmNotReq ? '#64748B' : '#0369A1'}; text-transform:uppercase; letter-spacing:0.04em;">
                                 📋 Sizning markazdan so'ralgan texnik jihozlar / IT xizmati:
                               </div>
-                              <div style="font-size:13px; font-weight:700; color:#1E293B; margin-top:2px; line-height:1.4;">
-                                ${ev.req_atm_note || 'Speaker, mikrofon, monitor va IT ta\'minot'}
+                              <div style="font-size:13px; font-weight:700; color:${isAtmNotReq ? '#64748B' : '#1E293B'}; margin-top:2px; line-height:1.4;">
+                                ${ev.req_atm_note || (isAtmNotReq ? 'Texnik jihoz yoki xizmat so\'ralmagan (Zarurat yo\'q)' : 'Speaker, mikrofon, monitor va IT ta\'minot')}
                               </div>
                             </div>
 
-                            ${ev.agreement_atm_status === 'pending' ? `
+                            ${isAtmNotReq ? `
+                              <div style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px;">
+                                <span>⚪️ Ushbu tadbir uchun Sizning markaz kelishuvi talab etilmaydi (texnik talab kiritilmagan).</span>
+                              </div>
+                            ` : isAtmPending ? `
                               <button class="btn btn-block" onclick="openEventAgreementModal('${ev.id}', 'atm')" style="width:100%; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); color:white; font-weight:800; font-size:13.5px; padding:10px 14px; border-radius:8px; border:none; box-shadow:0 4px 12px rgba(2,132,199,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 ⚡️ 💻 IT MARKAZI: QARORNI BILDIRISH (TASDIQLASH / RAD ETISH)
                               </button>
-                            ` : ev.agreement_atm_status === 'agreed' ? `
+                            ` : isAtmAgreed ? `
                               <div style="font-size:12px; color:#065F46; display:flex; justify-content:space-between; align-items:center;">
                                 <span>✅ Siz tomoningizdan kelishildi ${ev.agreement_atm_by ? `(${ev.agreement_atm_by})` : ''} ${ev.agreement_atm_note ? `&mdash; "${ev.agreement_atm_note}"` : ''}</span>
                                 <button class="btn btn-sm btn-link" onclick="openEventAgreementModal('${ev.id}', 'atm')" style="font-size:11px; color:#059669; font-weight:700; padding:0;">[O'zgartirish]</button>
@@ -3408,10 +3452,10 @@ async function renderDeptEvents(container) {
                               </div>
                             `}
 
-                            <div style="margin-top:8px; font-size:11px; color:#075985; display:flex; gap:10px; border-top:1px dashed #BAE6FD; padding-top:6px;">
+                            <div style="margin-top:8px; font-size:11px; color:#64748B; display:flex; gap:10px; border-top:1px dashed ${isAtmNotReq ? '#E2E8F0' : '#BAE6FD'}; padding-top:6px; flex-wrap:wrap;">
                               <span>Boshqa bo'limlar:</span>
-                              <span>Xo'jalik: ${ev.agreement_xb_status === 'agreed' ? '✅' : ev.agreement_xb_status === 'rejected' ? '❌' : '⏳'}</span>
-                              <span>O'quv: ${ev.agreement_ob_status === 'agreed' ? '✅' : ev.agreement_ob_status === 'rejected' ? '❌' : '⏳'}</span>
+                              <span>Xo'jalik: ${ev.agreement_xb_status === 'agreed' ? '✅' : ev.agreement_xb_status === 'not_required' ? '⚪️ Kerakmas' : ev.agreement_xb_status === 'rejected' ? '❌' : '⏳'}</span>
+                              <span>O'quv: ${ev.agreement_ob_status === 'agreed' ? '✅' : ev.agreement_ob_status === 'not_required' ? '⚪️ Kerakmas' : ev.agreement_ob_status === 'rejected' ? '❌' : '⏳'}</span>
                               <span>Ish yurituvchi: ${ev.approval_final_status === 'approved' ? '✅' : '⏳'}</span>
                             </div>
                           </div>
@@ -3420,31 +3464,41 @@ async function renderDeptEvents(container) {
 
                       // 3. O'QUV BO'LIMI XODIMI KO'RADIGAN MAXSUS QISM
                       if (isOnlyOb) {
+                        const isObNotReq = ev.agreement_ob_status === 'not_required';
+                        const isObAgreed = ev.agreement_ob_status === 'agreed';
+                        const isObRejected = ev.agreement_ob_status === 'rejected';
+                        const isObPending = ev.agreement_ob_status === 'pending';
+
                         return `
-                          <div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); border: 1.5px solid #10B981; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);">
+                          <div style="background: ${isObNotReq ? '#F8FAFC' : 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)'}; border: 1.5px solid ${isObNotReq ? '#CBD5E1' : '#10B981'}; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                              <span style="font-size:12px; font-weight:800; color:#047857; display:flex; align-items:center; gap:5px;">
+                              <span style="font-size:12px; font-weight:800; color:${isObNotReq ? '#475569' : '#047857'}; display:flex; align-items:center; gap:5px;">
                                 <span>📚</span> SIZNING BO'LIM: O'QUV BO'LIMI KELISHUVI
                               </span>
-                              ${ev.agreement_ob_status === 'agreed' ? '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">✓ KELISHILGAN</span>' :
-                                ev.agreement_ob_status === 'rejected' ? '<span class="badge" style="background:#EF4444; color:white; font-size:10.5px; font-weight:700;">✗ RAD ETILGAN</span>' :
+                              ${isObAgreed ? '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">✓ KELISHILGAN</span>' :
+                                isObNotReq ? '<span class="badge" style="background:#64748B; color:white; font-size:10.5px; font-weight:700;">⚪️ TALAB ETILMAGAN</span>' :
+                                isObRejected ? '<span class="badge" style="background:#EF4444; color:white; font-size:10.5px; font-weight:700;">✗ RAD ETILGAN</span>' :
                                 '<span class="badge" style="background:#10B981; color:white; font-size:10.5px; font-weight:700;">⏳ SIZNING QARORINGIZ KUTILMOQDA</span>'}
                             </div>
                             
-                            <div style="background:white; border:1px solid #BBF7D0; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
-                              <div style="font-size:10.5px; font-weight:700; color:#047857; text-transform:uppercase; letter-spacing:0.04em;">
+                            <div style="background:white; border:1px solid ${isObNotReq ? '#E2E8F0' : '#BBF7D0'}; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+                              <div style="font-size:10.5px; font-weight:700; color:${isObNotReq ? '#64748B' : '#047857'}; text-transform:uppercase; letter-spacing:0.04em;">
                                 📋 Sizning bo'limdan so'ralgan auditoriya / jadval muvofiqligi:
                               </div>
-                              <div style="font-size:13px; font-weight:700; color:#1E293B; margin-top:2px; line-height:1.4;">
-                                ${ev.req_ob_note || 'Bo\'sh xona/zal ajratish va dars jadvali muvofiqligi'}
+                              <div style="font-size:13px; font-weight:700; color:${isObNotReq ? '#64748B' : '#1E293B'}; margin-top:2px; line-height:1.4;">
+                                ${ev.req_ob_note || (isObNotReq ? 'Tashqi tadbir yoki auditoriya kelishuvi talab etilmagan' : 'Bo\'sh xona/zal ajratish va dars jadvali muvofiqligi')}
                               </div>
                             </div>
 
-                            ${ev.agreement_ob_status === 'pending' ? `
+                            ${isObNotReq ? `
+                              <div style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px;">
+                                <span>⚪️ Ushbu tadbir uchun Sizning bo'lim kelishuvi talab etilmaydi.</span>
+                              </div>
+                            ` : isObPending ? `
                               <button class="btn btn-block" onclick="openEventAgreementModal('${ev.id}', 'ob')" style="width:100%; background: linear-gradient(135deg, #10B981 0%, #047857 100%); color:white; font-weight:800; font-size:13.5px; padding:10px 14px; border-radius:8px; border:none; box-shadow:0 4px 12px rgba(16,185,129,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 ⚡️ 📚 O'QUV BO'LIMI: QARORNI BILDIRISH (TASDIQLASH / RAD ETISH)
                               </button>
-                            ` : ev.agreement_ob_status === 'agreed' ? `
+                            ` : isObAgreed ? `
                               <div style="font-size:12px; color:#065F46; display:flex; justify-content:space-between; align-items:center;">
                                 <span>✅ Siz tomoningizdan kelishildi ${ev.agreement_ob_by ? `(${ev.agreement_ob_by})` : ''} ${ev.agreement_ob_note ? `&mdash; "${ev.agreement_ob_note}"` : ''}</span>
                                 <button class="btn btn-sm btn-link" onclick="openEventAgreementModal('${ev.id}', 'ob')" style="font-size:11px; color:#059669; font-weight:700; padding:0;">[O'zgartirish]</button>
@@ -3456,10 +3510,10 @@ async function renderDeptEvents(container) {
                               </div>
                             `}
 
-                            <div style="margin-top:8px; font-size:11px; color:#065F46; display:flex; gap:10px; border-top:1px dashed #BBF7D0; padding-top:6px;">
+                            <div style="margin-top:8px; font-size:11px; color:#64748B; display:flex; gap:10px; border-top:1px dashed ${isObNotReq ? '#E2E8F0' : '#BBF7D0'}; padding-top:6px; flex-wrap:wrap;">
                               <span>Boshqa bo'limlar:</span>
-                              <span>Xo'jalik: ${ev.agreement_xb_status === 'agreed' ? '✅' : ev.agreement_xb_status === 'rejected' ? '❌' : '⏳'}</span>
-                              <span>IT: ${ev.agreement_atm_status === 'agreed' ? '✅' : ev.agreement_atm_status === 'rejected' ? '❌' : '⏳'}</span>
+                              <span>Xo'jalik: ${ev.agreement_xb_status === 'agreed' ? '✅' : ev.agreement_xb_status === 'not_required' ? '⚪️ Kerakmas' : ev.agreement_xb_status === 'rejected' ? '❌' : '⏳'}</span>
+                              <span>IT: ${ev.agreement_atm_status === 'agreed' ? '✅' : ev.agreement_atm_status === 'not_required' ? '⚪️ Kerakmas' : ev.agreement_atm_status === 'rejected' ? '❌' : '⏳'}</span>
                               <span>Ish yurituvchi: ${ev.approval_final_status === 'approved' ? '✅' : '⏳'}</span>
                             </div>
                           </div>
@@ -3468,7 +3522,25 @@ async function renderDeptEvents(container) {
 
                       // 4. ISH YURITUVCHI XODIMI KO'RADIGAN MAXSUS QISM
                       if (isOnlyIy) {
-                        const allThreeAgreed = (ev.agreement_xb_status === 'agreed' && ev.agreement_atm_status === 'agreed' && ev.agreement_ob_status === 'agreed');
+                        const xbReady = (ev.agreement_xb_status === 'agreed' || ev.agreement_xb_status === 'not_required');
+                        const atmReady = (ev.agreement_atm_status === 'agreed' || ev.agreement_atm_status === 'not_required');
+                        const obReady = (ev.agreement_ob_status === 'agreed' || ev.agreement_ob_status === 'not_required');
+                        const allRequiredAgreed = (xbReady && atmReady && obReady);
+
+                        const renderIyDeptRow = (icon, title, status, note) => {
+                          let stHtml = '';
+                          if (status === 'agreed') {
+                            stHtml = '<span style="color:#059669; font-weight:700;">✓ Kelishilgan</span>';
+                          } else if (status === 'not_required') {
+                            stHtml = '<span style="color:#64748B; font-weight:700;">⚪️ Talab etilmagan (Kerak emas)</span>';
+                          } else if (status === 'rejected') {
+                            stHtml = '<span style="color:#DC2626; font-weight:700;">✗ Rad etilgan</span>';
+                          } else {
+                            stHtml = '<span style="color:#D97706; font-weight:700;">⏳ Kutilmoqda</span>';
+                          }
+                          return `<div>${icon} <b>${title}:</b> ${stHtml} ${note ? `("${note}")` : ''}</div>`;
+                        };
+
                         return `
                           <div style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); border: 1.5px solid #4F46E5; border-radius: 10px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.12);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -3482,22 +3554,22 @@ async function renderDeptEvents(container) {
 
                             <div style="background:white; border:1px solid #C7D2FE; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
                               <div style="font-size:10.5px; font-weight:700; color:#3730A3; margin-bottom:4px;">
-                                📋 3 ta bo'lim kelishuv xulosalari:
+                                📋 Bo'limlar kelishuv xulosalari:
                               </div>
                               <div style="font-size:12px; color:#1E293B; display:flex; flex-direction:column; gap:3px;">
-                                <div>🏢 <b>Xo'jalik:</b> ${ev.agreement_xb_status === 'agreed' ? '<span style="color:#059669; font-weight:700;">✓ Kelishilgan</span>' : ev.agreement_xb_status === 'rejected' ? '<span style="color:#DC2626; font-weight:700;">✗ Rad etilgan</span>' : '<span style="color:#D97706; font-weight:700;">⏳ Kutilmoqda</span>'} ${ev.agreement_xb_note ? `("${ev.agreement_xb_note}")` : ''}</div>
-                                <div>💻 <b>ATM (IT):</b> ${ev.agreement_atm_status === 'agreed' ? '<span style="color:#059669; font-weight:700;">✓ Kelishilgan</span>' : ev.agreement_atm_status === 'rejected' ? '<span style="color:#DC2626; font-weight:700;">✗ Rad etilgan</span>' : '<span style="color:#D97706; font-weight:700;">⏳ Kutilmoqda</span>'} ${ev.agreement_atm_note ? `("${ev.agreement_atm_note}")` : ''}</div>
-                                <div>📚 <b>O'quv:</b> ${ev.agreement_ob_status === 'agreed' ? '<span style="color:#059669; font-weight:700;">✓ Kelishilgan</span>' : ev.agreement_ob_status === 'rejected' ? '<span style="color:#DC2626; font-weight:700;">✗ Rad etilgan</span>' : '<span style="color:#D97706; font-weight:700;">⏳ Kutilmoqda</span>'} ${ev.agreement_ob_note ? `("${ev.agreement_ob_note}")` : ''}</div>
+                                ${renderIyDeptRow('🏢', 'Xo\'jalik', ev.agreement_xb_status, ev.agreement_xb_note)}
+                                ${renderIyDeptRow('💻', 'ATM (IT)', ev.agreement_atm_status, ev.agreement_atm_note)}
+                                ${renderIyDeptRow('📚', 'O\'quv', ev.agreement_ob_status, ev.agreement_ob_note)}
                               </div>
                             </div>
 
-                            ${allThreeAgreed && isPendingAgreement ? `
+                            ${allRequiredAgreed && isPendingAgreement ? `
                               <button class="btn btn-block" onclick="openFinalEventApproveModal('${ev.id}')" style="width:100%; background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); color:white; font-weight:800; font-size:13.5px; padding:10px 14px; border-radius:8px; border:none; box-shadow:0 4px 14px rgba(79,70,229,0.4); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 📑 ⚡️ BUYRUQ ASOSIDA YAKUNIY TASDIQLASH VA E'LON QILISH (PUBLISH)
                               </button>
                             ` : isPendingAgreement ? `
                               <div style="font-size:11.5px; color:#4338CA; background:#EEF2FF; padding:6px 10px; border-radius:6px; border:1px solid #C7D2FE;">
-                                ⏳ 3 ta bo'lim ham to'liq kelishgach, yakuniy tasdiqlash tugmasi faollashadi.
+                                ⏳ Talab etilgan barcha bo'limlar kelishgach, yakuniy tasdiqlash tugmasi faollashadi.
                               </div>
                             ` : ''}
                           </div>
@@ -3508,7 +3580,7 @@ async function renderDeptEvents(container) {
                       return `
                         <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
                           <div style="font-size: 11.5px; font-weight: 700; color: #334155; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-                            <span>📋 4 Ta Bo'lim Kelishuvi & Tasdig'i:</span>
+                            <span>📋 Bo'limlar Kelishuvi & Tasdig'i:</span>
                             ${isPendingAgreement ? `<span style="color:#D97706; font-size:10.5px; font-weight:600;">Jarayonda</span>` : `<span style="color:#059669; font-size:10.5px; font-weight:600;">✓ Tasdiqlangan</span>`}
                           </div>
                           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px;">
@@ -3536,14 +3608,14 @@ async function renderDeptEvents(container) {
 
                           ${isSuperadmin && isPendingAgreement ? `
                             <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #CBD5E1; display: flex; flex-wrap: wrap; gap: 6px;">
-                              <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', 'xb')" style="background:#FEF3C7; color:#B45309; border:1px solid #FCD34D; font-weight:700; font-size:11px;">
-                                🏢 Xo'jalik (${ev.agreement_xb_status})
+                              <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', 'xb')" style="background:${ev.agreement_xb_status === 'not_required' ? '#F1F5F9' : '#FEF3C7'}; color:${ev.agreement_xb_status === 'not_required' ? '#64748B' : '#B45309'}; border:1px solid ${ev.agreement_xb_status === 'not_required' ? '#CBD5E1' : '#FCD34D'}; font-weight:700; font-size:11px;">
+                                🏢 Xo'jalik (${ev.agreement_xb_status === 'not_required' ? 'talab yo\'q' : ev.agreement_xb_status})
                               </button>
-                              <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', 'atm')" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:700; font-size:11px;">
-                                💻 ATM (${ev.agreement_atm_status})
+                              <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', 'atm')" style="background:${ev.agreement_atm_status === 'not_required' ? '#F1F5F9' : '#E0F2FE'}; color:${ev.agreement_atm_status === 'not_required' ? '#64748B' : '#0369A1'}; border:1px solid ${ev.agreement_atm_status === 'not_required' ? '#CBD5E1' : '#BAE6FD'}; font-weight:700; font-size:11px;">
+                                💻 ATM (${ev.agreement_atm_status === 'not_required' ? 'talab yo\'q' : ev.agreement_atm_status})
                               </button>
-                              <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', 'ob')" style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; font-weight:700; font-size:11px;">
-                                📚 O'quv (${ev.agreement_ob_status})
+                              <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', 'ob')" style="background:${ev.agreement_ob_status === 'not_required' ? '#F1F5F9' : '#F0FDF4'}; color:${ev.agreement_ob_status === 'not_required' ? '#64748B' : '#15803D'}; border:1px solid ${ev.agreement_ob_status === 'not_required' ? '#CBD5E1' : '#BBF7D0'}; font-weight:700; font-size:11px;">
+                                📚 O'quv (${ev.agreement_ob_status === 'not_required' ? 'talab yo\'q' : ev.agreement_ob_status})
                               </button>
                               <button class="btn btn-sm btn-primary" onclick="openFinalEventApproveModal('${ev.id}')" style="background:#4F46E5; border-color:#4F46E5; font-weight:700; font-size:11px;">
                                 📑 Ish Yurituvchi Tasdiqlash
@@ -3583,7 +3655,7 @@ async function renderDeptEvents(container) {
                       ` : ''}
                     ` : isPendingAgreement ? `
                       <span style="font-size: 11.5px; color: #D97706; font-weight: 700; background: #FEF3C7; padding: 4px 8px; border-radius: 6px;">
-                        ⏳ 4 Bo'lim tasdiqlagach QR kodlar ochiladi
+                        ⏳ Bo'limlar to'liq tasdiqlagach QR kodlar ochiladi
                       </span>
                     ` : `
                       <span style="font-size: 12px; color: #94A3B8; font-weight: 600; padding: 4px 6px;">Tadbir vaqti tugagan</span>
