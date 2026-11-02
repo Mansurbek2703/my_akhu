@@ -578,9 +578,14 @@ function updateSidebarPermissions() {
     el.style.display = visible ? '' : 'none';
   });
 
-  // Agar bo'lim xodimi bo'lsa navbat sonini yuklash
-  if (AppState.isLoggedIn && (userRoles.some(r => r && r.startsWith('dep_')) || userRoles.includes('prorektor') || isSuper)) {
+  // Bildirishnomalar va tasdiq sonini yuklash & davriy yangilash
+  if (AppState.isLoggedIn) {
     checkPendingBadge();
+    if (!window._pendingBadgeInterval) {
+      window._pendingBadgeInterval = setInterval(() => {
+        if (AppState.isLoggedIn) checkPendingBadge();
+      }, 20000);
+    }
   }
 }
 
@@ -808,8 +813,8 @@ function navigateTo(pageName) {
       break;
     case 'observe-events':
     case 'dept-events':
-      pageTitle.textContent = 'Tadbirlar & QR Kodlar';
-      pageDesc.textContent = 'Universitet miqyosidagi tadbirlar, ishtirokchilar va check-in';
+      pageTitle.textContent = 'Tasdiqlash & Tadbirlar';
+      pageDesc.textContent = 'Universitet miqyosidagi tadbirlar, 4 bo\'lim kelishuvi va QR check-in';
       renderDeptEvents(targetContainer);
       break;
     case 'observe-catalog':
@@ -3133,6 +3138,8 @@ async function submitReject(id) {
 // SAHIFA: TADBIRLAR VA QR BOSHQARUVI (2 XIL USULDA QR CHECK-IN)
 // -------------------------------------------------------------
 async function renderDeptEvents(container) {
+  // Bildirishnoma sonini ham bir vaqtda yangilash
+  checkPendingBadge();
   try {
     const data = await apiFetch('/api/events');
     const events = data.events || [];
@@ -4704,6 +4711,7 @@ async function submitEventAgreement(eventId, deptCode) {
     });
 
     closeModal();
+    checkPendingBadge();
     alert(res.message || "Kelishuv qarori muvaffaqiyatli saqlandi!");
     renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
   } catch (err) {
@@ -4762,6 +4770,7 @@ async function submitFinalEventApprove(eventId) {
     });
 
     closeModal();
+    checkPendingBadge();
     alert(res.message || "Tadbir muvaffaqiyatli tasdiqlandi va rasman chop etildi!");
     renderDeptEvents(document.getElementById('module-page-container') || document.getElementById('app-content-area'));
   } catch (err) {

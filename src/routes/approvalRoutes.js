@@ -116,19 +116,20 @@ router.get('/', authenticateStaff, (req, res) => {
       if (user.roles.includes('dep_atm')) evConds.push("(status = 'pending_agreement' AND agreement_atm_status = 'pending')");
       if (user.roles.includes('dep_ob')) evConds.push("(status = 'pending_agreement' AND agreement_ob_status = 'pending')");
       if (user.roles.includes('dep_iy')) {
-        evConds.push("(status = 'pending_agreement' AND agreement_xb_status = 'agreed' AND agreement_atm_status = 'agreed' AND agreement_ob_status = 'agreed')");
+        evConds.push("(status = 'pending_agreement' AND agreement_xb_status IN ('agreed', 'not_required') AND agreement_atm_status IN ('agreed', 'not_required') AND agreement_ob_status IN ('agreed', 'not_required'))");
       }
     }
 
     if (evConds.length > 0) {
+      const tenMinFromNow = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       const evSql = `
         SELECT e.*, su.full_name as creator_name
         FROM event e
         LEFT JOIN staff_user su ON e.created_by = su.id
-        WHERE ${evConds.join(' OR ')}
+        WHERE (${evConds.join(' OR ')}) AND e.starts_at >= ?
         ORDER BY e.created_at DESC
       `;
-      pendingEvents = db.prepare(evSql).all();
+      pendingEvents = db.prepare(evSql).all(tenMinFromNow);
     }
   } catch (evErr) {
     console.error('Error fetching pending events in approvals:', evErr);
