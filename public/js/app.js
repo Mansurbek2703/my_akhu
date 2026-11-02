@@ -4038,6 +4038,9 @@ function recalcEndTime(prefix = '') {
   st.selectedEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 }
 
+function selectEventStartTime(val, prefix = '') { return onEventStartTimeSelect(val, prefix); }
+function selectEventEndTime(val, prefix = '') { return onEventEndTimeSelect(val, prefix); }
+
 function onEventStartTimeSelect(val, prefix = '') {
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.selectedStartTime = val;
@@ -15113,6 +15116,8 @@ window.handleUnifiedTtDay = handleUnifiedTtDay;
 window.handleUnifiedTimetableFilter = handleUnifiedTimetableFilter;
 window.setUnifiedLmsPeriod = setUnifiedLmsPeriod;
 window.setUnifiedLmsDate = setUnifiedLmsDate;
+const loadUnifiedLmsOverviewData = async () => { const b = document.getElementById("unified-tab-content"); if (b && typeof renderUnifiedLmsOverviewTab === "function") await renderUnifiedLmsOverviewTab(b); };
+const loadUnifiedGroupsRankingData = async () => { const b = document.getElementById("unified-tab-content"); if (b && typeof renderUnifiedGroupsRankingTab === "function") await renderUnifiedGroupsRankingTab(b); };
 window.loadUnifiedLmsOverviewData = loadUnifiedLmsOverviewData;
 window.loadUnifiedGroupsRankingData = loadUnifiedGroupsRankingData;
 window.filterCrossAuditCategory = filterCrossAuditCategory;
