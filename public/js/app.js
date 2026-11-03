@@ -736,6 +736,35 @@ function renderModuleSubNav(pageName) {
   `;
 }
 
+
+// ====================================================================
+// MOBILE RESPONSIVE SIDEBAR DRAWER CONTROLLER
+// ====================================================================
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('app-sidebar') || document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (!sidebar) return;
+  const isOpen = sidebar.classList.contains('mobile-open');
+  if (isOpen) {
+    closeMobileSidebar();
+  } else {
+    sidebar.classList.add('mobile-open');
+    if (backdrop) backdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('app-sidebar') || document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) sidebar.classList.remove('mobile-open');
+  if (backdrop) backdrop.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+window.toggleMobileSidebar = toggleMobileSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
+
 function initNavigation() {
   document.querySelectorAll('.sidebar-nav a.nav-item').forEach(link => {
     link.addEventListener('click', (e) => {
@@ -3147,6 +3176,7 @@ async function renderDeptEvents(container) {
     const data = await apiFetch('/api/events');
     const events = data.events || [];
     window.currentDeptEvents = events;
+    window.__lastEventsList = events;
 
     const isStaffOrAdmin = AppState.isLoggedIn && (
       (AppState.user.user_type === 'staff') ||
@@ -3305,247 +3335,215 @@ async function renderDeptEvents(container) {
             const allDeptAgreed = reqDepts.every(d => d.status === 'agreed');
             const iyStatus = ev.approval_final_status || (ev.status === 'published' ? 'approved' : 'pending');
 
+            // Mas'ul bo'lim xodimining qaror bildirish huquqi (2-MASALA)
+            const myPendingDept = reqDepts.find(d => (isSuperadmin || userRoles.includes(d.role)) && d.status === 'pending' && !isAgreementExpired);
+            const isIyAuthorized = isSuperadmin || userRoles.includes('dep_iy');
+            const canIyDecide = isIyAuthorized && allDeptAgreed && (iyStatus === 'pending' || ev.status !== 'published') && !isAgreementExpired;
+            const hasMyDecision = !!myPendingDept || canIyDecide;
+
             // Header status badge
             let headerBadgeHtml = '';
             if (isAgreementExpired) {
-              headerBadgeHtml = `<span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1.5px solid #F87171; font-size: 11px; font-weight: 800;">⛔️ Boshlanmadi (Kelishuv muddati o'tgan)</span>`;
+              headerBadgeHtml = `<span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1.5px solid #F87171; font-size: 11px; font-weight: 800;">⛔️ Boshlanmadi (Muddati o'tgan)</span>`;
             } else if (isPendingAgreement) {
               const pendingList = reqDepts.filter(d => d.status === 'pending');
               if (pendingList.length > 0) {
                 headerBadgeHtml = `<span class="badge" style="background: #FEF3C7; color: #D97706; border: 1px solid #FCD34D; font-size: 11px; font-weight: 700;">⏳ ${pendingList.length === 1 ? pendingList[0].shortName + ' tasdig\'i kutilmoqda' : pendingList.length + ' ta bo\'lim tasdig\'i kutilmoqda'}</span>`;
               } else {
-                headerBadgeHtml = `<span class="badge" style="background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; font-size: 11px; font-weight: 700;">⏳ Ish yurituvchi tasdig'i kutilmoqda</span>`;
+                headerBadgeHtml = `<span class="badge" style="background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; font-size: 11px; font-weight: 700;">⏳ Ish yurituvchi tasdig\'i kutilmoqda</span>`;
               }
             } else if (isAttEnded) {
-              headerBadgeHtml = `<span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 700;">⚠️ Yakunlangan (Davomat yopiq)</span>`;
+              headerBadgeHtml = `<span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 700;">⚠️ Yakunlangan</span>`;
             } else if (isAttOpen) {
-              headerBadgeHtml = `<span class="badge" style="background: #ECFDF5; color: #059669; border: 1.5px solid #10B981; font-size: 11px; font-weight: 800;">🟢 Davomat Ochiq (Check-in)</span>`;
+              headerBadgeHtml = `<span class="badge" style="background: #ECFDF5; color: #059669; border: 1.5px solid #10B981; font-size: 11px; font-weight: 800;">🟢 Davomat Ochiq</span>`;
             } else {
               headerBadgeHtml = `<span class="badge" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #93C5FD; font-size: 11px; font-weight: 700;">⏱️ E'lon qilingan</span>`;
             }
 
             return `
-              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${isAttEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
+              <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; ${hasMyDecision ? 'border: 2px solid #F59E0B; box-shadow: 0 4px 16px rgba(245,158,11,0.2);' : ''} ${isAttEnded ? 'opacity: 0.92; border-color: #E2E8F0;' : ''}">
                 <div>
-                  <!-- BANNER HEADER -->
+                  <!-- BANNER HEADER (IXCHAM VA MOSLASHUVCHAN) -->
                   ${imgSrc ? `
-                    <div style="height: 190px; width: 100%; position: relative; overflow: hidden; background: #0F172A; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <div style="height: 160px; width: 100%; position: relative; overflow: hidden; background: #0F172A; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
                       <div style="position: absolute; inset: -20px; background-image: url('${imgSrc}'); background-size: cover; background-position: center; filter: blur(24px) brightness(0.65); transform: scale(1.15);"></div>
                       <img src="${imgSrc}" alt="${ev.title}" style="position: relative; max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain; z-index: 2; display: block; box-shadow: 0 4px 20px rgba(0,0,0,0.4);" onerror="this.parentElement.style.display='none';">
                     </div>
                   ` : `
-                    <div style="height: 105px; width: 100%; background: linear-gradient(135deg, ${ev.category_color || '#3B82F6'}25 0%, #0F172A 100%); display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <div style="height: 85px; width: 100%; background: linear-gradient(135deg, ${ev.category_color || '#3B82F6'}25 0%, #0F172A 100%); display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06);">
                       <div>
-                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: ${ev.category_color || '#60A5FA'};">
+                        <span style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: ${ev.category_color || '#60A5FA'};">
                           ${ev.category_name || 'Universitet Tadbiri'}
                         </span>
-                        <div style="font-weight: 800; color: #F8FAFC; font-size: 14.5px; margin-top: 4px;">
+                        <div style="font-weight: 800; color: #F8FAFC; font-size: 13.5px; margin-top: 2px;">
                           ${ev.level ? ev.level.toUpperCase() + ' DARAJALI TADBIR' : 'RASMIY UNIVERSITET TADBIRI'}
                         </div>
                       </div>
-                      <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                      <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 17px;">
                         📅
                       </div>
                     </div>
                   `}
 
-                  <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
-                    <div>
+                  <div class="card-header" style="border-bottom: 1px solid var(--border-light); padding: 11px 14px;">
+                    <div style="flex: 1; min-width: 0; margin-right: 8px;">
                       <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                        <span class="badge" style="background: ${ev.category_color}20; color: ${ev.category_color}; border: 1px solid ${ev.category_color}40; font-weight: 600;">
+                        <span class="badge" style="background: ${ev.category_color}20; color: ${ev.category_color}; border: 1px solid ${ev.category_color}40; font-weight: 600; font-size: 11px;">
                           ${ev.category_name}
                         </span>
                         ${headerBadgeHtml}
                       </div>
-                      <h3 style="margin-top: 8px; font-size: 16px; font-weight: 700; color: var(--text-main); line-height: 1.35;">${ev.title}</h3>
+                      <h3 style="margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--text-main); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${ev.title}">
+                        ${ev.title}
+                      </h3>
                     </div>
-                    <span class="badge badge-primary" style="font-size: 13px; font-weight: 700; padding: 4px 10px;">+${ev.points} ball</span>
+                    <span class="badge badge-primary" style="font-size: 12px; font-weight: 700; padding: 3px 8px; flex-shrink: 0;">+${ev.points} ball</span>
                   </div>
 
-                  <div class="card-body" style="padding: 14px 18px;">
-                    <!-- ASOSIY TASHABBUSKOR TALABA / XODIM BLOKI -->
-                    ${ev.lead_type === 'student' && ev.lead_name ? `
-                      <div style="background: #EFF6FF; border: 1px dashed #93C5FD; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
-                        <span style="font-size: 12px; color: #1E40AF; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
-                          <span>🎯</span> <strong>Asosiy Tashabbuskor:</strong> ${ev.lead_name} ${ev.lead_group ? `(${ev.lead_group})` : ''}
-                        </span>
-                        <span class="badge" style="background: #2563EB; color: white; font-weight: 700; font-size: 11px;">
-                          +${ev.lead_points || 20} tashabbuskorlik bali
-                        </span>
-                      </div>
-                    ` : (ev.lead_name && ev.lead_name !== ev.organizer_unit) ? `
-                      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 12px; margin-bottom: 12px; font-size: 12px; color: #475569;">
-                        <strong>Asosiy Tashabbuskor:</strong> ${ev.lead_name}
-                      </div>
-                    ` : ''}
-
-                    <!-- QAT'IY OGOHLANTIRISH: AGAR 10 DAQIQA QOLGUNCHASIGA KELISHILMAGAN BO'LSA -->
+                  <div class="card-body" style="padding: 12px 14px;">
+                    <!-- 1-MASALA: AGAR MUDDATI O'TGAN BO'LSA - KATTA MATN O'RNIGA IXCHAM 1 QATORLI BADGE VA SABABI ℹ️ TUGMASI -->
                     ${isAgreementExpired ? `
-                      <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 10px; padding: 12px; margin-bottom: 12px;">
-                        <div style="font-size: 12.5px; font-weight: 800; color: #DC2626; display: flex; align-items: center; gap: 6px;">
-                          <span>⛔️</span> Tadbir boshlanmadi: Kelishuv vaqti o'tib ketgan!
-                        </div>
-                        <div style="font-size: 11.5px; color: #991B1B; margin-top: 4px; line-height: 1.45;">
-                          Reglamentga ko'ra, tadbir boshlanishiga kamida 10 daqiqa qolguncha tegishli barcha bo'limlar kelishuvi to'liq yakunlanishi shart. Ushbu tadbir o'z vaqtida tasdiqlanmaganligi sababli boshlanishi to'xtatildi.
-                          <br><strong style="color: #7F1D1D;">Harakat:</strong> Tadbir tashabbuskori yoki mas'ul xodim tadbir boshlanish vaqtini yangilashi (keyinroqqa ko'chirishi) lozim.
-                        </div>
+                      <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                        <span style="font-size: 11.5px; font-weight: 800; color: #DC2626; display: flex; align-items: center; gap: 5px;">
+                          <span>⛔️</span> Kelishuv muddati o'tib boshlanmadi
+                        </span>
+                        <button type="button" class="btn btn-sm" onclick="showEventDetailsModal('${ev.id}')" style="background: #DC2626; color: white; border: none; padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer;">
+                          Sababi ℹ️
+                        </button>
                       </div>
                     ` : ''}
 
-                    <!-- BIRLASHGAN BO'LIMLAR KELISHUVI BLOKI (TAKROARLANISHLARSIZ, FAQAT ZARUR BO'LIMLAR) -->
-                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
-                      <div style="font-size: 11.5px; font-weight: 700; color: #334155; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
-                        <span>📋 Bo'limlar Kelishuvi & Tasdig'i:</span>
-                        ${isPendingAgreement ? (isAgreementExpired ? `<span style="color:#DC2626; font-size:10.5px; font-weight:700;">Muddati o'tgan</span>` : `<span style="color:#D97706; font-size:10.5px; font-weight:600;">Jarayonda</span>`) : `<span style="color:#059669; font-size:10.5px; font-weight:600;">✓ Tasdiqlangan</span>`}
+                    <!-- TADBIRNING ASOSIY VA MUHIM MA'LUMOTLARI (FAQAT MUHIMLARI) -->
+                    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: #334155;">
+                      <div style="display: flex; align-items: center; gap: 7px;">
+                        <span style="color: #64748B; flex-shrink: 0;">${icon('clock', 14)}</span>
+                        <span><strong>Vaqti:</strong> ${startsFormatted} &mdash; ${endsFormatted}</span>
                       </div>
+                      <div style="display: flex; align-items: center; gap: 7px;">
+                        <span style="color: #64748B; flex-shrink: 0;">${icon('mapPin', 14)}</span>
+                        <span><strong>Joyi:</strong> ${ev.place || 'Aniq emas'}</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 7px; flex-wrap: wrap;">
+                        <span style="color: #64748B; flex-shrink: 0;">${icon('user', 14)}</span>
+                        <span><strong>Tashkilotchi:</strong> ${ev.lead_name || ev.organizer_unit}</span>
+                        ${ev.lead_type === 'student' ? `<span class="badge" style="background:#2563EB; color:white; font-size:10px; padding:1px 5px; font-weight:700;">Talaba +${ev.lead_points || 20} ball</span>` : ''}
+                      </div>
+                      <div style="display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; border-radius: 6px; padding: 6px 10px; margin-top: 2px;">
+                        <span style="color: #64748B;">Sig'im va check-in:</span>
+                        <span style="font-weight: 700; color: #1E293B;">${ev.checkins_count || 0} nafar ${ev.capacity ? `/ ${ev.capacity} ta o'rin` : ''}</span>
+                      </div>
+                    </div>
 
-                      <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <!-- BO'LIMLAR KELISHUVI IXCHAM STRIP (1 QATORDA) -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 10px; margin-top: 8px; font-size: 11.5px;">
+                      <span style="color: #475569; font-weight: 600;">Bo'limlar kelishuvi:</span>
+                      <div style="display: flex; gap: 5px; align-items: center;">
                         ${reqDepts.map(d => {
-                          const isDeptAuthorized = isSuperadmin || userRoles.includes(d.role);
-                          if (d.status === 'agreed') {
-                            return `
-                              <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                <span style="font-size: 12px; color: #065F46; font-weight: 700;">
-                                  ✅ ${d.icon} ${d.name}: Kelishildi ${d.by ? `(${d.by})` : ''} ${d.note ? `&mdash; "${d.note}"` : ''}
-                                </span>
-                                ${isDeptAuthorized && isPendingAgreement && !isAgreementExpired ? `
-                                  <button class="btn btn-sm btn-link" onclick="openEventAgreementModal('${ev.id}', '${d.code}')" style="font-size: 11px; color: #059669; font-weight: 700; padding: 0;">[O'zgartirish]</button>
-                                ` : ''}
-                              </div>
-                            `;
-                          } else if (d.status === 'rejected') {
-                            return `
-                              <div style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                <span style="font-size: 12px; color: #DC2626; font-weight: 700;">
-                                  ❌ ${d.icon} ${d.name}: Rad etilgan &mdash; "${d.note || 'Rad etildi'}"
-                                </span>
-                                ${isDeptAuthorized && isPendingAgreement && !isAgreementExpired ? `
-                                  <button class="btn btn-sm btn-link" onclick="openEventAgreementModal('${ev.id}', '${d.code}')" style="font-size: 11px; color: #DC2626; font-weight: 700; padding: 0;">[Qayta ko'rish]</button>
-                                ` : ''}
-                              </div>
-                            `;
-                          } else {
-                            return `
-                              <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                <span style="font-size: 12px; color: #B45309; font-weight: 700;">
-                                  ⏳ ${d.icon} ${d.name}: Qaror kutilmoqda ${d.reqNote ? `<span style="font-size:11px; color:#92400E; font-weight:normal;">("${d.reqNote}")</span>` : ''}
-                                </span>
-                                ${isDeptAuthorized && !isAgreementExpired ? `
-                                  <button class="btn btn-sm" onclick="openEventAgreementModal('${ev.id}', '${d.code}')" style="background: #F59E0B; color: white; font-weight: 700; font-size: 11.5px; border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer;">
-                                    Qaror bildirish
-                                  </button>
-                                ` : ''}
-                              </div>
-                            `;
-                          }
+                          const color = d.status === 'agreed' ? '#059669' : (d.status === 'rejected' ? '#DC2626' : '#D97706');
+                          const symbol = d.status === 'agreed' ? '✓' : (d.status === 'rejected' ? '✕' : '⏳');
+                          return `<span title="${d.name}: ${d.status === 'agreed' ? 'Kelishildi' : (d.status === 'rejected' ? 'Rad etildi' : 'Kutilmoqda')}" style="font-weight: 700; font-size: 11px; color: ${color}; background: white; border: 1px solid ${color}40; padding: 2px 6px; border-radius: 4px;">${d.icon} ${symbol}</span>`;
                         }).join('')}
-
-                        <!-- ISH YURITUVCHI (BUYRUQ & YAKUNIY TASDIQ) -->
-                        ${(() => {
-                          const isIyAuthorized = isSuperadmin || userRoles.includes('dep_iy');
-                          if (iyStatus === 'approved' || ev.status === 'published') {
-                            return `
-                              <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 7px 10px; font-size: 12px; color: #065F46; font-weight: 700;">
-                                ✅ 📑 Ish yurituvchi: Buyruq asosida rasman tasdiqlangan va e'lon qilingan
-                              </div>
-                            `;
-                          } else if (iyStatus === 'rejected') {
-                            return `
-                              <div style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 7px 10px; font-size: 12px; color: #DC2626; font-weight: 700;">
-                                ❌ 📑 Ish yurituvchi: Rad etilgan
-                              </div>
-                            `;
-                          } else if (allDeptAgreed) {
-                            return `
-                              <div style="background: #EEF2FF; border: 1.5px solid #6366F1; border-radius: 8px; padding: 9px 12px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${isIyAuthorized && !isAgreementExpired ? '8px' : '0'};">
-                                  <span style="font-size: 12px; font-weight: 700; color: #3730A3;">
-                                    📑 Ish yurituvchi: Bo'limlar kelishuvi to'liq tayyor, yakuniy buyruq/tasdiq kutilmoqda
-                                  </span>
-                                </div>
-                                ${isIyAuthorized && !isAgreementExpired ? `
-                                  <button class="btn btn-block" onclick="openFinalEventApproveModal('${ev.id}')" style="width: 100%; background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); color: white; font-weight: 800; font-size: 13px; padding: 8px 12px; border: none; border-radius: 7px; cursor: pointer; box-shadow: 0 2px 8px rgba(79,70,229,0.3);">
-                                    📑 ⚡️ BUYRUQ ASOSIDA TASDIQLASH VA E'LON QILISH (PUBLISH)
-                                  </button>
-                                ` : ''}
-                              </div>
-                            `;
-                          } else {
-                            return `
-                              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 7px 10px; font-size: 12px; color: #64748B;">
-                                <span>📑 Ish yurituvchi: Avval yuqoridagi bo'limlar kelishuvi kutiladi</span>
-                              </div>
-                            `;
-                          }
-                        })()}
+                        <span title="Ish yurituvchi" style="font-weight: 700; font-size: 11px; color: ${iyStatus === 'approved' ? '#059669' : (iyStatus === 'rejected' ? '#DC2626' : '#6366F1')}; background: white; border: 1px solid #CBD5E1; padding: 2px 6px; border-radius: 4px;">📑 ${iyStatus === 'approved' ? '✓' : (iyStatus === 'rejected' ? '✕' : '⏳')}</span>
+                        <button type="button" onclick="showEventDetailsModal('${ev.id}')" class="btn btn-sm btn-link" style="padding: 0 4px; font-size: 11.5px; font-weight: 700; color: #2563EB; text-decoration: none;" title="Barcha kelishuv xulosalarini ko'rish">ℹ️</button>
                       </div>
+                    </div>
 
-                      ${(reqDepts.some(d => d.status === 'rejected') && (isCreator || isSuperadmin) && !isAgreementExpired) ? `
-                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #CBD5E1;">
-                          <button class="btn btn-sm btn-block" onclick="openResubmitAgreementModal('${ev.id}')" style="width:100%; background:#DC2626; color:white; font-weight:700; border:none; border-radius:6px; padding:7px; cursor:pointer;">
-                            🔄 Talabni o'zgartirib qayta kelishishga yuborish
+                    <!-- 2-MASALA: MAS'UL BO'LIM XODIMI KABINETIDA TASDIQLASH/RAD ETISH QAROR BILDIRISH TUGMALARI (PASTKI QISMDA, YASHIL VA QIZIL) -->
+                    ${myPendingDept ? `
+                      <div style="background: #FFFBEB; border: 1.5px solid #F59E0B; border-radius: 10px; padding: 10px 12px; margin-top: 10px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                          <span style="font-size: 11.5px; font-weight: 800; color: #92400E; display: flex; align-items: center; gap: 4px;">
+                            <span>⚖️</span> Sizning qaroringiz kutilmoqda:
+                          </span>
+                          <span style="font-size: 11px; background: #FEF3C7; color: #B45309; font-weight: 700; padding: 1px 6px; border-radius: 4px;">${myPendingDept.name}</span>
+                        </div>
+                        ${myPendingDept.reqNote ? `
+                          <div style="font-size: 11px; color: #78350F; background: rgba(245, 158, 11, 0.1); padding: 5px 8px; border-radius: 6px; margin-bottom: 8px; line-height: 1.35;">
+                            <strong>So'ralgan ta'minot:</strong> ${myPendingDept.reqNote}
+                          </div>
+                        ` : ''}
+                        <div style="display: flex; gap: 8px;">
+                          <button type="button" class="btn" onclick="openEventAgreementModal('${ev.id}', '${myPendingDept.code}', 'agreed')" style="flex: 1; background: #059669; color: white; font-weight: 800; font-size: 12.5px; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(5,150,105,0.25);">
+                            <span>✅ Tasdiqlash</span>
+                          </button>
+                          <button type="button" class="btn" onclick="openEventAgreementModal('${ev.id}', '${myPendingDept.code}', 'rejected')" style="flex: 1; background: #DC2626; color: white; font-weight: 800; font-size: 12.5px; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(220,38,38,0.25);">
+                            <span>❌ Rad etish</span>
                           </button>
                         </div>
-                      ` : ''}
-                    </div>
+                      </div>
+                    ` : ''}
 
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                      ${icon('mapPin', 14)} <span><strong>O'tkazilish joyi:</strong> ${ev.place}</span>
-                    </p>
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                      ${icon('clock', 14)} <span><strong>Vaqti:</strong> ${startsFormatted} &mdash; ${endsFormatted}</span>
-                    </p>
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-                      ${icon('building', 14)} <span><strong>Tashkilotchi:</strong> ${ev.organizer_unit}</span>
-                    </p>
-                    <div style="background: #F8FAFC; border-radius: 8px; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-                      <span style="color: var(--text-secondary);">Qabul qilingan talabalar:</span>
-                      <span style="font-weight: 700; color: #1E293B;">${ev.checkins_count || 0} nafar ${ev.capacity ? `/ ${ev.capacity} ta o'rin` : ''}</span>
-                    </div>
+                    ${canIyDecide ? `
+                      <div style="background: #EEF2FF; border: 1.5px solid #6366F1; border-radius: 10px; padding: 10px 12px; margin-top: 10px; box-shadow: 0 2px 8px rgba(99,102,241,0.2);">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #3730A3; margin-bottom: 6px;">
+                          📑 Ish Yurituvchi: Barcha bo'limlar kelishdi, buyruq/tasdiq kutilmoqda:
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                          <button type="button" class="btn" onclick="openFinalEventApproveModal('${ev.id}')" style="flex: 1; background: #059669; color: white; font-weight: 800; font-size: 12px; border: none; border-radius: 8px; padding: 9px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(5,150,105,0.25);">
+                            <span>✅ Buyruq bilan Tasdiqlash</span>
+                          </button>
+                          <button type="button" class="btn" onclick="openEventAgreementModal('${ev.id}', 'iy', 'rejected')" style="flex: 0.6; background: #DC2626; color: white; font-weight: 800; font-size: 12px; border: none; border-radius: 8px; padding: 9px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            <span>❌ Rad etish</span>
+                          </button>
+                        </div>
+                      </div>
+                    ` : ''}
+
+                    ${(reqDepts.some(d => d.status === 'rejected') && (isCreator || isSuperadmin) && !isAgreementExpired) ? `
+                      <div style="margin-top: 8px;">
+                        <button type="button" class="btn btn-sm btn-block" onclick="openResubmitAgreementModal('${ev.id}')" style="width:100%; background:#DC2626; color:white; font-weight:700; border:none; border-radius:6px; padding:7px; cursor:pointer;">
+                          🔄 Talabni o'zgartirib qayta kelishishga yuborish
+                        </button>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
 
-                <div class="card-footer" style="background: #FAFAFA; border-top: 1px solid var(--border-light); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div class="card-footer" style="background: #FAFAFA; border-top: 1px solid var(--border-light); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                   <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
                     ${isAgreementExpired ? `
-                      <span style="font-size: 11.5px; color: #DC2626; font-weight: 700; background: #FEF2F2; padding: 5px 10px; border-radius: 6px; border: 1px solid #FECACA;">
-                        ⛔️ Boshlanishiga 10 daqiqa qolguncha tasdiqlanmadi (Tadbir boshlanmaydi)
+                      <span style="font-size: 11.5px; color: #DC2626; font-weight: 700; background: #FEF2F2; padding: 4px 8px; border-radius: 6px; border: 1px solid #FECACA;">
+                        ⛔️ Tadbir o'tkazilmaydi
                       </span>
                     ` : isPendingAgreement ? `
-                      <span style="font-size: 11.5px; color: #D97706; font-weight: 700; background: #FEF3C7; padding: 5px 10px; border-radius: 6px; border: 1px solid #FCD34D;">
-                        ⏳ Kelishuv jarayonida (Tasdiqlangach e'lon qilinadi)
+                      <span style="font-size: 11.5px; color: #D97706; font-weight: 700; background: #FEF3C7; padding: 4px 8px; border-radius: 6px; border: 1px solid #FCD34D;">
+                        ⏳ Kelishuv jarayonida
                       </span>
                     ` : isAttEnded ? `
                       <span style="font-size: 12px; color: #94A3B8; font-weight: 600; padding: 4px 6px;">
-                        🏁 Tadbir va davomat yakunlangan
+                        🏁 Yakunlangan
                       </span>
                     ` : isAttOpen ? `
-                      <button class="btn btn-primary btn-sm" onclick="showEventQrModal('${ev.id}')" title="1-Usul: Jonli Tadbir QR kodini chiqarish (har 10s yangilanadi)" style="display: inline-flex; align-items: center; gap: 5px; background: #16A34A; border-color: #16A34A; font-weight: 700;">
+                      <button type="button" class="btn btn-primary btn-sm" onclick="showEventQrModal('${ev.id}')" title="1-Usul: Jonli Tadbir QR kodini chiqarish (har 10s yangilanadi)" style="display: inline-flex; align-items: center; gap: 5px; background: #16A34A; border-color: #16A34A; font-weight: 700;">
                         ${icon('qrCode', 13)} <span>Tadbir QR (10s Jonli)</span>
                       </button>
                       ${isStaffOrAdmin ? `
-                        <button class="btn btn-outline btn-sm" onclick="showStudentCheckinModal('${ev.id}')" title="2-Usul: Talaba QR kodini yoki ID raqamini skanerlab ball berish" style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700;">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="showStudentCheckinModal('${ev.id}')" title="2-Usul: Talaba QR kodini yoki ID raqamini skanerlab ball berish" style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700;">
                           ${icon('checkCircle', 13)} <span>Qabul Qilish</span>
                         </button>
                       ` : ''}
                     ` : `
-                      <span style="font-size: 11.5px; color: #1E40AF; font-weight: 700; background: #EFF6FF; padding: 5px 10px; border-radius: 6px; border: 1px solid #BFDBFE;">
-                        ⏱️ Davomat ${startsFormatted} dan 5 daqiqa oldin ochiladi
+                      <span style="font-size: 11.5px; color: #1E40AF; font-weight: 700; background: #EFF6FF; padding: 4px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">
+                        ⏱️ Davomat 5 daqiqa oldin ochiladi
                       </span>
                     `}
                   </div>
 
                   <div style="display: flex; gap: 6px; align-items: center;">
-                    <button class="btn btn-outline btn-sm" onclick="showEventParticipantsModal('${ev.id}')" title="Ishtirokchilar ro'yxati">
+                    <!-- 1-MASALA: BATAFSIL ℹ️ TUGMASI (TADBIRNING BARCHA DETALLARI UCHUN) -->
+                    <button type="button" class="btn btn-outline btn-sm" onclick="showEventDetailsModal('${ev.id}')" title="Tadbirning barcha ma'lumotlari va 4 bo'lim kelishuv xulosalari" style="color: #2563EB; border-color: #BFDBFE; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; font-size: 12px;">
+                      <span>ℹ️</span> <span>Batafsil</span>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="showEventParticipantsModal('${ev.id}')" title="Ishtirokchilar ro'yxati">
                       ${icon('users', 13)}
                     </button>
                     ${(canEdit || isAgreementExpired) ? `
-                      <button class="btn btn-outline btn-sm" onclick="openEditEventModal('${ev.id}')" title="Tadbirni tahrirlash (boshlanish vaqtini o'zgartirish)" style="color: #2563EB; border-color: #BFDBFE; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">
-                        ${icon('edit', 12)} <span>Tahrirlash</span>
+                      <button type="button" class="btn btn-outline btn-sm" onclick="openEditEventModal('${ev.id}')" title="Tadbirni tahrirlash" style="color: #2563EB; border-color: #BFDBFE; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">
+                        ${icon('edit', 12)}
                       </button>
                     ` : ''}
                     ${isSuperadmin ? `
-                      <button class="btn btn-outline btn-sm" onclick="deleteEvent('${ev.id}')" title="Tadbirni o'chirish" style="color: #DC2626; border-color: #FECACA; padding: 5px 8px;">
+                      <button type="button" class="btn btn-outline btn-sm" onclick="deleteEvent('${ev.id}')" title="Tadbirni o'chirish" style="color: #DC2626; border-color: #FECACA; padding: 4px 7px;">
                         ${icon('trash', 13)}
                       </button>
                     ` : ''}
@@ -4649,19 +4647,263 @@ async function submitCreateEvent() {
 }
 
 // 4 Ta Bo'lim Kelishuvi Modali (Xo'jalik, ATM, O'quv)
-function openEventAgreementModal(eventId, deptCode) {
-  const deptNames = {
-    'xb': { name: 'Xo\'jalik Bo\'limi', icon: '🏢', role: 'stol, stul, zal, moddiy baza' },
-    'atm': { name: 'Axborot Texnologiyalari Markazi (ATM)', icon: '💻', role: 'speaker, mikrofon, monitor, IT jihozlar' },
-    'ob': { name: 'O\'quv Bo\'limi', icon: '📚', role: 'bo\'sh xona/zal ajratish va dars jadvali' }
-  };
-  const dInfo = deptNames[deptCode] || { name: 'Bo\'lim', icon: '📋', role: 'texnik jarayonlar' };
+
+// ====================================================================
+// 1-MASALA: TADBIR DETALLARI MODALI (ℹ️ BATAFSIL)
+// ====================================================================
+async function showEventDetailsModal(eventId) {
+  let event = null;
+  if (window.__lastEventsList && window.__lastEventsList.length > 0) {
+    event = window.__lastEventsList.find(e => e.id === eventId);
+  }
+  if (!event) {
+    try {
+      const data = await apiFetch('/api/events');
+      window.__lastEventsList = data.events || [];
+      event = window.__lastEventsList.find(e => e.id === eventId);
+    } catch (e) {}
+  }
+
+  if (!event) {
+    alert("Tadbir ma'lumotlari topilmadi");
+    return;
+  }
+
+  const ev = event;
+  const startsDate = new Date(ev.starts_at);
+  const endsDate = new Date(ev.ends_at);
+  const startsFormatted = startsDate.toLocaleString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const endsFormatted = endsDate.toLocaleString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  const minutesUntilStart = (startsDate.getTime() - now.getTime()) / (60 * 1000);
+  const isPendingAgreement = (ev.status === 'pending_agreement');
+  const isAgreementExpired = isPendingAgreement && (minutesUntilStart < 10);
+  const isSuperadmin = AppState.user && (AppState.user.user_type === 'superadmin' || (AppState.user.roles || []).includes('superadmin'));
+  const userRoles = AppState.user?.roles || [];
+
+  const reqDepts = [];
+  if (ev.agreement_xb_status && ev.agreement_xb_status !== 'not_required') {
+    reqDepts.push({
+      code: 'xb',
+      name: "Xo'jalik bo'limi",
+      shortName: "Xo'jalik",
+      icon: '🏢',
+      status: ev.agreement_xb_status,
+      note: ev.agreement_xb_note,
+      by: ev.agreement_xb_by,
+      at: ev.agreement_xb_at,
+      reqNote: ev.req_xb_note,
+      role: 'dep_xb'
+    });
+  }
+  if (ev.agreement_atm_status && ev.agreement_atm_status !== 'not_required') {
+    reqDepts.push({
+      code: 'atm',
+      name: "Axborot texnologiyalari (ATM)",
+      shortName: "ATM (IT)",
+      icon: '💻',
+      status: ev.agreement_atm_status,
+      note: ev.agreement_atm_note,
+      by: ev.agreement_atm_by,
+      at: ev.agreement_atm_at,
+      reqNote: ev.req_atm_note,
+      role: 'dep_atm'
+    });
+  }
+  if (ev.agreement_ob_status && ev.agreement_ob_status !== 'not_required') {
+    reqDepts.push({
+      code: 'ob',
+      name: "O'quv bo'limi",
+      shortName: "O'quv",
+      icon: '📚',
+      status: ev.agreement_ob_status,
+      note: ev.agreement_ob_note,
+      by: ev.agreement_ob_by,
+      at: ev.agreement_ob_at,
+      reqNote: ev.req_ob_note,
+      role: 'dep_ob'
+    });
+  }
+  const allDeptAgreed = reqDepts.every(d => d.status === 'agreed');
+  const iyStatus = ev.approval_final_status || (ev.status === 'published' ? 'approved' : 'pending');
 
   const modalTitle = document.getElementById('modal-title');
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${dInfo.icon} ${dInfo.name} &mdash; Tadbirni Kelishish</span>`;
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">ℹ️ Tadbir Tafsilotlari & Kelishuv Xulosalari</span>`;
+  
+  modalBody.innerHTML = `
+    <!-- TADBAR SARLAVHASI VA STATUSI -->
+    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
+        <div>
+          <span class="badge" style="background: ${ev.category_color || '#3B82F6'}20; color: ${ev.category_color || '#2563EB'}; border: 1px solid ${ev.category_color || '#3B82F6'}40; font-weight: 700;">
+            ${ev.category_name || 'Tadbir'}
+          </span>
+          <h3 style="font-size: 17px; font-weight: 800; color: #0F172A; margin: 6px 0 2px 0;">${ev.title}</h3>
+        </div>
+        <span class="badge badge-primary" style="font-size: 14px; font-weight: 800; padding: 5px 12px;">+${ev.points} ball</span>
+      </div>
+    </div>
+
+    <!-- AGAR MUDDATI O'TGAN BO'LSA: TO'LIQ OGOHLANTIRISH BLOKI -->
+    ${isAgreementExpired ? `
+      <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+        <div style="font-size: 13.5px; font-weight: 800; color: #DC2626; display: flex; align-items: center; gap: 6px;">
+          <span>⛔️</span> Tadbir boshlanmadi: Kelishuv vaqti o'tib ketgan!
+        </div>
+        <div style="font-size: 12px; color: #991B1B; margin-top: 6px; line-height: 1.5;">
+          Reglamentga ko'ra, tadbir boshlanishiga kamida 10 daqiqa qolguncha tegishli barcha bo'limlar kelishuvi to'liq yakunlanishi shart. Ushbu tadbir o'z vaqtida tasdiqlanmaganligi sababli boshlanishi to'xtatildi.
+          <br><strong style="color: #7F1D1D;">Harakat:</strong> Tadbir tashabbuskori yoki mas'ul xodim tadbir boshlanish vaqtini yangilashi (keyinroqqa ko'chirishi) lozim.
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- ASOSIY PARAMETRLAR JADVALI -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 16px;">
+      <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px;">
+        <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">🕒 O'tkazilish Vaqti</div>
+        <div style="font-size: 12.5px; font-weight: 700; color: #0F172A; margin-top: 3px;">${startsFormatted} &mdash; ${endsFormatted}</div>
+      </div>
+      <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px;">
+        <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">📍 O'tkazilish Joyi</div>
+        <div style="font-size: 12.5px; font-weight: 700; color: #0F172A; margin-top: 3px;">${ev.place || 'Aniq emas'}</div>
+      </div>
+      <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px;">
+        <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">👥 Ishtirokchilar Sig'imi</div>
+        <div style="font-size: 12.5px; font-weight: 700; color: #0F172A; margin-top: 3px;">${ev.checkins_count || 0} nafar ${ev.capacity ? `/ ${ev.capacity} ta o'rin` : ''}</div>
+      </div>
+      <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px;">
+        <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">🎯 Asosiy Tashabbuskor</div>
+        <div style="font-size: 12.5px; font-weight: 700; color: #0F172A; margin-top: 3px;">
+          ${ev.lead_name || ev.organizer_unit} ${ev.lead_group ? `(${ev.lead_group})` : ''}
+          ${ev.lead_type === 'student' ? `<span class="badge" style="background:#2563EB;color:white;font-size:10px;padding:2px 6px;margin-left:4px;">+${ev.lead_points || 20} ball</span>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- TADBIR TAVSIFI (AGAR BO'LSA) -->
+    ${ev.description ? `
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 14px; margin-bottom: 16px;">
+        <div style="font-size: 11.5px; color: #64748B; font-weight: 700; margin-bottom: 4px;">📝 Tadbir Tavsifi:</div>
+        <div style="font-size: 12.5px; color: #334155; line-height: 1.5;">${ev.description}</div>
+      </div>
+    ` : ''}
+
+    <!-- 4 BO'LIM KELISHUV & TASDIQ XULOSALARI (BATAFSIL) -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; background: white; margin-bottom: 14px;">
+      <div style="font-size: 13px; font-weight: 800; color: #1E293B; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+        <span>📋 Bo'limlar Kelishuvi & Mas'ullar Xulosasi:</span>
+        <span style="font-size: 11.5px; color: #64748B; font-weight: 600;">Jami ${reqDepts.length + 1} bosqich</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${reqDepts.map(d => {
+          const isDeptAuthorized = isSuperadmin || userRoles.includes(d.role);
+          let statusBadge = '';
+          let bg = '#F8FAFC';
+          let border = '#E2E8F0';
+
+          if (d.status === 'agreed') {
+            bg = '#ECFDF5';
+            border = '#A7F3D0';
+            statusBadge = `<span style="background: #D1FAE5; color: #065F46; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">✅ Kelishildi</span>`;
+          } else if (d.status === 'rejected') {
+            bg = '#FEF2F2';
+            border = '#FCA5A5';
+            statusBadge = `<span style="background: #FEE2E2; color: #DC2626; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">❌ Rad etildi</span>`;
+          } else {
+            bg = '#FFFBEB';
+            border = '#FCD34D';
+            statusBadge = `<span style="background: #FEF3C7; color: #D97706; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">⏳ Kutilmoqda</span>`;
+          }
+
+          return `
+            <div style="background: ${bg}; border: 1px solid ${border}; border-radius: 10px; padding: 10px 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-weight: 800; font-size: 12.5px; color: #1E293B;">
+                  ${d.icon} ${d.name}
+                </span>
+                <div>${statusBadge}</div>
+              </div>
+              ${d.reqNote ? `
+                <div style="font-size: 11.5px; color: #475569; margin-top: 4px;">
+                  <strong>So'ralgan baza:</strong> ${d.reqNote}
+                </div>
+              ` : ''}
+              ${d.note ? `
+                <div style="font-size: 11.5px; color: #1E293B; margin-top: 4px; background: rgba(255,255,255,0.7); padding: 5px 8px; border-radius: 6px;">
+                  <strong>Bo'lim xulosasi:</strong> "${d.note}" ${d.by ? `(Mas'ul: <em>${d.by}</em>)` : ''}
+                </div>
+              ` : ''}
+              ${isDeptAuthorized && !isAgreementExpired ? `
+                <div style="margin-top: 8px; display: flex; gap: 6px;">
+                  <button class="btn btn-sm" onclick="closeModal(); openEventAgreementModal('${ev.id}', '${d.code}', 'agreed');" style="background: #059669; color: white; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer;">
+                    ✅ Kelishish
+                  </button>
+                  <button class="btn btn-sm" onclick="closeModal(); openEventAgreementModal('${ev.id}', '${d.code}', 'rejected');" style="background: #DC2626; color: white; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer;">
+                    ❌ Rad etish
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+
+        <!-- ISH YURITUVCHI BLOKI -->
+        <div style="background: ${iyStatus === 'approved' ? '#ECFDF5' : (iyStatus === 'rejected' ? '#FEF2F2' : '#EEF2FF')}; border: 1px solid ${iyStatus === 'approved' ? '#A7F3D0' : (iyStatus === 'rejected' ? '#FCA5A5' : '#C7D2FE')}; border-radius: 10px; padding: 10px 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-weight: 800; font-size: 12.5px; color: #1E293B;">
+              📑 Ish Yurituvchi (Buyruq & Yakuniy Tasdiq)
+            </span>
+            <div>
+              ${iyStatus === 'approved' ? '<span style="background: #D1FAE5; color: #065F46; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">✅ Tasdiqlangan (Chop etilgan)</span>' : (iyStatus === 'rejected' ? '<span style="background: #FEE2E2; color: #DC2626; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">❌ Rad etilgan</span>' : '<span style="background: #EEF2FF; color: #4F46E5; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">⏳ Kutilmoqda</span>')}
+            </div>
+          </div>
+          <div style="font-size: 11.5px; color: #475569; margin-top: 4px;">
+            ${iyStatus === "approved" ? "Universitet buyrug'i bilan rasman tasdiqlangan va talabalar Telegram ilovasida e'lon qilingan." : (allDeptAgreed ? "Barcha bo'limlar kelishuvi tayyor, buyruq rasmiylashtirilishi kutilmoqda." : "Avval 3 ta bo'lim (Xo'jalik, ATM, O'quv) kelishuvi kutiladi.")}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  modalFooter.innerHTML = `
+    <div style="display: flex; gap: 8px; width: 100%; justify-content: space-between; flex-wrap: wrap;">
+      <div style="display: flex; gap: 6px;">
+        <button class="btn btn-outline btn-sm" onclick="closeModal(); showEventParticipantsModal('${ev.id}')" style="display: inline-flex; align-items: center; gap: 5px;">
+          <span>👥</span> Ishtirokchilar (${ev.checkins_count || 0})
+        </button>
+        ${(isSuperadmin || (AppState.user && (ev.created_by === AppState.user.id || ev.organizer_unit === AppState.user.id))) ? `
+          <button class="btn btn-outline btn-sm" onclick="closeModal(); openEditEventModal('${ev.id}')" style="color: #2563EB; border-color: #BFDBFE;">
+            ✏️ Tahrirlash
+          </button>
+        ` : ''}
+      </div>
+      <button class="btn btn-outline" onclick="closeModal()">Yopish</button>
+    </div>
+  `;
+
+  openModal();
+}
+window.showEventDetailsModal = showEventDetailsModal;
+
+function openEventAgreementModal(eventId, deptCode, initialStatus = 'agreed') {
+  const deptNames = {
+    'xb': { name: 'Xo\'jalik Bo\'limi', icon: '🏢', role: 'stol, stul, zal, moddiy baza' },
+    'atm': { name: 'Axborot Texnologiyalari Markazi (ATM)', icon: '💻', role: 'speaker, mikrofon, monitor, IT jihozlar' },
+    'ob': { name: 'O\'quv Bo\'limi', icon: '📚', role: 'bo\'sh xona/zal ajratish va dars jadvali' },
+    'iy': { name: 'Ish Yurituvchi Bo\'limi', icon: '📑', role: 'buyruq rasmiylashtirish va e\'lon qilish' }
+  };
+  const dInfo = deptNames[deptCode] || { name: 'Bo\'lim', icon: '📋', role: 'texnik jarayonlar' };
+  const isAgreed = initialStatus === 'agreed';
+
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalFooter = document.getElementById('modal-footer');
+
+  modalTitle.innerHTML = `<span style="display:flex; align-items:center; gap:8px;">${dInfo.icon} ${dInfo.name} &mdash; Tadbir Qarori</span>`;
   modalBody.innerHTML = `
     <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; margin-bottom:14px;">
       <p style="margin:0; font-size:13px; color:#334155; line-height:1.45;">
@@ -4669,32 +4911,93 @@ function openEventAgreementModal(eventId, deptCode) {
       </p>
     </div>
 
+    <!-- 2-MASALA: YASHIL VA QIZIL ANIQLASHTIRILGAN QAROR TUGMALARI -->
     <div class="form-group mb-3">
       <label class="form-label" style="font-weight:700;">Kelishuv Qaroringiz *:</label>
-      <select id="event-agree-status" class="form-control" style="font-weight:700;">
-        <option value="agreed" selected>✅ Kelishildi (Moddiy-texnik imkoniyatlar mavjud, roziman)</option>
-        <option value="rejected">❌ E'tiroz bilan rad etish (Zal band, jihozlar yetarli emas yoki boshqa sabab)</option>
-      </select>
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <button type="button" id="btn-opt-agree" onclick="setModalAgreeStatus('agreed')" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 2px solid ${isAgreed ? '#10B981' : '#E2E8F0'}; background: ${isAgreed ? '#ECFDF5' : '#FFFFFF'}; color: ${isAgreed ? '#065F46' : '#64748B'}; font-weight: 800; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>✅ Kelishildi (Tasdiqlash)</span>
+        </button>
+        <button type="button" id="btn-opt-reject" onclick="setModalAgreeStatus('rejected')" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 2px solid ${!isAgreed ? '#EF4444' : '#E2E8F0'}; background: ${!isAgreed ? '#FEF2F2' : '#FFFFFF'}; color: ${!isAgreed ? '#DC2626' : '#64748B'}; font-weight: 800; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>❌ Rad etish (E'tiroz)</span>
+        </button>
+      </div>
+      <input type="hidden" id="event-agree-status" value="${isAgreed ? 'agreed' : 'rejected'}">
     </div>
 
     <div class="form-group">
-      <label class="form-label" style="font-weight:700;">Izoh / Ta'minot bo'yicha ko'rsatma:</label>
-      <textarea id="event-agree-note" class="form-control" rows="3" placeholder="Zal, jihozlar yoki e'tiroz sababini aniq yozing..."></textarea>
-      <small style="color:#64748B; font-size:11.5px; margin-top:4px; display:block;">
-        ⚠️ E'tiroz bildirilsa, rad etish sababi tadbir tashabbuskoriga ko'rsatiladi.
+      <label class="form-label" style="font-weight:700;" id="event-agree-note-label">${isAgreed ? "Izoh / Ajratilgan baza bo'yicha ko'rsatma (ixtiyoriy):" : "Rad etish sababi va e'tiroz (majburiy) *:"}</label>
+      <textarea id="event-agree-note" class="form-control" rows="3" placeholder="${isAgreed ? "Masalan: Zal ajratildi, kerakli jihozlar sozlandi..." : "Iltimos, nima sababdan rad etilayotganini aniq tushuntiring..."}"></textarea>
+      <small id="event-agree-note-hint" style="color:#64748B; font-size:11.5px; margin-top:4px; display:block;">
+        ${isAgreed ? "✓ Ijobiy xulosa qabul qilingandan so'ng navbatdagi bo'limlarga o'tkaziladi." : "⚠️ E'tiroz bildirilsa, sabab tadbir tashabbuskoriga ko'rsatiladi va u talabni o'zgartirishi lozim bo'ladi."}
       </small>
     </div>
   `;
 
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Bekor qilish</button>
-    <button class="btn btn-primary" onclick="submitEventAgreement('${eventId}', '${deptCode}')" style="font-weight:700;">
-      Qarorni Tasdiqlash
+    <button class="btn" id="btn-submit-agreement" onclick="submitEventAgreement('${eventId}', '${deptCode}')" style="font-weight:800; background: ${isAgreed ? '#059669' : '#DC2626'}; color: white; border: none; padding: 8px 18px; border-radius: 8px;">
+      ${isAgreed ? '✅ Tasdiqlashni Saqlash' : '❌ Rad etishni Saqlash'}
     </button>
   `;
 
   openModal();
+  if (!isAgreed) {
+    setTimeout(() => {
+      const ta = document.getElementById('event-agree-note');
+      if (ta) ta.focus();
+    }, 150);
+  }
 }
+
+function setModalAgreeStatus(status) {
+  const hiddenInput = document.getElementById('event-agree-status');
+  if (hiddenInput) hiddenInput.value = status;
+  const btnAgree = document.getElementById('btn-opt-agree');
+  const btnReject = document.getElementById('btn-opt-reject');
+  const label = document.getElementById('event-agree-note-label');
+  const hint = document.getElementById('event-agree-note-hint');
+  const submitBtn = document.getElementById('btn-submit-agreement');
+  const textarea = document.getElementById('event-agree-note');
+
+  if (status === 'agreed') {
+    if (btnAgree) {
+      btnAgree.style.borderColor = '#10B981';
+      btnAgree.style.background = '#ECFDF5';
+      btnAgree.style.color = '#065F46';
+    }
+    if (btnReject) {
+      btnReject.style.borderColor = '#E2E8F0';
+      btnReject.style.background = '#FFFFFF';
+      btnReject.style.color = '#64748B';
+    }
+    if (label) label.textContent = "Izoh / Ajratilgan baza bo'yicha ko'rsatma (ixtiyoriy):";
+    if (hint) hint.innerHTML = "✓ Ijobiy xulosa qabul qilingandan so'ng navbatdagi bo'limlarga o'tkaziladi.";
+    if (submitBtn) {
+      submitBtn.style.background = '#059669';
+      submitBtn.textContent = '✅ Tasdiqlashni Saqlash';
+    }
+  } else {
+    if (btnAgree) {
+      btnAgree.style.borderColor = '#E2E8F0';
+      btnAgree.style.background = '#FFFFFF';
+      btnAgree.style.color = '#64748B';
+    }
+    if (btnReject) {
+      btnReject.style.borderColor = '#EF4444';
+      btnReject.style.background = '#FEF2F2';
+      btnReject.style.color = '#DC2626';
+    }
+    if (label) label.textContent = "Rad etish sababi va e'tiroz (majburiy) *:";
+    if (hint) hint.innerHTML = "⚠️ E'tiroz bildirilsa, sabab tadbir tashabbuskoriga ko'rsatiladi va u talabni o'zgartirishi lozim bo'ladi.";
+    if (submitBtn) {
+      submitBtn.style.background = '#DC2626';
+      submitBtn.textContent = '❌ Rad etishni Saqlash';
+    }
+    if (textarea) textarea.focus();
+  }
+}
+window.setModalAgreeStatus = setModalAgreeStatus;
 
 async function submitEventAgreement(eventId, deptCode) {
   const status = document.getElementById('event-agree-status')?.value;

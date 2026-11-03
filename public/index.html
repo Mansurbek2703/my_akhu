@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=20261102_cal_fix_v2">
+  <link rel="stylesheet" href="/css/main.css?v=20261103_mobile_compact_v1">
 </head>
 <body>
   <!-- 1. MAXSUS TIZIMGA KIRISH DARCHASI (FAQAT SHU OCHILADI AGAR TIZIMGA KIRILMAGAN BO'LSA) -->
@@ -71,8 +71,11 @@
 
   <!-- 2. AVTORIZATSIYADAN O'TGANDAN KEYINGI BOSHQARUV VA XIZMAT PANELI -->
   <div class="app-container" id="app-container" style="display: none;">
+    <!-- SIDEBAR BACKDROP FOR MOBILE -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-header">
         <div class="logo-badge">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -83,6 +86,10 @@
           <h1>AL-XORAZMIY</h1>
           <span>TALABALAR TIZIMI</span>
         </div>
+        <!-- Close button for mobile sidebar -->
+        <button type="button" class="mobile-sidebar-close-btn" onclick="closeMobileSidebar()" aria-label="Menyuni yopish" title="Menyuni yopish">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
 
       <!-- XIZMAT FOYDALANUVCHISI STATUSI -->
@@ -159,9 +166,14 @@
     <main class="main-wrapper">
       <!-- TOP BAR -->
       <header class="topbar">
-        <div class="page-title">
-          <h2 id="current-page-title">Boshqaruv Paneli</h2>
-          <p id="current-page-desc">Al-Xorazmiy Universiteti Talabalar Reyting va Boshqaruv Tizimi</p>
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Menyuni ochish" title="Menyuni ochish">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div class="page-title">
+            <h2 id="current-page-title">Boshqaruv Paneli</h2>
+            <p id="current-page-desc">Al-Xorazmiy Universiteti Talabalar Reyting va Boshqaruv Tizimi</p>
+          </div>
         </div>
 
         <div class="topbar-actions">
@@ -231,6 +243,6 @@
   </div>
 
   <script src="/js/html5-qrcode.min.js"></script>
-  <script src="/js/app.js?v=20261102_no_tutor_v4"></script>
+  <script src="/js/app.js?v=20261103_mobile_compact_v1"></script>
 </body>
 </html>
