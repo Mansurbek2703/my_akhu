@@ -376,41 +376,7 @@ function updateAuthUI() {
       miniappBtn.style.display = (isSuper && window.innerWidth > 992) ? 'inline-flex' : 'none';
     }
 
-    // Profil Dropdown (Mobile va Desktop) elementlarini to'ldirish
-    const dropName = document.getElementById('dropdown-user-name');
-    const dropRole = document.getElementById('dropdown-user-role');
-    const dropModeBox = document.getElementById('dropdown-superadmin-mode-box');
-    const dropModeTitle = document.getElementById('dropdown-mode-title');
-    const dropModeIcon = document.getElementById('dropdown-mode-icon');
-    const dropModeDesc = document.getElementById('dropdown-mode-desc');
-    const dropModePill = document.getElementById('dropdown-mode-pill');
-    const dropAvatarImg = document.getElementById('dropdown-avatar-img');
-    const dropAvatarFallback = document.getElementById('dropdown-avatar-fallback');
-
-    if (dropName) dropName.textContent = fullName;
-    if (dropRole) dropRole.textContent = isSuper ? 'Superadmin' : ((AppState.user.roles || [])[0] || 'Xodim');
-    if (dropAvatarImg && dropAvatarFallback) {
-      if (AppState.user.photo_url) {
-        dropAvatarImg.src = AppState.user.photo_url;
-        dropAvatarImg.style.display = 'block';
-        dropAvatarFallback.style.display = 'none';
-      } else {
-        dropAvatarImg.style.display = 'none';
-        dropAvatarFallback.style.display = 'block';
-        dropAvatarFallback.textContent = initials || '👤';
-      }
-    }
-    if (dropModeBox) {
-      dropModeBox.style.display = isSuper ? 'block' : 'none';
-      if (dropModeTitle) dropModeTitle.textContent = isSuperMode ? 'Mode: Super (To\'liq)' : 'Mode: Normal (IT)';
-      if (dropModeIcon) dropModeIcon.textContent = isSuperMode ? '⚡' : '🛡️';
-      if (dropModeDesc) dropModeDesc.textContent = isSuperMode ? 'Normal IT rejimiga o\'tish' : 'To\'liq super rejimga o\'tish';
-      if (dropModePill) {
-        dropModePill.textContent = isSuperMode ? 'Super' : 'Normal';
-        dropModePill.style.background = isSuperMode ? '#EDE9FE' : '#DBEAFE';
-        dropModePill.style.color = isSuperMode ? '#6D28D9' : '#1D4ED8';
-      }
-    }
+// Dropdown olib tashlandi, tugmalar Profil sahifasining o'zida chiroyli joylashtirildi
   }
 }
 
@@ -6035,6 +6001,8 @@ async function renderStaffProfile(container) {
     const initials = (fullName || '').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
     const roles = user.roles || [];
     const groups = user.groups || [];
+    const isSuper = roles.includes('superadmin');
+    const isSuperMode = isSuper && AppState.adminMode === 'super';
 
     const roleBadges = roles.map(r => {
       const meta = ROLE_META[r] || { label: r, color: '#3B82F6', bg: '#EFF6FF' };
@@ -6047,20 +6015,51 @@ async function renderStaffProfile(container) {
       <div class="staff-profile-card">
         <!-- Hero Header -->
         <div class="staff-profile-header">
-          <div class="staff-profile-avatar-wrap" id="profile-avatar-wrap">
-            ${user.photo_url ? `
-              <img src="${user.photo_url}" class="staff-profile-avatar-img" id="profile-hero-img" alt="Foto">
-            ` : `
-              <span class="staff-profile-avatar-fallback" id="profile-hero-fallback">${initials || '👤'}</span>
-            `}
-          </div>
-          <div>
-            <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 6px;">${fullName}</h2>
-            <div style="font-size: 13px; opacity: 0.9; margin-bottom: 10px;">
-              <span>@${user.username || user.id}</span> &nbsp;|&nbsp; <span>${user.email || 'Email kiritilmagan'}</span>
+          <!-- Yuqori Tezkor Amallar Paneli (Mode, Katta Ekran, Chiqish) -->
+          <div class="staff-profile-top-actions">
+            <div class="profile-top-actions-left">
+              ${isSuper ? `
+                <button type="button" id="profile-btn-toggle-admin-mode" onclick="toggleAdminMode()" class="profile-action-btn profile-mode-btn ${isSuperMode ? 'is-super' : 'is-normal'}" title="Superadmin rejimini almashtirish">
+                  <span class="p-btn-icon">${isSuperMode ? '⚡' : '🛡️'}</span>
+                  <span class="p-btn-label">${isSuperMode ? 'Super Mode (To\'liq)' : 'Normal Mode (IT Bo\'lim)'}</span>
+                  <span class="p-btn-pill">${isSuperMode ? 'To\'liq' : 'Normal'}</span>
+                </button>
+              ` : `
+                <div class="profile-role-status" style="font-size: 13px; font-weight: 600; opacity: 0.9; display: flex; align-items: center; gap: 6px;">
+                  <span>👤</span> <span>Xodim Shaxsiy Kabineti</span>
+                </div>
+              `}
             </div>
-            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              ${roleBadges}
+
+            <div class="profile-top-actions-right">
+              <a href="/tv" target="_blank" class="profile-action-btn profile-tv-btn" title="Katta Ekran (TV) rejimini ochish">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                <span>Katta Ekran</span>
+              </a>
+              <button type="button" onclick="logoutStaffUser()" class="profile-action-btn profile-logout-btn" title="Tizimdan chiqish">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Chiqish</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Asosiy Rasm va Ism-Familiya -->
+          <div class="staff-profile-main-info">
+            <div class="staff-profile-avatar-wrap" id="profile-avatar-wrap">
+              ${user.photo_url ? `
+                <img src="${user.photo_url}" class="staff-profile-avatar-img" id="profile-hero-img" alt="Foto">
+              ` : `
+                <span class="staff-profile-avatar-fallback" id="profile-hero-fallback">${initials || '👤'}</span>
+              `}
+            </div>
+            <div class="staff-profile-details">
+              <h2 class="staff-profile-name">${fullName}</h2>
+              <div class="staff-profile-meta">
+                <span>@${user.username || user.id}</span> &nbsp;|&nbsp; <span>${user.email || 'Email kiritilmagan'}</span>
+              </div>
+              <div class="staff-profile-roles">
+                ${roleBadges}
+              </div>
             </div>
           </div>
         </div>

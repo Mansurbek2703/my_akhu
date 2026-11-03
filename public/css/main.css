@@ -1155,12 +1155,136 @@ body {
 
 .staff-profile-header {
   background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #2563EB 100%);
-  padding: 32px 30px;
+  padding: 24px 28px;
   color: #FFFFFF;
   display: flex;
-  align-items: center;
-  gap: 24px;
+  flex-direction: column;
+  gap: 20px;
   position: relative;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+/* Xodim profilidagi yuqori tezkor amallar paneli (Mode switch, TV, Logout) */
+.staff-profile-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.profile-top-actions-left,
+.profile-top-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.profile-mode-btn {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.profile-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.profile-mode-btn.is-super {
+  background: linear-gradient(135deg, #7C3AED 0%, #9333EA 100%);
+  border-color: rgba(216, 180, 254, 0.45);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+}
+
+.profile-mode-btn.is-normal {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.profile-mode-btn .p-btn-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+  margin-left: 3px;
+}
+
+.profile-tv-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #93C5FD;
+  border-color: rgba(147, 197, 253, 0.3);
+}
+
+.profile-tv-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+}
+
+.profile-logout-btn {
+  background: rgba(239, 68, 68, 0.22);
+  color: #FCA5A5;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.profile-logout-btn:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #EF4444;
+}
+
+.staff-profile-main-info {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+}
+
+.staff-profile-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.staff-profile-name {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  color: #FFFFFF;
+  word-break: break-word;
+}
+
+.staff-profile-meta {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-bottom: 10px;
+}
+
+.staff-profile-roles {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .staff-profile-avatar-wrap {
@@ -3409,9 +3533,72 @@ body {
   .content-body {
     padding: 12px 8px !important;
   }
-}
 
-.card {
+    .staff-profile-header {
+    padding: 16px 14px !important;
+    gap: 14px !important;
+  }
+
+  .staff-profile-top-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding-bottom: 12px !important;
+  }
+
+  .profile-top-actions-left,
+  .profile-top-actions-right {
+    display: flex !important;
+    width: 100% !important;
+  }
+
+  .profile-top-actions-left .profile-mode-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    font-size: 12.5px !important;
+  }
+
+  .profile-top-actions-right {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .profile-top-actions-right .profile-action-btn {
+    justify-content: center !important;
+    padding: 8px 10px !important;
+    font-size: 12.5px !important;
+    width: 100% !important;
+  }
+
+  .staff-profile-main-info {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 12px !important;
+  }
+
+  .staff-profile-avatar-wrap {
+    width: 84px !important;
+    height: 84px !important;
+  }
+
+  .staff-profile-name {
+    font-size: 19px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .staff-profile-meta {
+    font-size: 12px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .staff-profile-roles {
+    justify-content: center !important;
+  }
+
+  .card {
     border-radius: 12px !important;
   }
 
