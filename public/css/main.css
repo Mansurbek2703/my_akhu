@@ -3296,13 +3296,69 @@ body {
   }
 
   .topbar {
-    padding: 0 14px !important;
-    height: 60px !important;
+    padding: 0 12px !important;
+    height: 58px !important;
+    gap: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  .topbar-title-wrap {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .page-title {
+    flex: 1 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .page-title h2 {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin: 0 !important;
+  }
+
+  .topbar-actions {
+    flex-shrink: 0 !important;
+    gap: 5px !important;
+    display: flex !important;
+    align-items: center !important;
   }
 
   #topbar-tv-btn,
   #topbar-miniapp-btn {
     display: none !important;
+  }
+
+  .topbar-btn-text {
+    display: none !important;
+  }
+
+  #topbar-user-badge span#topbar-user-name {
+    display: none !important;
+  }
+
+  #topbar-user-badge {
+    padding: 2px !important;
+    border-radius: 50% !important;
+  }
+
+  #btn-toggle-admin-mode span#admin-mode-label {
+    display: none !important;
+  }
+
+  #btn-toggle-admin-mode {
+    padding: 4px 7px !important;
   }
 
   .content-body {
@@ -3318,18 +3374,25 @@ body {
 /* 640px gacha bo'lgan kichik smartfonlar */
 @media (max-width: 640px) {
   .topbar {
-    height: auto !important;
+    height: 56px !important;
     min-height: 56px !important;
-    padding: 8px 10px !important;
-    gap: 8px !important;
+    padding: 6px 10px !important;
+    gap: 6px !important;
+  }
+
+  .topbar-title-wrap {
+    flex: 1 !important;
+    min-width: 0 !important;
+    gap: 6px !important;
   }
 
   .page-title h2 {
     font-size: 14.5px !important;
-    max-width: 170px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-weight: 800 !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .page-title p {
@@ -3337,31 +3400,15 @@ body {
   }
 
   .topbar-actions {
-    gap: 6px !important;
-  }
-
-  #topbar-user-badge span#topbar-user-name {
-    display: none !important;
-  }
-
-  #topbar-user-badge {
-    padding: 3px 5px !important;
-    border-radius: 50% !important;
-  }
-
-  #btn-toggle-admin-mode span#admin-mode-label {
-    display: none !important;
-  }
-
-  #btn-toggle-admin-mode {
-    padding: 4px 8px !important;
+    gap: 4px !important;
   }
 
   .content-body {
     padding: 12px 8px !important;
   }
+}
 
-  .card {
+.card {
     border-radius: 12px !important;
   }
 
