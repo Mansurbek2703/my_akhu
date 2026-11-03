@@ -375,6 +375,42 @@ function updateAuthUI() {
     if (miniappBtn) {
       miniappBtn.style.display = (isSuper && window.innerWidth > 992) ? 'inline-flex' : 'none';
     }
+
+    // Profil Dropdown (Mobile va Desktop) elementlarini to'ldirish
+    const dropName = document.getElementById('dropdown-user-name');
+    const dropRole = document.getElementById('dropdown-user-role');
+    const dropModeBox = document.getElementById('dropdown-superadmin-mode-box');
+    const dropModeTitle = document.getElementById('dropdown-mode-title');
+    const dropModeIcon = document.getElementById('dropdown-mode-icon');
+    const dropModeDesc = document.getElementById('dropdown-mode-desc');
+    const dropModePill = document.getElementById('dropdown-mode-pill');
+    const dropAvatarImg = document.getElementById('dropdown-avatar-img');
+    const dropAvatarFallback = document.getElementById('dropdown-avatar-fallback');
+
+    if (dropName) dropName.textContent = fullName;
+    if (dropRole) dropRole.textContent = isSuper ? 'Superadmin' : ((AppState.user.roles || [])[0] || 'Xodim');
+    if (dropAvatarImg && dropAvatarFallback) {
+      if (AppState.user.photo_url) {
+        dropAvatarImg.src = AppState.user.photo_url;
+        dropAvatarImg.style.display = 'block';
+        dropAvatarFallback.style.display = 'none';
+      } else {
+        dropAvatarImg.style.display = 'none';
+        dropAvatarFallback.style.display = 'block';
+        dropAvatarFallback.textContent = initials || '👤';
+      }
+    }
+    if (dropModeBox) {
+      dropModeBox.style.display = isSuper ? 'block' : 'none';
+      if (dropModeTitle) dropModeTitle.textContent = isSuperMode ? 'Mode: Super (To\'liq)' : 'Mode: Normal (IT)';
+      if (dropModeIcon) dropModeIcon.textContent = isSuperMode ? '⚡' : '🛡️';
+      if (dropModeDesc) dropModeDesc.textContent = isSuperMode ? 'Normal IT rejimiga o\'tish' : 'To\'liq super rejimga o\'tish';
+      if (dropModePill) {
+        dropModePill.textContent = isSuperMode ? 'Super' : 'Normal';
+        dropModePill.style.background = isSuperMode ? '#EDE9FE' : '#DBEAFE';
+        dropModePill.style.color = isSuperMode ? '#6D28D9' : '#1D4ED8';
+      }
+    }
   }
 }
 
@@ -402,6 +438,42 @@ function toggleAdminMode() {
   }
 }
 window.toggleAdminMode = toggleAdminMode;
+
+// ====================================================================
+// TOPBAR PROFIL DROPDOWN KONTROLLERI (MOBILE & DESKTOP)
+// ====================================================================
+function toggleUserProfileDropdown(e) {
+  if (e) e.stopPropagation();
+  const dropdown = document.getElementById('topbar-profile-dropdown');
+  if (!dropdown) return;
+  const isHidden = dropdown.style.display === 'none' || !dropdown.style.display;
+  dropdown.style.display = isHidden ? 'block' : 'none';
+}
+
+function closeUserProfileDropdown() {
+  const dropdown = document.getElementById('topbar-profile-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+}
+
+function toggleAdminModeFromDropdown() {
+  closeUserProfileDropdown();
+  toggleAdminMode();
+}
+
+window.toggleUserProfileDropdown = toggleUserProfileDropdown;
+window.closeUserProfileDropdown = closeUserProfileDropdown;
+window.toggleAdminModeFromDropdown = toggleAdminModeFromDropdown;
+
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('topbar-profile-dropdown');
+  const badge = document.getElementById('topbar-user-badge');
+  if (dropdown && dropdown.style.display === 'block') {
+    if (!dropdown.contains(e.target) && (!badge || !badge.contains(e.target))) {
+      closeUserProfileDropdown();
+    }
+  }
+});
+
 
 // XODIMNING TIZIMDAN CHIQISHI (LOGOUT)
 function logoutStaffUser(askConfirm = true) {

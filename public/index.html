@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=20261103_title_fix_v3">
+  <link rel="stylesheet" href="/css/main.css?v=20261103_profile_dropdown_v4">
 </head>
 <body>
   <!-- 1. MAXSUS TIZIMGA KIRISH DARCHASI (FAQAT SHU OCHILADI AGAR TIZIMGA KIRILMAGAN BO'LSA) -->
@@ -196,17 +196,76 @@
           </div>
 
           <!-- Foydalanuvchi Profil qismi -->
-          <div id="auth-action-area" style="display: inline-flex; align-items: center; gap: 6px;">
+          <div id="auth-action-area" style="position: relative; display: inline-flex; align-items: center; gap: 6px;">
             <div id="auth-logged-box" style="display: flex; align-items: center; gap: 6px;">
-              <div id="topbar-user-badge" onclick="navigateTo('staff-my-profile')" style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 30px; padding: 3px 10px 3px 4px;" title="Mening Profilimga o'tish">
+              <div id="topbar-user-badge" onclick="toggleUserProfileDropdown(event)" style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 30px; padding: 3px 10px 3px 4px;" title="Profil va hisob amallari">
                 <img id="topbar-avatar-img" src="" alt="Avatar" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: none;">
                 <span id="topbar-avatar-fallback" style="width: 26px; height: 26px; border-radius: 50%; background: #3B82F6; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">👤</span>
                 <span id="topbar-user-name" style="font-weight: 600; font-size: 12px; color: #1D4ED8;">Foydalanuvchi</span>
               </div>
-              <button class="btn btn-outline btn-sm text-danger" onclick="logoutStaffUser()" title="Tizimdan chiqish" style="border-color: #FECACA; color: #DC2626; display: flex; align-items: center; gap: 4px; padding: 5px 8px;">
+              <button class="btn btn-outline btn-sm text-danger desktop-only-btn" id="topbar-logout-btn" onclick="logoutStaffUser()" title="Tizimdan chiqish" style="border-color: #FECACA; color: #DC2626; display: flex; align-items: center; gap: 4px; padding: 5px 8px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 <span class="topbar-btn-text">Chiqish</span>
               </button>
+            </div>
+
+            <!-- PROFIL DROPDOWN DARCHASI (MOBILE VA DESKTOP UCHUN) -->
+            <div id="topbar-profile-dropdown" class="profile-dropdown-menu" style="display: none;">
+              <div class="profile-dropdown-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div id="dropdown-avatar-circle" style="width: 38px; height: 38px; border-radius: 50%; background: #2563EB; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; overflow: hidden;">
+                    <img id="dropdown-avatar-img" src="" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                    <span id="dropdown-avatar-fallback">👤</span>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div id="dropdown-user-name" style="font-weight: 700; font-size: 13px; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Foydalanuvchi</div>
+                    <div id="dropdown-user-role" style="font-size: 11px; color: #64748B; margin-top: 1px;">Xodim</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="profile-dropdown-body">
+                <!-- 1. Mening Profilim -->
+                <button type="button" class="profile-dropdown-item" onclick="closeUserProfileDropdown(); navigateTo('staff-my-profile');">
+                  <span class="p-item-icon">👤</span>
+                  <div class="p-item-text">
+                    <div class="p-item-title">Mening Profilim</div>
+                    <div class="p-item-desc">Shaxsiy ma'lumotlar va fotosurat</div>
+                  </div>
+                </button>
+
+                <!-- 2. Superadmin Mode Almashtirish (Faqat Superadmin uchun) -->
+                <div id="dropdown-superadmin-mode-box" style="display: none;">
+                  <button type="button" class="profile-dropdown-item" onclick="toggleAdminModeFromDropdown();">
+                    <span class="p-item-icon" id="dropdown-mode-icon">🛡️</span>
+                    <div class="p-item-text">
+                      <div class="p-item-title" id="dropdown-mode-title">Mode: Normal (IT)</div>
+                      <div class="p-item-desc" id="dropdown-mode-desc">Boshqaruv rejimini almashtirish</div>
+                    </div>
+                    <span id="dropdown-mode-pill" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background: #DBEAFE; color: #1D4ED8;">Almashtirish</span>
+                  </button>
+                </div>
+
+                <!-- 3. Katta Ekran (TV) -->
+                <a href="/tv" target="_blank" class="profile-dropdown-item" onclick="closeUserProfileDropdown();">
+                  <span class="p-item-icon">📺</span>
+                  <div class="p-item-text">
+                    <div class="p-item-title">Katta Ekran (TV)</div>
+                    <div class="p-item-desc">Jonli kuzatuv rejimini ochish</div>
+                  </div>
+                </a>
+
+                <div class="dropdown-divider"></div>
+
+                <!-- 4. Tizimdan Chiqish -->
+                <button type="button" class="profile-dropdown-item text-danger" onclick="closeUserProfileDropdown(); logoutStaffUser();" style="color: #DC2626;">
+                  <span class="p-item-icon" style="color: #DC2626;">🚪</span>
+                  <div class="p-item-text">
+                    <div class="p-item-title" style="color: #DC2626; font-weight: 700;">Tizimdan Chiqish</div>
+                    <div class="p-item-desc">Sessiyani xavfsiz yakunlash</div>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -243,6 +302,6 @@
   </div>
 
   <script src="/js/html5-qrcode.min.js"></script>
-  <script src="/js/app.js?v=20261103_title_fix_v3"></script>
+  <script src="/js/app.js?v=20261103_profile_dropdown_v4"></script>
 </body>
 </html>
