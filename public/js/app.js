@@ -370,10 +370,10 @@ function updateAuthUI() {
     if (tvBtn1) tvBtn1.href = tvUrl;
     if (tvBtn2) tvBtn2.href = tvUrl;
 
-    // Talaba Mini App tugmasi: FAQAT SUPERADMINGA ko'rinadi, boshqa hech kimga ko'rinmaydi!
+    // Talaba Mini App tugmasi: FAQAT SUPERADMINGA (va faqat desktopda) ko'rinadi, mobile rejimda yashiriladi
     const miniappBtn = document.getElementById('topbar-miniapp-btn');
     if (miniappBtn) {
-      miniappBtn.style.display = isSuper ? 'inline-flex' : 'none';
+      miniappBtn.style.display = (isSuper && window.innerWidth > 992) ? 'inline-flex' : 'none';
     }
   }
 }
