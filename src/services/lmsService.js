@@ -867,6 +867,15 @@ function getStudentAttendance(studentId) {
   const student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(studentId, studentId);
   if (!student) return { error: 'Talaba topilmadi' };
 
+  // Barcha faol kurslar nomlari lug'ati
+  const allCourses = db.prepare(`SELECT id, code, name FROM lms_course`).all();
+  const courseNameMap = {};
+  for (const c of allCourses) {
+    courseNameMap[c.id] = c.name || c.code;
+  }
+  // Kurs 28 maxsus nomi
+  courseNameMap[28] = 'Academic & Communication Skills (Fall 26/27)';
+
   let attendances = [];
   if (student.moodle_id) {
     attendances = db.prepare(`
@@ -898,7 +907,11 @@ function getStudentAttendance(studentId) {
     else if (att.status === 'E') excusedCount++;
     else if (att.status === 'A') absentCount++;
 
-    const cName = att.course_name || `Kurs ${att.course_id}`;
+    let cName = att.course_name;
+    if (!cName || cName.startsWith('Kurs ')) {
+      cName = courseNameMap[att.course_id] || (att.course_id === 28 ? 'Academic & Communication Skills (Fall 26/27)' : `Kurs ${att.course_id}`);
+    }
+
     if (!subjectsMap[cName]) {
       subjectsMap[cName] = {
         course_name: cName,
@@ -946,11 +959,11 @@ function getStudentAttendance(studentId) {
       overall_rate: overallRate
     },
     subjects,
-    recent_sessions: attendances.slice(0, 30).map(a => ({
+    recent_sessions: attendances.map(a => ({
       id: a.id,
       session_id: a.session_id,
       course_id: a.course_id,
-      course_name: a.course_name,
+      course_name: (a.course_name && !a.course_name.startsWith('Kurs ')) ? a.course_name : (courseNameMap[a.course_id] || (a.course_id === 28 ? 'Academic & Communication Skills (Fall 26/27)' : `Kurs ${a.course_id}`)),
       sessdate: a.sessdate,
       sessdate_iso: a.sessdate_iso,
       status: a.status,

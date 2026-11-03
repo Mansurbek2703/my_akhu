@@ -15,6 +15,8 @@ git checkout -- . 2>/dev/null || true
 git pull origin main
 npm install --omit=dev
 
+node scripts/fix_course_28.js 2>/dev/null || true
+
 node -e '
 const { initSchema, db } = require("./src/db/database");
 initSchema();

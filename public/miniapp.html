@@ -199,7 +199,7 @@
     <!-- 2-KO'RINISH: DARS DAVOMATI (ATTENDANCE) -->
     <div id="classes-view-attendance" style="display: none;">
       <!-- Hero Davomat Kartasi -->
-      <div style="background: linear-gradient(135deg, #1E3A8A, #2563EB); border-radius: 18px; padding: 18px 16px; color: white; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(37,99,235,0.25);">
+      <div style="background: linear-gradient(135deg, #1E3A8A, #2563EB); border-radius: 18px; padding: 18px 16px; color: white; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(37,99,235,0.25);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
           <div>
             <div style="font-size: 11.5px; text-transform: uppercase; color: #BFDBFE; font-weight: 700; letter-spacing: 0.5px;">Semestr Dars Davomati</div>
@@ -231,20 +231,52 @@
         </div>
       </div>
 
-      <!-- FANLAR KESIMIDA DAVOMAT -->
-      <div class="section-title">
-        <span>Fanlar Kesimida Davomat</span>
-      </div>
-      <div id="lms-subjects-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
-        <div style="text-align: center; padding: 15px; color: #94A3B8; font-size: 12.5px;">Fanlar davomati yuklanmoqda...</div>
+      <!-- QISQA VA QULAY FILTRLAR (STATUS VA FANLAR BO'YICHA) -->
+      <div style="background: white; border-radius: 14px; border: 1px solid #E2E8F0; padding: 10px 12px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+        <!-- 1. Holat bo'yicha filter tugmalari -->
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;" id="att-status-filters">
+          <button class="att-status-btn active" data-status="ALL" onclick="setAttStatusFilter('ALL')" style="flex: 1; padding: 7px 6px; border-radius: 10px; border: 1px solid #2563EB; background: #2563EB; color: white; font-weight: 700; font-size: 11.5px; cursor: pointer; text-align: center; transition: all 0.2s;">
+            Barchasi
+          </button>
+          <button class="att-status-btn" data-status="A" onclick="setAttStatusFilter('A')" style="flex: 1; padding: 7px 6px; border-radius: 10px; border: 1px solid #E2E8F0; background: #F8FAFC; color: #DC2626; font-weight: 700; font-size: 11.5px; cursor: pointer; text-align: center; transition: all 0.2s;">
+            🔴 Kelmaganlar
+          </button>
+          <button class="att-status-btn" data-status="P" onclick="setAttStatusFilter('P')" style="flex: 1; padding: 7px 6px; border-radius: 10px; border: 1px solid #E2E8F0; background: #F8FAFC; color: #059669; font-weight: 700; font-size: 11.5px; cursor: pointer; text-align: center; transition: all 0.2s;">
+            🟢 Borlar
+          </button>
+        </div>
+
+        <!-- 2. Fanlar bo'yicha gorizontal qisqa scroll pills -->
+        <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch;" id="att-subject-pills-row">
+          <!-- Fanlar filtri tugmalari -->
+        </div>
       </div>
 
-      <!-- SO'NGGI DARSLAR JURNALI -->
-      <div class="section-title">
-        <span>So'nggi Darslar Jurnali</span>
+      <!-- FANLAR KESIMIDA QISQA UMUMIY STATISTIKA -->
+      <div id="lms-subjects-section" style="margin-bottom: 14px;">
+        <div class="section-title" style="margin-bottom: 8px;">
+          <span id="lms-subjects-title">Fanlar Davomati</span>
+        </div>
+        <div id="lms-subjects-container" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="text-align: center; padding: 15px; color: #94A3B8; font-size: 12.5px;">Fanlar davomati yuklanmoqda...</div>
+        </div>
       </div>
-      <div id="lms-recent-sessions-container" style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="text-align: center; padding: 15px; color: #94A3B8; font-size: 12.5px;">Darslar jurnali yuklanmoqda...</div>
+
+      <!-- QISQA DARSLAR JURNALI (MAX 3-4 TA, OCHILADIGAN ACCORDION) -->
+      <div id="lms-recent-section">
+        <div class="section-title" style="margin-bottom: 8px; justify-content: space-between;">
+          <span id="lms-sessions-title">Darslar Tarixi</span>
+          <span style="font-size: 11px; color: #64748B; font-weight: 600;" id="lms-sessions-count"></span>
+        </div>
+        <div id="lms-recent-sessions-container" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="text-align: center; padding: 15px; color: #94A3B8; font-size: 12.5px;">Darslar jurnali yuklanmoqda...</div>
+        </div>
+        <div id="lms-sessions-toggle-container" style="text-align: center; margin-top: 10px; display: none;">
+          <button id="lms-sessions-toggle-btn" onclick="toggleAttSessionsExpanded()" style="background: white; border: 1px solid #CBD5E1; color: #334155; padding: 7px 16px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s;">
+            <span id="lms-toggle-text">Barcha darslarni ko'rish</span>
+            <span id="lms-toggle-arrow">▼</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1054,11 +1086,54 @@
       }
     }
 
+    let currentAttStatusFilter = 'ALL'; // 'ALL', 'A', 'P'
+    let currentAttSubjectFilter = 'ALL'; // 'ALL' yoki aniq fan nomi
+    let isAttSessionsExpanded = false; // Odatiy holda faqat 3-4 ta dars ko'rinadi
+
+    function setAttStatusFilter(status) {
+      currentAttStatusFilter = status;
+      document.querySelectorAll('.att-status-btn').forEach(btn => {
+        const s = btn.getAttribute('data-status');
+        if (s === status) {
+          btn.style.background = (status === 'A' ? '#DC2626' : (status === 'P' ? '#059669' : '#2563EB'));
+          btn.style.color = 'white';
+          btn.style.borderColor = (status === 'A' ? '#DC2626' : (status === 'P' ? '#059669' : '#2563EB'));
+        } else {
+          btn.style.background = '#F8FAFC';
+          btn.style.color = (s === 'A' ? '#DC2626' : (s === 'P' ? '#059669' : '#334155'));
+          btn.style.borderColor = '#E2E8F0';
+        }
+      });
+      renderAttendanceFilteredViews();
+    }
+
+    function setAttSubjectFilter(subj) {
+      currentAttSubjectFilter = subj;
+      document.querySelectorAll('.att-subj-pill').forEach(btn => {
+        const s = btn.getAttribute('data-subj');
+        if (s === subj) {
+          btn.style.background = '#2563EB';
+          btn.style.color = 'white';
+          btn.style.borderColor = '#2563EB';
+        } else {
+          btn.style.background = '#F8FAFC';
+          btn.style.color = '#475569';
+          btn.style.borderColor = '#E2E8F0';
+        }
+      });
+      renderAttendanceFilteredViews();
+    }
+
+    function toggleAttSessionsExpanded() {
+      isAttSessionsExpanded = !isAttSessionsExpanded;
+      renderAttendanceFilteredViews();
+    }
+
     function renderClassesAttendance() {
       if (!classesAttendanceData) return;
-      const { summary, subjects, recent_sessions } = classesAttendanceData;
+      const { summary, subjects } = classesAttendanceData;
 
-      // Hero statistika
+      // 1. Hero statistika
       if (summary) {
         const rateEl = document.getElementById('lms-overall-rate');
         const totalEl = document.getElementById('lms-total-sessions');
@@ -1074,24 +1149,64 @@
         if (eEl) eEl.textContent = summary.excused_count || 0;
         if (aEl) aEl.textContent = summary.absent_count || 0;
 
-        // Bosh sahifadagi qisqa statistikani ham yangilash
         const homeStatEl = document.getElementById('home-lms-quick-stat');
         if (homeStatEl) {
           homeStatEl.textContent = `Semestr davomati: ${summary.overall_rate || 0}% (${summary.present_count || 0} bor, ${summary.absent_count || 0} yo'q)`;
         }
       }
 
-      // Fanlar kesimida
+      // 2. Fanlar filtri tugmalari (gorizontal scroll pills)
+      const pillsRow = document.getElementById('att-subject-pills-row');
+      if (pillsRow) {
+        let pillsHtml = `
+          <button class="att-subj-pill" data-subj="ALL" onclick="setAttSubjectFilter('ALL')" style="flex-shrink: 0; padding: 5px 12px; border-radius: 20px; border: 1px solid ${currentAttSubjectFilter === 'ALL' ? '#2563EB' : '#E2E8F0'}; background: ${currentAttSubjectFilter === 'ALL' ? '#2563EB' : '#F8FAFC'}; color: ${currentAttSubjectFilter === 'ALL' ? 'white' : '#475569'}; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+            Barcha fanlar
+          </button>
+        `;
+
+        if (subjects && subjects.length > 0) {
+          pillsHtml += subjects.map(s => {
+            const isAct = currentAttSubjectFilter === s.course_name;
+            const shortName = s.course_name.split(/[-–—(]/)[0].trim();
+            return `
+              <button class="att-subj-pill" data-subj="${s.course_name.replace(/"/g, '&quot;')}" onclick="setAttSubjectFilter('${s.course_name.replace(/'/g, "\\'")}')" style="flex-shrink: 0; padding: 5px 12px; border-radius: 20px; border: 1px solid ${isAct ? '#2563EB' : '#E2E8F0'}; background: ${isAct ? '#2563EB' : '#F8FAFC'}; color: ${isAct ? 'white' : '#475569'}; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+                ${shortName}
+              </button>
+            `;
+          }).join('');
+        }
+        pillsRow.innerHTML = pillsHtml;
+      }
+
+      // 3. Filtrlangan fanlar va qisqa darslarni chiqarish
+      renderAttendanceFilteredViews();
+    }
+
+    function renderAttendanceFilteredViews() {
+      if (!classesAttendanceData) return;
+      const { subjects, recent_sessions } = classesAttendanceData;
+
+      // --- FANLAR KESIMIDAGI QISQA STATISTIKA ---
       const subContainer = document.getElementById('lms-subjects-container');
+      const subTitle = document.getElementById('lms-subjects-title');
       if (subContainer) {
-        if (!subjects || subjects.length === 0) {
-          subContainer.innerHTML = '<div style="text-align:center; padding:15px; color:#94A3B8; font-size:12px;">Hozircha davomat qayd etilgan fanlar mavjud emas</div>';
+        let filteredSubjects = subjects || [];
+        if (currentAttSubjectFilter !== 'ALL') {
+          filteredSubjects = filteredSubjects.filter(s => s.course_name === currentAttSubjectFilter);
+          if (subTitle) subTitle.textContent = `${currentAttSubjectFilter} Davomati`;
         } else {
-          subContainer.innerHTML = subjects.map(sb => {
+          if (subTitle) subTitle.textContent = 'Fanlar Davomati (Umumiy)';
+        }
+
+        if (filteredSubjects.length === 0) {
+          subContainer.innerHTML = '<div style="text-align:center; padding:12px; color:#94A3B8; font-size:12px;">Ma\'lumot topilmadi</div>';
+        } else {
+          subContainer.innerHTML = filteredSubjects.map(sb => {
             const color = sb.rate >= 85 ? '#10B981' : (sb.rate >= 70 ? '#F59E0B' : '#EF4444');
             const bgLight = sb.rate >= 85 ? '#ECFDF5' : (sb.rate >= 70 ? '#FFFBEB' : '#FEF2F2');
+            const isSelected = currentAttSubjectFilter === sb.course_name;
             return `
-              <div style="background: white; border-radius: 14px; border: 1px solid #E2E8F0; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+              <div onclick="setAttSubjectFilter('${isSelected ? 'ALL' : sb.course_name.replace(/'/g, "\\'")}')" style="background: white; border-radius: 14px; border: 1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}; padding: 12px 14px; box-shadow: ${isSelected ? '0 0 0 1px #3B82F6' : '0 1px 4px rgba(0,0,0,0.02)'}; cursor: pointer; transition: all 0.2s;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 13.5px; font-weight: 700; color: #0F172A; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     ${sb.course_name}
@@ -1104,7 +1219,7 @@
                   <div style="width: ${Math.min(sb.rate, 100)}%; height: 100%; background: ${color}; border-radius: 4px; transition: width 0.3s;"></div>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 11px; color: #64748B;">
-                  <span>🟢 Bor: <b>${sb.present}</b> | 🔴 Yo'q: <b>${sb.absent}</b></span>
+                  <span>🟢 Bor: <b>${sb.present}</b> | 🔴 Kelmadi: <b style="color:${sb.absent > 0 ? '#DC2626' : '#64748B'};">${sb.absent}</b></span>
                   <span>Jami: <b>${sb.total} dars</b></span>
                 </div>
               </div>
@@ -1113,40 +1228,95 @@
         }
       }
 
-      // So'nggi darslar jurnali
+      // --- QISQA DARSLAR JURNALI (FILTRLANGAN VA IXCHAM) ---
       const recContainer = document.getElementById('lms-recent-sessions-container');
+      const sessCountEl = document.getElementById('lms-sessions-count');
+      const toggleContainer = document.getElementById('lms-sessions-toggle-container');
+      const toggleText = document.getElementById('lms-toggle-text');
+      const toggleArrow = document.getElementById('lms-toggle-arrow');
+
       if (recContainer) {
-        if (!recent_sessions || recent_sessions.length === 0) {
-          recContainer.innerHTML = '<div style="text-align:center; padding:15px; color:#94A3B8; font-size:12px;">Hozircha o\'tkazilgan darslar tarixi yo\'q</div>';
-        } else {
-          recContainer.innerHTML = recent_sessions.map(s => {
-            let statusBadge = '';
-            if (s.status === 'P') {
-              statusBadge = '<span style="background: #ECFDF5; color: #059669; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #A7F3D0;">🟢 Bor</span>';
-            } else if (s.status === 'L') {
-              statusBadge = '<span style="background: #FFFBEB; color: #D97706; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #FDE68A;">🟡 Kech</span>';
-            } else if (s.status === 'E') {
-              statusBadge = '<span style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">🔵 Sababli</span>';
-            } else {
-              statusBadge = '<span style="background: #FEF2F2; color: #DC2626; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #FECACA;">🔴 Kelmadi</span>';
-            }
+        let list = recent_sessions || [];
 
-            const dateStr = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '';
+        // 1. Fan bo'yicha filter
+        if (currentAttSubjectFilter !== 'ALL') {
+          list = list.filter(s => s.course_name === currentAttSubjectFilter);
+        }
 
-            return `
-              <div style="background: white; border-radius: 12px; border: 1px solid #E2E8F0; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                <div style="max-width: 72%;">
-                  <div style="font-size: 13px; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    ${s.course_name}
-                  </div>
-                  <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
-                    📅 ${dateStr} ${s.remarks ? `• <i>${s.remarks}</i>` : ''}
-                  </div>
-                </div>
-                <div>${statusBadge}</div>
+        // 2. Holat bo'yicha filter
+        if (currentAttStatusFilter === 'A') {
+          list = list.filter(s => s.status === 'A');
+        } else if (currentAttStatusFilter === 'P') {
+          list = list.filter(s => s.status === 'P' || s.status === 'L');
+        }
+
+        const totalFiltered = list.length;
+        if (sessCountEl) {
+          sessCountEl.textContent = `${totalFiltered} ta dars`;
+        }
+
+        if (totalFiltered === 0) {
+          if (currentAttStatusFilter === 'A') {
+            recContainer.innerHTML = `
+              <div style="text-align: center; padding: 18px 14px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px; color: #065F46; font-size: 12.5px; font-weight: 700;">
+                🎉 Tabriklaymiz! Sizda ${currentAttSubjectFilter !== 'ALL' ? 'ushbu fandan' : ''} qoldirilgan darslar yo'q!
               </div>
             `;
-          }).join('');
+          } else {
+            recContainer.innerHTML = '<div style="text-align:center; padding:15px; color:#94A3B8; font-size:12px;">Tanlangan filtr bo\'yicha darslar topilmadi</div>';
+          }
+          if (toggleContainer) toggleContainer.style.display = 'none';
+          return;
+        }
+
+        // Qisqa rejim: agar ochilmagan bo'lsa, faqat 3 ta dars ko'rsatiladi
+        const displayLimit = isAttSessionsExpanded ? totalFiltered : 3;
+        const visibleList = list.slice(0, displayLimit);
+
+        recContainer.innerHTML = visibleList.map(s => {
+          let statusBadge = '';
+          if (s.status === 'P') {
+            statusBadge = '<span style="background: #ECFDF5; color: #059669; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #A7F3D0;">🟢 Bor</span>';
+          } else if (s.status === 'L') {
+            statusBadge = '<span style="background: #FFFBEB; color: #D97706; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #FDE68A;">🟡 Kech</span>';
+          } else if (s.status === 'E') {
+            statusBadge = '<span style="background: #EFF6FF; color: #2563EB; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #BFDBFE;">🔵 Sababli</span>';
+          } else {
+            statusBadge = '<span style="background: #FEF2F2; color: #DC2626; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid #FECACA;">🔴 Kelmadi</span>';
+          }
+
+          const dateStr = s.sessdate_iso ? new Date(s.sessdate_iso).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric', weekday: 'short' }) : '';
+          const isAbsent = s.status === 'A';
+
+          return `
+            <div style="background: white; border-radius: 12px; border: 1px solid ${isAbsent ? '#FECACA' : '#E2E8F0'}; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <div style="max-width: 72%;">
+                <div style="font-size: 13px; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${s.course_name}
+                </div>
+                <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
+                  📅 ${dateStr} ${s.remarks ? `• <i>${s.remarks}</i>` : ''}
+                </div>
+              </div>
+              <div>${statusBadge}</div>
+            </div>
+          `;
+        }).join('');
+
+        // 3 tadan ko'p bo'lsa ochish/yopish tugmasini ko'rsatish
+        if (toggleContainer) {
+          if (totalFiltered > 3) {
+            toggleContainer.style.display = 'block';
+            if (isAttSessionsExpanded) {
+              if (toggleText) toggleText.textContent = 'Qisqartirish';
+              if (toggleArrow) toggleArrow.textContent = '▲';
+            } else {
+              if (toggleText) toggleText.textContent = `Barcha darslarni ko'rish (${totalFiltered} ta)`;
+              if (toggleArrow) toggleArrow.textContent = '▼';
+            }
+          } else {
+            toggleContainer.style.display = 'none';
+          }
         }
       }
     }
