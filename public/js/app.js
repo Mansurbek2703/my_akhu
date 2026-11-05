@@ -8607,6 +8607,8 @@ let adminStudentsState = {
   gender: '',
   status: '',
   has_photo: '',
+  has_bot: '',
+  sort: 'score_desc',
   viewMode: localStorage.getItem('akhu_students_view_mode') || 'list',
   limit: 48,
   offset: 0,
@@ -8948,6 +8950,10 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
             <span style="color: #FDE047;">🖼️ Rasmli:</span>
             <strong id="stat-photos-students" class="compact-metric-val">202</strong>
           </div>
+          <div class="compact-metric-item" title="Telegram botga start bosgan / ulangan talabalar" style="background: rgba(14, 165, 233, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 6px; padding: 2px 8px;">
+            <span style="color: #38BDF8;">🤖 Bot start:</span>
+            <strong id="stat-bot-students" class="compact-metric-val" style="color: #38BDF8;">0</strong>
+          </div>
           <button class="btn-groups-summary" onclick="openAcademicGroupsModal()" title="Barcha 12 ta guruh ro'yxatini ko'rish uchun bosing">
             <span>🏢 Guruhlar:</span>
             <strong id="stat-groups-count">12 ta</strong>
@@ -9054,6 +9060,17 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
           <option value="">Barcha holatlar</option>
           <option value="active">Faol (Active)</option>
           <option value="left">Nofaol (Left)</option>
+        </select>
+        <select id="filter-student-bot" class="admin-filter-select" title="Telegram bot holati">
+          <option value="">Barcha talabalar</option>
+          <option value="1">🤖 Botga start bosganlar</option>
+          <option value="0">❌ Botga start bosmaganlar</option>
+        </select>
+        <select id="filter-student-sort" class="admin-filter-select" title="Saralash tartibi" style="font-weight: 600; border-color: #93C5FD; color: #1E3A8A; background: #EFF6FF;">
+          <option value="score_desc" selected>🏆 Ball: Eng balanddan kamga</option>
+          <option value="score_asc">📉 Ball: Kamdan ko'pga</option>
+          <option value="name_asc">🔤 Ism bo'yicha (A-Z)</option>
+          <option value="created_desc">🕒 Yangi qo'shilganlar</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="resetStudentFilters()" title="Filtrlarni tozalash" style="display: inline-flex; align-items: center; gap: 4px;">
           ${icon('refresh', 13)} Tozalash
@@ -9190,6 +9207,24 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
     loadAdminStudentsList();
   });
 
+  const botFilterEl = document.getElementById('filter-student-bot');
+  if (botFilterEl) {
+    botFilterEl.addEventListener('change', (e) => {
+      adminStudentsState.has_bot = e.target.value;
+      adminStudentsState.offset = 0;
+      loadAdminStudentsList();
+    });
+  }
+
+  const sortFilterEl = document.getElementById('filter-student-sort');
+  if (sortFilterEl) {
+    sortFilterEl.addEventListener('change', (e) => {
+      adminStudentsState.sort = e.target.value;
+      adminStudentsState.offset = 0;
+      loadAdminStudentsList();
+    });
+  }
+
   await loadAdminStudentsList();
 }
 
@@ -9200,6 +9235,8 @@ function resetStudentFilters() {
   adminStudentsState.has_photo = '';
   adminStudentsState.gender = '';
   adminStudentsState.status = '';
+  adminStudentsState.has_bot = '';
+  adminStudentsState.sort = 'score_desc';
   adminStudentsState.offset = 0;
 
   const s = document.getElementById('filter-student-search');
@@ -9214,6 +9251,10 @@ function resetStudentFilters() {
   if (g) g.value = '';
   const st = document.getElementById('filter-student-status');
   if (st) st.value = '';
+  const b = document.getElementById('filter-student-bot');
+  if (b) b.value = '';
+  const srt = document.getElementById('filter-student-sort');
+  if (srt) srt.value = 'score_desc';
 
   loadAdminStudentsList();
 }
@@ -9272,6 +9313,8 @@ async function loadAdminStudentsList() {
     if (adminStudentsState.status) params.append('status', adminStudentsState.status);
     if (adminStudentsState.gender) params.append('gender', adminStudentsState.gender);
     if (adminStudentsState.has_photo !== '') params.append('has_photo', adminStudentsState.has_photo);
+    if (adminStudentsState.has_bot !== '') params.append('has_bot', adminStudentsState.has_bot);
+    if (adminStudentsState.sort) params.append('sort', adminStudentsState.sort);
 
     const res = await apiFetch(`/api/admin/students?${params.toString()}`);
     let students = res.students || [];
@@ -9285,10 +9328,12 @@ async function loadAdminStudentsList() {
     const statPhotos = document.getElementById('stat-photos-students');
     const statGroups = document.getElementById('stat-groups-count');
 
+    const statBot = document.getElementById('stat-bot-students');
     if (res.metrics) {
       if (statTotal) statTotal.textContent = res.metrics.total || 0;
       if (statActive) statActive.textContent = res.metrics.active || 0;
       if (statPhotos) statPhotos.textContent = res.metrics.photos || 0;
+      if (statBot) statBot.textContent = (res.metrics.bot_started !== undefined ? res.metrics.bot_started : 0) + ' ta';
       if (statGroups) statGroups.textContent = res.metrics.groups || 0;
     } else {
       if (statTotal) statTotal.textContent = res.total || 0;
@@ -9510,8 +9555,20 @@ function renderAdminStudentsCards(students) {
             </div>
             <div class="meta-item">
               <span class="meta-label">Ball:</span>
-              <span class="meta-val meta-score">${st.season || st.total || 0}</span>
+              <span class="meta-val meta-score">${st.season || 0}</span>
             </div>
+          </div>
+          <div style="margin-top: 6px; font-size: 11px; display: flex; align-items: center; justify-content: space-between;">
+            ${st.telegram_user_id ? `
+              <span class="badge" style="background:#E0F2FE; color:#0284C7; border: 1px solid #BAE6FD; font-size: 10px; font-weight: 600; padding: 2px 6px;">
+                🤖 Bot ulangan
+              </span>
+            ` : `
+              <span class="badge" style="background:#F1F5F9; color:#94A3B8; border: 1px solid #E2E8F0; font-size: 10px; padding: 2px 6px;">
+                ❌ Botga kirmagan
+              </span>
+            `}
+            <span style="font-size: 10.5px; color: var(--text-muted);">Jami: ${st.total || 0}</span>
           </div>
 
           <div class="student-card-actions" onclick="event.stopPropagation()">
@@ -9596,10 +9653,19 @@ function renderAdminStudentsTable(students) {
             <span style="color: #64748B;">${icon('phone', 12)}</span>
             <span>${st.phone || '-'}</span>
           </div>
+          ${st.telegram_user_id ? `
+            <div style="font-size: 10.5px; color: #0284C7; display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+              <span>🤖 Bot ulangan</span>
+            </div>
+          ` : `
+            <div style="font-size: 10.5px; color: #94A3B8; display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+              <span>❌ Botga kirmagan</span>
+            </div>
+          `}
         </td>
         <td>
-          <div style="font-weight: 700; color: #1E3A8A; font-size: 13px;">${st.season || st.total || 0}</div>
-          <div class="table-sub-text">Jami: ${st.total || 0}</div>
+          <div style="font-weight: 800; color: #2563EB; font-size: 14px;">${st.season || 0} <span style="font-size: 11px; font-weight: 500;">ball</span></div>
+          <div class="table-sub-text" style="font-size: 11px;">Jami: ${st.total || 0}</div>
         </td>
         <td>
           <span class="status-badge ${isActive ? 'badge-active' : 'badge-inactive'}">
@@ -10205,6 +10271,33 @@ async function showStudentDetailsModal(studentId) {
     const st = data.student;
     const entries = data.entries || [];
 
+    const isSuperadmin = Boolean(
+      AppState.user && (
+        AppState.user.id === 'superadmin' ||
+        AppState.user.user_type === 'superadmin' ||
+        (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('prorektor')))
+      )
+    );
+
+    const escapeHtmlText = (str) => String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeStudentModalCleanly()">Yopish</button>
+      ${isSuperadmin ? `
+        <button class="btn btn-outline text-danger" onclick="confirmResetStudentScores('${st.id}', '${escapeHtmlText(st.first_name)} ${escapeHtmlText(st.last_name)}')" style="border-color: #FECACA; color: #DC2626; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+          ${icon('trash', 14)} Barcha ballarni 0 ga tushirish
+        </button>
+      ` : ''}
+      <button class="btn btn-primary" onclick="showEditStudentModal('${studentId}')" style="display:inline-flex; align-items:center; gap:6px;">
+        ${icon('edit', 14)} Tahrirlash
+      </button>
+    `;
+
     const isFemale = st.gender === 'female' || st.gender === 'f';
     const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
 
@@ -10257,6 +10350,32 @@ async function showStudentDetailsModal(studentId) {
         <div id="photo-upload-status" style="margin-top: 8px; display: none;"></div>
       </div>
 
+      <!-- BALLAR VA NATIJALAR XULOSASI (PROMINENT BANNER) -->
+      <div style="background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%); color: white; padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; box-shadow: 0 4px 12px rgba(37,99,235,0.2);">
+        <div>
+          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85;">Talabaning Joriy Natijalari</div>
+          <div style="font-size: 22px; font-weight: 800; display: flex; align-items: baseline; gap: 8px;">
+            <span>${st.season || 0} <span style="font-size: 13px; font-weight: 500;">mavsumiy ball</span></span>
+            <span style="font-size: 14px; opacity: 0.85;">(Jami: ${st.total || 0} ball)</span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center; font-size: 12.5px;">
+          <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 6px;">
+            <div style="font-size: 10px; opacity: 0.8;">Tadbirlar</div>
+            <div style="font-weight: 700; font-size: 14px;">${st.events_count || 0} ta</div>
+          </div>
+          <div style="text-align: center; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 6px;">
+            <div style="font-size: 10px; opacity: 0.8;">Reyting o'rni</div>
+            <div style="font-weight: 700; font-size: 14px;">#${st.rank_cohort || 1}</div>
+          </div>
+          ${isSuperadmin ? `
+            <button type="button" class="btn btn-sm" onclick="confirmResetStudentScores('${st.id}', '${escapeHtmlText(st.first_name)} ${escapeHtmlText(st.last_name)}')" style="background: #EF4444; color: white; border: none; font-size: 11.5px; font-weight: 600; padding: 6px 11px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+              ${icon('trash', 13)} Barcha ballarni 0 ga tushirish
+            </button>
+          ` : ''}
+        </div>
+      </div>
+
       <!-- TALABA ASOSIY MA'LUMOTLARI -->
       <div class="grid grid-2 mb-3" style="font-size: 13px; background: white; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
         <div>
@@ -10266,8 +10385,8 @@ async function showStudentDetailsModal(studentId) {
         </div>
         <div>
           <p style="margin-bottom: 6px;"><strong>Telefon:</strong> ${st.phone || '-'}</p>
-          <p style="margin-bottom: 6px;"><strong>Telegram:</strong> ${st.telegram_user_id ? '<span class="text-success">Ulangan</span>' : '<span class="text-muted">Ulanmagan</span>'}</p>
-          <p style="margin-bottom: 6px;"><strong>Mavsumiy Ball:</strong> <strong style="color: #2563EB; font-size: 16px;">${st.season || 0}</strong> <span style="font-size: 12px; color: var(--text-muted);">(Jami: ${st.total || 0} ball)</span></p>
+          <p style="margin-bottom: 6px;"><strong>Telegram:</strong> ${st.telegram_user_id ? '<span class="text-success" style="font-weight:600;">🤖 Ulangan (' + st.telegram_user_id + ')</span>' : '<span class="text-muted">❌ Ulanmagan</span>'}</p>
+          <p style="margin-bottom: 6px;"><strong>Guruh:</strong> <span class="badge badge-group">${st.group_code || '-'}</span> (${st.course || 1}-kurs)</p>
         </div>
       </div>
 
@@ -10300,8 +10419,9 @@ async function showStudentDetailsModal(studentId) {
                 <tr>
                   <td style="white-space: nowrap;">${e.event_date || (e.created_at || '').substring(0, 10)}</td>
                   <td>
-                    <div style="font-weight: 600;">${escapeHtmlText(e.catalog_title || e.item_id || '-')}</div>
-                    ${e.note ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtmlText(e.note)}</div>` : ''}
+                    <div style="font-weight: 600; color: #1E293B;">${escapeHtmlText(e.event_title || e.catalog_title || e.item_id || '-')}</div>
+                    ${e.note ? `<div style="font-size: 11px; color: #64748B; margin-top: 2px;">💬 ${escapeHtmlText(e.note)}</div>` : ''}
+                    ${e.creator_name ? `<div style="font-size: 10.5px; color: #94A3B8; margin-top: 1px;">👤 Bergan / Tasdiqlagan: ${escapeHtmlText(e.creator_name)}</div>` : ''}
                   </td>
                   <td style="white-space: nowrap;"><strong style="color: ${e.points >= 0 ? '#16A34A' : '#DC2626'}; font-size: 13px;">${e.points > 0 ? '+' : ''}${e.points}</strong></td>
                   <td><span class="status-badge status-${e.status}">${e.status}</span></td>

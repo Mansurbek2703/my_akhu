@@ -264,7 +264,7 @@ router.post('/login', (req, res) => {
  * Talabalar ro'yxati (filtrlash, qidiruv)
  */
 router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
-  const { search, status, group, level, course, gender, has_photo, limit = 100, offset = 0 } = req.query;
+  const { search, status, group, level, course, gender, has_photo, has_bot, sort = 'score_desc', limit = 100, offset = 0 } = req.query;
 
   let where = [];
   let params = [];
@@ -295,6 +295,11 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
   } else if (has_photo === '0' || has_photo === 'false') {
     where.push("(st.photo_url IS NULL OR st.photo_url = '')");
   }
+  if (has_bot === '1' || has_bot === 'true') {
+    where.push("(st.telegram_user_id IS NOT NULL AND st.telegram_user_id != '')");
+  } else if (has_bot === '0' || has_bot === 'false') {
+    where.push("(st.telegram_user_id IS NULL OR st.telegram_user_id = '')");
+  }
   if (search && search.trim()) {
     const searchRes = buildStudentSearch(search, 'st');
     if (searchRes.clauses.length > 0) {
@@ -305,13 +310,28 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
 
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
+  let orderBy = 'COALESCE(sc.season, sc.total, 0) DESC, st.first_name ASC';
+  if (sort === 'score_asc') {
+    orderBy = 'COALESCE(sc.season, sc.total, 0) ASC, st.first_name ASC';
+  } else if (sort === 'score_desc') {
+    orderBy = 'COALESCE(sc.season, sc.total, 0) DESC, st.first_name ASC';
+  } else if (sort === 'name_asc') {
+    orderBy = 'st.first_name ASC, st.last_name ASC';
+  } else if (sort === 'name_desc') {
+    orderBy = 'st.first_name DESC, st.last_name DESC';
+  } else if (sort === 'created_desc') {
+    orderBy = 'st.created_at DESC';
+  } else if (sort === 'created_asc') {
+    orderBy = 'st.created_at ASC';
+  }
+
   const sql = `
     SELECT st.*, su.full_name as tutor_name, sc.total, sc.season, sc.rank_cohort
     FROM student st
     LEFT JOIN staff_user su ON st.tutor_id = su.id
     LEFT JOIN student_score sc ON st.id = sc.student_id
     ${whereClause}
-    ORDER BY st.created_at DESC
+    ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
   `;
 
@@ -324,6 +344,7 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_all,
       SUM(CASE WHEN status = 'left' THEN 1 ELSE 0 END) as inactive_all,
       SUM(CASE WHEN photo_url IS NOT NULL AND photo_url != '' THEN 1 ELSE 0 END) as with_photo_all,
+      SUM(CASE WHEN telegram_user_id IS NOT NULL AND telegram_user_id != '' THEN 1 ELSE 0 END) as bot_started_all,
       COUNT(DISTINCT group_code) as groups_all
     FROM student
   `).get();
@@ -336,6 +357,7 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
       active: counts.active_all || 0,
       inactive: counts.inactive_all || 0,
       photos: counts.with_photo_all || 0,
+      bot_started: counts.bot_started_all || 0,
       groups: counts.groups_all || 0
     }
   });
@@ -633,10 +655,11 @@ router.get('/students/:id', authenticateSuperadminOrRegistrator, (req, res) => {
   }
 
   const entries = db.prepare(`
-    SELECT pe.*, ci.name as catalog_title, su.full_name as creator_name
+    SELECT pe.*, ci.name as catalog_title, su.full_name as creator_name, ev.title as event_title
     FROM point_entry pe
     LEFT JOIN catalog_item ci ON pe.item_id = ci.id
     LEFT JOIN staff_user su ON pe.created_by = su.id
+    LEFT JOIN event ev ON pe.event_id = ev.id
     WHERE pe.student_id = ?
     ORDER BY pe.created_at DESC
   `).all(student.id);
