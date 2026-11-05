@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const xlsx = require('xlsx');
 const archiver = require('archiver');
-const { PERMISSION_CATEGORIES, ROLE_DEFAULT_PERMISSIONS, ALL_PERMISSIONS } = require('../utils/permissions');
+const { PERMISSION_CATEGORIES, ROLE_DEFAULT_PERMISSIONS, ALL_PERMISSIONS, getEffectiveUserPermissions, userHasPermission } = require('../utils/permissions');
 
 function sanitizeFilenamePart(s) {
   return String(s || '').replace(/[\/\\:*?"<>|]/g, '').trim();
@@ -106,6 +106,34 @@ function authenticateSuperadmin(req, res, next) {
 
   req.staffUser = { ...user, roles };
   next();
+}
+
+// Middleware: Superadmin YOKI 'settings_catalog' ruxsatiga ega xodim
+function authenticateCatalogManager(req, res, next) {
+  const userId = req.headers['x-user-id'] || req.query.user_id;
+  if (!userId) return res.status(401).json({ error: "Avtorizatsiyadan o'tilmagan. Iltimos, tizimga kiring." });
+
+  if (userId === 'superadmin') {
+    req.staffUser = { id: 'superadmin', full_name: 'Superadmin', roles: ['superadmin'], permissions: ALL_PERMISSIONS };
+    return next();
+  }
+
+  const user = db.prepare(`SELECT * FROM staff_user WHERE (LOWER(id) = LOWER(?) OR LOWER(COALESCE(passport_id, '')) = LOWER(?)) AND active = 1`).get(userId, userId);
+  if (!user) return res.status(401).json({ error: "Foydalanuvchi topilmadi yoki hisob faol emas" });
+
+  let roles = [];
+  try { roles = JSON.parse(user.roles); } catch (e) { roles = [user.roles]; }
+
+  let permissions = [];
+  try { permissions = JSON.parse(user.permissions || '[]'); } catch (e) { permissions = []; }
+
+  const effective = getEffectiveUserPermissions({ ...user, roles, permissions });
+  if (roles.includes('superadmin') || effective.includes('settings_catalog')) {
+    req.staffUser = { ...user, roles, permissions: effective };
+    return next();
+  }
+
+  return res.status(403).json({ error: "Ball mezonlari katalogini boshqarish uchun sizda 'settings_catalog' ruxsati mavjud emas" });
 }
 
 // Middleware: Superadmin, Registrator (dep_ob) YOKI Tyutor
@@ -2275,7 +2303,7 @@ router.delete('/users/:id', authenticateSuperadmin, (req, res) => {
 /**
  * GET /api/admin/catalog
  */
-router.get('/catalog', authenticateSuperadmin, (req, res) => {
+router.get('/catalog', authenticateCatalogManager, (req, res) => {
   const categories = db.prepare(`SELECT * FROM catalog_category ORDER BY sort ASC`).all();
   const items = db.prepare(`
     SELECT ci.*, cc.name as category_name, cc.color as category_color
@@ -2290,9 +2318,9 @@ router.get('/catalog', authenticateSuperadmin, (req, res) => {
 
 /**
  * POST /api/admin/catalog/item
- * Yangi mezon qo'shish (Superadmin)
+ * Yangi mezon qo'shish (Superadmin yoki 'settings_catalog' ruxsatiga ega xodim)
  */
-router.post('/catalog/item', authenticateSuperadmin, (req, res) => {
+router.post('/catalog/item', authenticateCatalogManager, (req, res) => {
   try {
     let { id, category_id, name, base_points, is_scale, is_auto, approver_role, evidence_hint, limit_rule } = req.body;
 
@@ -2368,9 +2396,9 @@ router.post('/catalog/item', authenticateSuperadmin, (req, res) => {
 
 /**
  * PUT /api/admin/catalog/item/:id
- * Mezonni tahrirlash (Superadmin: to'g'ridan-to'g'ri yangilash yoki yangi versiya yaratish)
+ * Mezonni tahrirlash (Superadmin yoki 'settings_catalog' ruxsatiga ega xodim)
  */
-router.put('/catalog/item/:id', authenticateSuperadmin, (req, res) => {
+router.put('/catalog/item/:id', authenticateCatalogManager, (req, res) => {
   try {
     const {
       name,
@@ -2486,9 +2514,9 @@ router.put('/catalog/item/:id', authenticateSuperadmin, (req, res) => {
 
 /**
  * DELETE /api/admin/catalog/item/:id
- * Mezonni yoki uning ma'lum versiyasini o'chirish (Superadmin)
+ * Mezonni yoki uning ma'lum versiyasini o'chirish
  */
-router.delete('/catalog/item/:id', authenticateSuperadmin, (req, res) => {
+router.delete('/catalog/item/:id', authenticateCatalogManager, (req, res) => {
   try {
     const id = req.params.id;
     const versionFrom = req.query.version_from || req.body?.version_from;

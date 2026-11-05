@@ -43,14 +43,13 @@ const PERMISSION_CATEGORIES = [
     ]
   },
   {
-    category: "Tadbirlar & QR Monitoring",
+    category: "Tadbirlar & Ishtirok",
     icon: "calendar",
     color: "#7C3AED",
     permissions: [
       { id: "events_view", name: "Tadbirlarni ko'rish", desc: "Universitet tadbirlari ro'yxatini ko'rish" },
       { id: "events_create", name: "Yangi tadbir yaratish", desc: "Tadbir, joyi, vaqti va mezonlarini belgilash" },
       { id: "events_edit", name: "Tadbirni tahrirlash", desc: "Tadbir vaqtini o'zgartirish, bekor qilish yoki yakunlash" },
-      { id: "events_qr_manage", name: "Dinamik QR kod boshqaruvi", desc: "Tadbir uchun jonli QR kodni ko'rsatish va monitoring" },
       { id: "events_view_registrations", name: "Ro'yxatdan o'tganlar nazorati", desc: "Tadbirga ro'yxatdan o'tgan va kelgan talabalar ro'yxati" }
     ]
   },
@@ -135,8 +134,8 @@ const ROLE_DEFAULT_PERMISSIONS = {
     'points_approve_dept', 'points_enter', 'events_view', 'events_create', 'attendance_view'
   ],
   dep_atm: [
-    'attendance_view', 'attendance_view_history', 'events_view', 'events_create', 'events_edit', 'events_qr_manage',
-    'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_bot_manage', 'students_view'
+    'attendance_view', 'attendance_view_history', 'events_view', 'events_create', 'events_edit',
+    'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_telegram', 'students_view'
   ],
   dep_xb: [
     'attendance_view', 'attendance_view_history', 'observe_analytics', 'events_view'
@@ -179,7 +178,7 @@ function getEffectiveUserPermissions(user) {
     }
     // dep_ bilan boshlangan bo'limlar (masalan: dep_yb, dep_mb, dep_ib...)
     if (r && r.startsWith('dep_')) {
-      ['points_enter', 'points_approve_dept', 'events_view', 'events_create', 'events_edit', 'events_qr_manage', 'attendance_view'].forEach(p => permSet.add(p));
+      ['points_enter', 'points_approve_dept', 'events_view', 'events_create', 'events_edit', 'attendance_view'].forEach(p => permSet.add(p));
     }
   }
 

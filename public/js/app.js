@@ -225,6 +225,30 @@ function getDefaultPageForRoles(roles = []) {
   return 'staff-my-profile';
 }
 
+function hasPermission(permId) {
+  if (!AppState.isLoggedIn || !AppState.user) return false;
+  const roles = AppState.user.roles || [];
+  if (roles.includes('superadmin') || AppState.user.id === 'superadmin') return true;
+
+  const perms = AppState.user.permissions || [];
+  if (Array.isArray(perms) && (perms.includes(permId) || (permId === 'settings_turniket' && perms.includes('settings_hikcentral')) || (permId === 'settings_seasons' && perms.includes('settings_semesters')))) return true;
+
+  const roleDefaults = window.ROLE_DEFAULT_PERMISSIONS || {
+    executive_director: ['observe_analytics', 'observe_tv_screen', 'attendance_view', 'attendance_view_history', 'attendance_export_excel', 'students_view', 'events_view', 'events_create', 'points_history_view', 'points_approve_prorektor', 'settings_audit_logs', 'settings_risk_monitoring'],
+    rector: ['observe_analytics', 'observe_tv_screen', 'attendance_view', 'attendance_view_history', 'attendance_export_excel', 'students_view', 'events_view', 'events_create', 'points_history_view', 'points_approve_prorektor', 'settings_audit_logs', 'settings_risk_monitoring'],
+    prorektor: ['points_approve_prorektor', 'points_history_view', 'observe_analytics', 'observe_tv_screen', 'settings_audit_logs', 'settings_risk_monitoring', 'attendance_view', 'events_view'],
+    dep_ob: ['students_view', 'students_create', 'students_edit', 'students_import_excel', 'students_import_gpa', 'students_export_zip', 'students_sync_turniket_photos', 'attendance_view', 'attendance_export_excel', 'observe_analytics'],
+    tutor: ['tutor_my_students', 'tutor_enter_points', 'attendance_view', 'attendance_view_history', 'events_view']
+  };
+
+  for (const r of roles) {
+    if (roleDefaults[r] && roleDefaults[r].includes(permId)) return true;
+    if (r && r.startsWith('dep_') && ['points_enter', 'points_approve_dept', 'events_view', 'events_create', 'events_edit', 'attendance_view'].includes(permId)) return true;
+  }
+  return false;
+}
+window.hasPermission = hasPermission;
+
 // Muayyan sahifa foydalanuvchi roliga ruxsat etilganmi?
 function isPagePermittedForUser(pageName, userRoles = []) {
   if (!userRoles || userRoles.length === 0) return false;
@@ -239,9 +263,9 @@ function isPagePermittedForUser(pageName, userRoles = []) {
   // Barcha xodimlar shaxsiy profilini, davomatni va LMS monitoringni ko'ra oladi
   if (pageName === 'staff-my-profile' || pageName === 'campus-attendance-manage' || pageName === 'lms-monitoring') return true;
 
-  // Talabalar boshqaruvi (Registrator va Superadmin)
+  // Talabalar boshqaruvi (Registrator, Superadmin yoki 'students_view' ruxsatiga ega xodim)
   if (pageName === 'admin-students-manage' || pageName === 'dept-students-manage') {
-    return userRoles.includes('dep_ob') || userRoles.includes('superadmin');
+    return userRoles.includes('dep_ob') || userRoles.includes('superadmin') || hasPermission('students_view');
   }
 
   // Tadbirlar & QR (Har bir xodim tadbir uyushtira oladi va ko'ra oladi)
@@ -252,22 +276,26 @@ function isPagePermittedForUser(pageName, userRoles = []) {
     );
   }
   if (pageName === 'observe-events') {
-    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector' || r === 'superadmin'));
+    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector' || r === 'superadmin')) || hasPermission('events_view');
   }
 
   // Tasdiqlash & Ijro
   if (pageName === 'dept-approvals' || pageName === 'prorektor-queue' || pageName === 'prorektor-risks' || pageName === 'prorektor-appeals') {
-    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector' || r === 'superadmin'));
+    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector' || r === 'superadmin')) || hasPermission('points_approve_dept') || hasPermission('points_approve_prorektor');
   }
 
-  // Tizim sozlamalari, xodimlar boshqaruvi, audit
+  // Tizim sozlamalari, xodimlar boshqaruvi, audit, katalog
   if (pageName.startsWith('admin-')) {
+    if (pageName === 'admin-catalog') return userRoles.includes('superadmin') || hasPermission('settings_catalog');
+    if (pageName === 'admin-audit') return userRoles.includes('superadmin') || hasPermission('settings_audit_logs');
+    if (pageName === 'admin-bot-monitoring') return userRoles.includes('superadmin') || hasPermission('settings_telegram');
+    if (pageName === 'admin-users-manage') return userRoles.includes('superadmin') || hasPermission('staff_view');
     return userRoles.includes('superadmin');
   }
 
   // Rahbariyat monitoringi (Superadmin, Ijrochi direktor, Rektor va Prorektor)
   if (pageName.startsWith('observe-')) {
-    return userRoles.includes('executive_director') || userRoles.includes('rector') || userRoles.includes('prorektor') || userRoles.includes('superadmin');
+    return userRoles.includes('executive_director') || userRoles.includes('rector') || userRoles.includes('prorektor') || userRoles.includes('superadmin') || hasPermission('observe_analytics');
   }
 
   return false;
@@ -617,6 +645,7 @@ function initLoginForm() {
         name: data.user.full_name,
         full_name: data.user.full_name,
         roles: data.user.roles || [],
+        permissions: data.user.permissions || [],
         email: data.user.email,
         phone: data.user.phone || '',
         photo_url: data.user.photo_url || '',
@@ -687,13 +716,16 @@ function updateSidebarPermissions() {
         } else if (forRole === 'tutor') {
           visible = userRoles.includes('tutor');
         }
+      } else if (forRole === 'superadmin') {
+        // Xodimga Tizim Sozlamalari bo'yicha granular ruxsat berilgan bo'lsa (masalan: settings_catalog, settings_audit_logs, staff_view)
+        visible = hasPermission('settings_catalog') || hasPermission('settings_audit_logs') || hasPermission('settings_telegram') || hasPermission('staff_view');
+      } else if (forRole === 'leadership') {
+        visible = userRoles.includes('prorektor') || userRoles.includes('rector') || userRoles.includes('executive_director') || hasPermission('observe_analytics');
+      } else if (forRole === 'students') {
+        visible = userRoles.includes('dep_ob') || hasPermission('students_view');
       } else if (forRole === 'tutor' && userRoles.includes('tutor')) {
         visible = true;
-      } else if (forRole === 'approver' && (userRoles.some(r => r && r.startsWith('dep_')) || userRoles.includes('prorektor'))) {
-        visible = true;
-      } else if (forRole === 'leadership' && (userRoles.includes('prorektor'))) {
-        visible = true;
-      } else if (forRole === 'students' && (userRoles.includes('dep_ob'))) {
+      } else if (forRole === 'approver' && (userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector')) || hasPermission('points_approve_dept') || hasPermission('points_approve_prorektor'))) {
         visible = true;
       } else if (forRole === 'dep_ob' && userRoles.includes('dep_ob')) {
         visible = true;
@@ -814,13 +846,20 @@ function renderModuleSubNav(pageName) {
       { id: 'tutor-history', label: 'Kiritilgan Yozuvlar' }
     ];
   } else if (sectionKey === 'admin-users-manage') {
-    tabs = [
-      { id: 'admin-users-manage', label: 'Xodimlar va Rollar' },
-      { id: 'admin-catalog', label: 'Katalog Sozlamalari' },
-      { id: 'admin-audit', label: 'Audit Jurnali' },
-      { id: 'admin-bot-monitoring', label: '🤖 Bot Monitoringi' }
-    ];
-    if (pageName === 'admin-staff-edit') {
+    tabs = [];
+    if (isSuperadmin || hasPermission('staff_view')) {
+      tabs.push({ id: 'admin-users-manage', label: 'Xodimlar va Rollar' });
+    }
+    if (isSuperadmin || hasPermission('settings_catalog')) {
+      tabs.push({ id: 'admin-catalog', label: 'Katalog Sozlamalari' });
+    }
+    if (isSuperadmin || hasPermission('settings_audit_logs')) {
+      tabs.push({ id: 'admin-audit', label: 'Audit Jurnali' });
+    }
+    if (isSuperadmin || hasPermission('settings_telegram')) {
+      tabs.push({ id: 'admin-bot-monitoring', label: '🤖 Bot Monitoringi' });
+    }
+    if (pageName === 'admin-staff-edit' && (isSuperadmin || hasPermission('staff_edit'))) {
       tabs.push({ id: 'admin-staff-edit', label: '✏️ Xodimni Tahrirlash' });
     }
   } else if (sectionKey === 'campus-attendance-manage') {
@@ -892,9 +931,14 @@ window.closeMobileSidebar = closeMobileSidebar;
 function initNavigation() {
   document.querySelectorAll('.sidebar-nav a.nav-item').forEach(link => {
     link.addEventListener('click', (e) => {
-      const page = link.getAttribute('data-page');
+      let page = link.getAttribute('data-page');
       if (page) {
         e.preventDefault();
+        if (page === 'admin-users-manage' && !isPagePermittedForUser('admin-users-manage', AppState.user?.roles)) {
+          if (hasPermission('settings_catalog')) page = 'admin-catalog';
+          else if (hasPermission('settings_audit_logs')) page = 'admin-audit';
+          else if (hasPermission('settings_telegram')) page = 'admin-bot-monitoring';
+        }
         navigateTo(page);
       }
     });
@@ -2091,6 +2135,13 @@ async function renderObserveCatalog(container) {
               ball shkalasi va tasdiqlovchi mas'ul bo'limlar ro'yxati.
             </p>
           </div>
+          ${(hasPermission('settings_catalog') || (AppState.user?.roles || []).includes('superadmin')) ? `
+            <div>
+              <button class="btn btn-primary" onclick="navigateTo('admin-catalog')" style="display:inline-flex; align-items:center; gap:8px; font-weight:700; padding:10px 18px; border-radius:10px; box-shadow:0 4px 14px rgba(37,99,235,0.3); cursor:pointer;">
+                ${icon('edit', 16)} <span>Mezonlarni Tahrirlash & Boshqarish</span>
+              </button>
+            </div>
+          ` : ''}
         </div>
       </div>
 
@@ -2185,6 +2236,11 @@ async function renderObserveCatalog(container) {
             ${icon('fileSpreadsheet', 16)} Katalog Bandlari va Mezonlar Ro'yxati (${observeCatalogState.items.length} ta mezon)
           </h3>
           <div style="display: flex; gap: 10px; align-items: center;">
+            ${(hasPermission('settings_catalog') || (AppState.user?.roles || []).includes('superadmin')) ? `
+              <button class="btn btn-primary btn-sm" onclick="navigateTo('admin-catalog')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+                ${icon('edit', 14)} <span>Katalog Sozlamalari</span>
+              </button>
+            ` : ''}
             <select id="obs-catalog-filter-cat" class="form-select" style="width: auto; font-size: 12px; padding: 6px 10px;">
               <option value="">Barcha sohalar</option>
               ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
@@ -2204,6 +2260,7 @@ async function renderObserveCatalog(container) {
                 <th>Turi</th>
                 <th>Dalil Talabi</th>
                 <th>Tasdiqlovchi Bo'lim</th>
+                ${(hasPermission('settings_catalog') || (AppState.user?.roles || []).includes('superadmin')) ? '<th style="text-align:right; width:90px;">Amal</th>' : ''}
               </tr>
             </thead>
             <tbody id="obs-catalog-table-body">
@@ -2281,6 +2338,13 @@ function renderObserveCatalogTable() {
         <td>
           <span class="badge badge-group" style="font-weight: 600;">${formatApproverRole(it.approver_role)}</span>
         </td>
+        ${(hasPermission('settings_catalog') || (AppState.user?.roles || []).includes('superadmin')) ? `
+          <td style="text-align:right;">
+            <button class="btn btn-outline btn-sm" onclick="showEditCatalogModal('${it.id}', ${it.version_from || 1})" style="padding:4px 8px; font-size:11px; display:inline-flex; align-items:center; gap:4px; font-weight:600;" title="Mezonni tahrirlash">
+              ${icon('edit', 12)} Tahrirlash
+            </button>
+          </td>
+        ` : ''}
       </tr>
     `;
   }).join('');
@@ -6974,14 +7038,31 @@ async function submitAddCatalogItem() {
     const refreshData = await apiFetch('/api/admin/catalog');
     adminCatalogState.items = refreshData.items || [];
     renderAdminCatalogRows();
+    if (AppState.currentPage === 'observe-catalog') {
+      observeCatalogState.items = refreshData.items || [];
+      renderObserveCatalogTable();
+    }
   } catch (err) {
     showToast('Xatolik: ' + err.message, 'error');
   }
 }
 
 async function showEditCatalogModal(id, version_from) {
-  const item = adminCatalogState.items.find(i => String(i.id) === String(id) && Number(i.version_from || 1) === Number(version_from || 1)) 
-            || adminCatalogState.items.find(i => String(i.id) === String(id));
+  if (!adminCatalogState.items || adminCatalogState.items.length === 0) {
+    if (observeCatalogState.items && observeCatalogState.items.length > 0) {
+      adminCatalogState.items = observeCatalogState.items;
+      adminCatalogState.categories = observeCatalogState.categories;
+    } else {
+      try {
+        const d = await apiFetch('/api/admin/catalog');
+        adminCatalogState.items = d.items || [];
+        adminCatalogState.categories = d.categories || [];
+      } catch (e) {}
+    }
+  }
+
+  const item = (adminCatalogState.items || []).find(i => String(i.id) === String(id) && Number(i.version_from || 1) === Number(version_from || 1)) 
+            || (adminCatalogState.items || []).find(i => String(i.id) === String(id));
   if (!item) return;
 
   const categories = adminCatalogState.categories || [];
@@ -7123,6 +7204,10 @@ async function saveCatalogItem(id, version_from) {
     const refreshData = await apiFetch('/api/admin/catalog');
     adminCatalogState.items = refreshData.items || [];
     renderAdminCatalogRows();
+    if (AppState.currentPage === 'observe-catalog') {
+      observeCatalogState.items = refreshData.items || [];
+      renderObserveCatalogTable();
+    }
   } catch (e) {
     showToast('Xatolik: ' + e.message, 'error');
   }
@@ -7146,6 +7231,10 @@ async function deleteCatalogItem(id, version_from) {
     const refreshData = await apiFetch('/api/admin/catalog');
     adminCatalogState.items = refreshData.items || [];
     renderAdminCatalogRows();
+    if (AppState.currentPage === 'observe-catalog') {
+      observeCatalogState.items = refreshData.items || [];
+      renderObserveCatalogTable();
+    }
   } catch (err) {
     showToast('Xatolik: ' + err.message, 'error');
   }
@@ -11387,7 +11476,7 @@ const PERM_CATEGORIES_DATA = [
   },
   {
     key: 'events',
-    category: 'Tadbirlar & QR Monitoring',
+    category: 'Tadbirlar & Ishtirok',
     color: '#7C3AED',
     bg: '#F5F3FF',
     icon: '📅',
@@ -11395,7 +11484,6 @@ const PERM_CATEGORIES_DATA = [
       { id: 'events_view', name: "Tadbirlarni ko'rish", desc: "Universitet tadbirlari ro'yxatini ko'rish" },
       { id: 'events_create', name: "Yangi tadbir yaratish", desc: "Tadbir, joyi, vaqti va mezonlarini belgilash" },
       { id: 'events_edit', name: "Tadbirni tahrirlash", desc: "Tadbir vaqtini o'zgartirish, bekor qilish yoki yakunlash" },
-      { id: 'events_qr_manage', name: "Dinamik QR kod boshqaruvi", desc: "Tadbir uchun jonli QR kodni ko'rsatish va monitoring" },
       { id: 'events_view_registrations', name: "Ro'yxatdan o'tganlar nazorati", desc: "Tadbirga ro'yxatdan o'tgan va kelgan talabalar ro'yxati" }
     ]
   },
@@ -11432,8 +11520,8 @@ const PERM_CATEGORIES_DATA = [
     bg: '#F8FAFC',
     icon: '⚙️',
     permissions: [
-      { id: 'settings_seasons', name: "Mavsumlar va semestrlar", desc: "O'quv yili va mavsumlarni sozlash" },
       { id: 'settings_catalog', name: "Ball mezonlari katalogi", desc: "Katalog bandlari va mezonlar qiymatlarini tahrirlash" },
+      { id: 'settings_seasons', name: "Mavsumlar va semestrlar", desc: "O'quv yili va mavsumlarni sozlash" },
       { id: 'settings_hikcentral', name: "Turniket sozlamalari", desc: "HikCentral server IP, AppKey va ulanish parametrlari" },
       { id: 'settings_telegram', name: "Telegram bot boshqaruvi", desc: "Bot tokeni, kanallar va xabarnomalar" },
       { id: 'settings_tv_display', name: "TV Ekran boshqaruvi", desc: "Katta ekran TV tokeni va ko'rsatish sozlamalari" },
@@ -12850,12 +12938,16 @@ function impersonateStaffUser(userId) {
   let roles = [];
   try { roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles; } catch(e) { roles = [user.roles]; }
 
+  let perms = [];
+  try { perms = typeof user.permissions === 'string' ? JSON.parse(user.permissions || '[]') : (user.permissions || []); } catch(e) { perms = []; }
+
   AppState.isLoggedIn = true;
   AppState.user = {
     id: user.id,
     name: user.full_name,
     full_name: user.full_name,
     roles: roles || [],
+    permissions: perms || [],
     email: user.email,
     groups: user.tutor_groups || []
   };
