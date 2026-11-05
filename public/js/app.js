@@ -3709,6 +3709,13 @@ const eventDtState = {
   }
 };
 
+// Tashkent mahalliy vaqt yordamchisi
+function getTashkentNow() {
+  const now = new Date();
+  const s = now.toLocaleString('en-US', { timeZone: 'Asia/Tashkent' });
+  return new Date(s);
+}
+
 function renderDateTimeControlsHtml(prefix = '') {
   return `
     <div style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
@@ -3737,27 +3744,43 @@ function renderDateTimeControlsHtml(prefix = '') {
         <span id="${prefix}ev-date-weekday-badge" style="font-size: 12px; font-weight: 700; color: #2563EB; background: #EFF6FF; padding: 4px 10px; border-radius: 6px; border: 1px solid #BFDBFE;"></span>
       </div>
 
-      <!-- 2. VAQT BOSHQARUVI (Boshlanish va Tugash vaqtlari) -->
-      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+      <!-- 2. VAQT BOSHQARUVI (Windows-style 24-soatlik Vaqt Tanlagich) -->
+      <div style="background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
           <div>
-            <label style="font-size: 11.5px; font-weight: 700; color: #1E293B; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
-              ⏰ Boshlanish vaqti *
+            <label style="font-size: 12px; font-weight: 700; color: #1E293B; display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+              <span>⏰ Boshlanish vaqti *</span>
+              <span id="${prefix}ev-start-time-badge" style="font-size: 10.5px; font-weight: 700; color: #2563EB; background: #EFF6FF; padding: 2px 7px; border-radius: 5px; border: 1px solid #BFDBFE;">24-soatlik</span>
             </label>
-            <select id="${prefix}ev-start-time" class="form-control" onchange="onEventStartTimeSelect(this.value, '${prefix}')" style="font-size: 13px; font-weight: 700; background: white; border: 1.5px solid #CBD5E1;">
-            </select>
+            <div class="windows-time-box">
+              <input type="time" 
+                     id="${prefix}ev-start-time" 
+                     class="windows-time-picker" 
+                     step="300"
+                     oninput="onEventStartTimeSelect(this.value, '${prefix}')" 
+                     onchange="onEventStartTimeSelect(this.value, '${prefix}')">
+            </div>
+            <div id="${prefix}ev-start-time-hint" style="font-size: 11px; margin-top: 4px; font-weight: 600; line-height: 1.3;"></div>
           </div>
           <div>
-            <label style="font-size: 11.5px; font-weight: 700; color: #1E293B; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
-              ⌛ Tugash vaqti *
+            <label style="font-size: 12px; font-weight: 700; color: #1E293B; display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+              <span>⏳ Tugash vaqti *</span>
+              <span id="${prefix}ev-end-time-badge" style="font-size: 10.5px; font-weight: 700; color: #059669; background: #ECFDF5; padding: 2px 7px; border-radius: 5px; border: 1px solid #A7F3D0;">Avtomatik</span>
             </label>
-            <select id="${prefix}ev-end-time" class="form-control" onchange="onEventEndTimeSelect(this.value, '${prefix}')" style="font-size: 13px; font-weight: 700; background: white; border: 1.5px solid #CBD5E1;">
-            </select>
+            <div class="windows-time-box">
+              <input type="time" 
+                     id="${prefix}ev-end-time" 
+                     class="windows-time-picker" 
+                     step="300"
+                     oninput="onEventEndTimeSelect(this.value, '${prefix}')" 
+                     onchange="onEventEndTimeSelect(this.value, '${prefix}')">
+            </div>
+            <div id="${prefix}ev-end-time-hint" style="font-size: 11px; margin-top: 4px; font-weight: 600; line-height: 1.3;"></div>
           </div>
         </div>
 
         <!-- TEZKOR DAVOMIYLIK CHIPLARI -->
-        <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 6px; border-top: 1px dashed #CBD5E1;">
           <span style="font-size: 11px; font-weight: 700; color: #64748B;">⏱️ Davomiyligi:</span>
           <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(30, '${prefix}')" data-dur="30">30 daq</button>
           <button type="button" class="duration-chip-btn ${prefix}dur-btn" onclick="selectEventDuration(45, '${prefix}')" data-dur="45">45 daq</button>
@@ -3775,8 +3798,9 @@ function renderDateTimeControlsHtml(prefix = '') {
 }
 
 function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialEndsAt = null) {
-  const now = new Date();
+  const tNow = getTashkentNow();
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
+  const todayStr = `${tNow.getFullYear()}-${String(tNow.getMonth() + 1).padStart(2, '0')}-${String(tNow.getDate()).padStart(2, '0')}`;
 
   if (initialStartsAt && initialEndsAt) {
     const sDate = new Date(initialStartsAt);
@@ -3798,15 +3822,27 @@ function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialE
     st.calMonth = Number(getS('month')) - 1;
     st.durationMinutes = Math.max(15, Math.round((eDate - sDate) / (60 * 1000)));
   } else {
-    const defaultStart = new Date(now.getTime() + 15 * 60 * 1000);
-    defaultStart.setMinutes(Math.ceil(defaultStart.getMinutes() / 15) * 15);
-    const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+    // Tadbir yangi yaratilayotganda o'tgan vaqtni hisobga olgan holda boshlanish vaqtini belgilaymiz:
+    const defaultStart = new Date(tNow.getTime() + 15 * 60 * 1000);
+    defaultStart.setMinutes(Math.ceil(defaultStart.getMinutes() / 5) * 5);
+    defaultStart.setSeconds(0);
 
-    st.selectedDate = `${defaultStart.getFullYear()}-${String(defaultStart.getMonth() + 1).padStart(2, '0')}-${String(defaultStart.getDate()).padStart(2, '0')}`;
-    st.selectedStartTime = `${String(defaultStart.getHours()).padStart(2, '0')}:${String(defaultStart.getMinutes()).padStart(2, '0')}`;
-    st.selectedEndTime = `${String(defaultEnd.getHours()).padStart(2, '0')}:${String(defaultEnd.getMinutes()).padStart(2, '0')}`;
-    st.calYear = now.getFullYear();
-    st.calMonth = now.getMonth();
+    // Agar bugun kech bo'lib ketgan bo'lsa (23:40 dan o'tgan bo'lsa), ertangi kunga ko'chiramiz
+    if (defaultStart.getDate() !== tNow.getDate() || (defaultStart.getHours() >= 23 && defaultStart.getMinutes() > 40)) {
+      const tmr = new Date(tNow.getTime() + 24 * 60 * 60 * 1000);
+      st.selectedDate = `${tmr.getFullYear()}-${String(tmr.getMonth() + 1).padStart(2, '0')}-${String(tmr.getDate()).padStart(2, '0')}`;
+      st.selectedStartTime = '09:00';
+      st.selectedEndTime = '10:00';
+      st.calYear = tmr.getFullYear();
+      st.calMonth = tmr.getMonth();
+    } else {
+      st.selectedDate = todayStr;
+      st.selectedStartTime = `${String(defaultStart.getHours()).padStart(2, '0')}:${String(defaultStart.getMinutes()).padStart(2, '0')}`;
+      const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+      st.selectedEndTime = `${String(defaultEnd.getHours()).padStart(2, '0')}:${String(defaultEnd.getMinutes()).padStart(2, '0')}`;
+      st.calYear = tNow.getFullYear();
+      st.calMonth = tNow.getMonth();
+    }
     st.durationMinutes = 60;
   }
   st.confirmed = true;
@@ -3814,7 +3850,6 @@ function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialE
   const dateInput = document.getElementById(`${prefix}ev-date-input`);
   if (dateInput) {
     dateInput.value = st.selectedDate;
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     dateInput.min = todayStr;
   }
 
@@ -3924,15 +3959,17 @@ function selectEventCalendarDate(dateStr, prefix = '') {
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.selectedDate = dateStr;
 
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const tNow = getTashkentNow();
+  const todayStr = `${tNow.getFullYear()}-${String(tNow.getMonth() + 1).padStart(2, '0')}-${String(tNow.getDate()).padStart(2, '0')}`;
 
   if (dateStr === todayStr) {
-    const minStartMs = now.getTime() + 10 * 60 * 1000;
-    const currentStartDt = new Date(`${dateStr}T${st.selectedStartTime || '08:00'}:00`);
-    if (currentStartDt.getTime() < minStartMs) {
-      const nextSlot = new Date(minStartMs + 5 * 60 * 1000);
-      nextSlot.setMinutes(Math.ceil(nextSlot.getMinutes() / 15) * 15);
+    const minStartMs = tNow.getTime() + 10 * 60 * 1000;
+    const minStartDt = new Date(minStartMs);
+    const minStartStr = `${String(minStartDt.getHours()).padStart(2, '0')}:${String(minStartDt.getMinutes()).padStart(2, '0')}`;
+
+    if (!st.selectedStartTime || st.selectedStartTime < minStartStr) {
+      const nextSlot = new Date(tNow.getTime() + 15 * 60 * 1000);
+      nextSlot.setMinutes(Math.ceil(nextSlot.getMinutes() / 5) * 5);
       st.selectedStartTime = `${String(nextSlot.getHours()).padStart(2, '0')}:${String(nextSlot.getMinutes()).padStart(2, '0')}`;
       recalcEndTime(prefix);
     }
@@ -4027,62 +4064,56 @@ function setEventQuickDate(type, prefix = '') {
 }
 
 function renderEventTimeSelects(prefix = '') {
-  const startSelect = document.getElementById(`${prefix}ev-start-time`);
-  const endSelect = document.getElementById(`${prefix}ev-end-time`);
-  if (!startSelect || !endSelect) return;
+  const startInput = document.getElementById(`${prefix}ev-start-time`);
+  const endInput = document.getElementById(`${prefix}ev-end-time`);
+  const startHint = document.getElementById(`${prefix}ev-start-time-hint`);
+  const endHint = document.getElementById(`${prefix}ev-end-time-hint`);
+  if (!startInput || !endInput) return;
 
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const tNow = getTashkentNow();
+  const todayStr = `${tNow.getFullYear()}-${String(tNow.getMonth() + 1).padStart(2, '0')}-${String(tNow.getDate()).padStart(2, '0')}`;
   const isToday = (st.selectedDate === todayStr);
-  const minStartMs = now.getTime() + 10 * 60 * 1000;
 
-  if (!st.selectedStartTime) {
-    st.selectedStartTime = '09:00';
-  }
+  const minStartDt = new Date(tNow.getTime() + 10 * 60 * 1000);
+  const minStartStr = `${String(minStartDt.getHours()).padStart(2, '0')}:${String(minStartDt.getMinutes()).padStart(2, '0')}`;
 
-  let startHtml = '';
-  for (let h = 7; h <= 22; h++) {
-    for (let m of [0, 15, 30, 45]) {
-      const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      let isDisabled = false;
-
-      if (isToday) {
-        const slotDt = new Date(`${st.selectedDate}T${timeStr}:00`);
-        if (slotDt.getTime() < minStartMs) {
-          isDisabled = true;
-        }
-      }
-
-      const isSelected = (timeStr === st.selectedStartTime);
-      startHtml += `<option value="${timeStr}" ${isDisabled ? 'disabled style="color:#94A3B8;"' : ''} ${isSelected ? 'selected' : ''}>${timeStr} ${isDisabled ? '(O\'tgan)' : ''}</option>`;
+  if (isToday) {
+    startInput.min = minStartStr;
+    if (!st.selectedStartTime || st.selectedStartTime < minStartStr) {
+      const rounded = new Date(tNow.getTime() + 15 * 60 * 1000);
+      rounded.setMinutes(Math.ceil(rounded.getMinutes() / 5) * 5);
+      st.selectedStartTime = `${String(rounded.getHours()).padStart(2, '0')}:${String(rounded.getMinutes()).padStart(2, '0')}`;
+      recalcEndTime(prefix);
+    }
+    if (startHint) {
+      startHint.innerHTML = `<span style="color:#2563EB;">🕒 Eng erta vaqt: <strong>${minStartStr}</strong> (hozir: ${String(tNow.getHours()).padStart(2,'0')}:${String(tNow.getMinutes()).padStart(2,'0')})</span>`;
+    }
+  } else {
+    startInput.removeAttribute('min');
+    if (!st.selectedStartTime) {
+      st.selectedStartTime = '09:00';
+      recalcEndTime(prefix);
+    }
+    if (startHint) {
+      startHint.innerHTML = `<span style="color:#64748B;">🕒 24-soatlik format (00:00 &mdash; 23:59)</span>`;
     }
   }
-  startSelect.innerHTML = startHtml;
-  startSelect.value = st.selectedStartTime;
 
-  const [startH, startM] = (st.selectedStartTime || '09:00').split(':').map(Number);
-  const startMinutes = startH * 60 + startM;
-
-  let endHtml = '';
-  for (let offset = 15; offset <= 360; offset += 15) {
-    const endMinutes = startMinutes + offset;
-    const endH = Math.floor(endMinutes / 60) % 24;
-    const endM = endMinutes % 60;
-    const timeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-
-    const durHours = Math.floor(offset / 60);
-    const durMins = offset % 60;
-    let labelDur = '';
-    if (durHours > 0) labelDur += `${durHours} soat `;
-    if (durMins > 0) labelDur += `${durMins} daq`;
-
-    const isSelected = (timeStr === st.selectedEndTime);
-    endHtml += `<option value="${timeStr}" data-offset="${offset}" ${isSelected ? 'selected' : ''}>${timeStr} (${labelDur.trim()})</option>`;
+  if (!st.selectedEndTime) {
+    recalcEndTime(prefix);
   }
-  endSelect.innerHTML = endHtml;
-  if (st.selectedEndTime) {
-    endSelect.value = st.selectedEndTime;
+
+  startInput.value = st.selectedStartTime || '';
+  endInput.value = st.selectedEndTime || '';
+  endInput.min = st.selectedStartTime || '';
+
+  if (endHint) {
+    const durM = st.durationMinutes || 60;
+    const h = Math.floor(durM / 60);
+    const m = durM % 60;
+    const durText = (h > 0 ? `${h} soat ` : '') + (m > 0 ? `${m} daqiqa` : '');
+    endHint.innerHTML = `<span style="color:#059669;">⏱️ Davomiyligi: <strong>${durText.trim()}</strong></span>`;
   }
 
   updateDurationButtons(prefix);
@@ -4103,7 +4134,7 @@ function updateDurationButtons(prefix = '') {
 
 function recalcEndTime(prefix = '') {
   const st = eventDtState[prefix];
-  if (!st || !st.selectedDate || !st.selectedStartTime) return;
+  if (!st || !st.selectedStartTime) return;
 
   const [sH, sM] = st.selectedStartTime.split(':').map(Number);
   const startMins = sH * 60 + sM;
@@ -4118,23 +4149,61 @@ function selectEventStartTime(val, prefix = '') { return onEventStartTimeSelect(
 function selectEventEndTime(val, prefix = '') { return onEventEndTimeSelect(val, prefix); }
 
 function onEventStartTimeSelect(val, prefix = '') {
+  if (!val) return;
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.selectedStartTime = val;
+
+  const tNow = getTashkentNow();
+  const todayStr = `${tNow.getFullYear()}-${String(tNow.getMonth() + 1).padStart(2, '0')}-${String(tNow.getDate()).padStart(2, '0')}`;
+  const isToday = (st.selectedDate === todayStr);
+  const minStartDt = new Date(tNow.getTime() + 10 * 60 * 1000);
+  const minStartStr = `${String(minStartDt.getHours()).padStart(2, '0')}:${String(minStartDt.getMinutes()).padStart(2, '0')}`;
+
+  const startHint = document.getElementById(`${prefix}ev-start-time-hint`);
+  if (isToday && val < minStartStr) {
+    if (startHint) {
+      startHint.innerHTML = `<span style="color:#DC2626; font-weight:700;">⚠️ Tanlangan vaqt o'tib ketgan! Kamida ${minStartStr} bo'lishi kerak.</span>`;
+    }
+  } else {
+    if (startHint) {
+      startHint.innerHTML = isToday
+        ? `<span style="color:#2563EB;">🕒 Eng erta vaqt: <strong>${minStartStr}</strong></span>`
+        : `<span style="color:#64748B;">🕒 24-soatlik format</span>`;
+    }
+  }
+
   recalcEndTime(prefix);
-  renderEventTimeSelects(prefix);
+  const endInput = document.getElementById(`${prefix}ev-end-time`);
+  if (endInput && st.selectedEndTime) {
+    endInput.value = st.selectedEndTime;
+    endInput.min = st.selectedStartTime;
+  }
+
+  updateDurationButtons(prefix);
   updateEventDateTimeSummary(prefix);
   if (prefix === '' && typeof syncEventObNoteAuto === 'function') syncEventObNoteAuto();
 }
 
 function onEventEndTimeSelect(val, prefix = '') {
+  if (!val) return;
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.selectedEndTime = val;
 
   const [sH, sM] = (st.selectedStartTime || '09:00').split(':').map(Number);
   const [eH, eM] = val.split(':').map(Number);
   let dur = (eH * 60 + eM) - (sH * 60 + sM);
-  if (dur <= 0) dur += 24 * 60;
+  if (dur <= 0) {
+    dur += 24 * 60;
+  }
   st.durationMinutes = Math.max(15, dur);
+
+  const endHint = document.getElementById(`${prefix}ev-end-time-hint`);
+  if (endHint) {
+    const h = Math.floor(st.durationMinutes / 60);
+    const m = st.durationMinutes % 60;
+    const durText = (h > 0 ? `${h} soat ` : '') + (m > 0 ? `${m} daqiqa` : '');
+    endHint.innerHTML = `<span style="color:#059669;">⏱️ Davomiyligi: <strong>${durText.trim()}</strong></span>`;
+  }
 
   updateDurationButtons(prefix);
   updateEventDateTimeSummary(prefix);
@@ -4145,7 +4214,21 @@ function selectEventDuration(mins, prefix = '') {
   const st = eventDtState[prefix] || (eventDtState[prefix] = {});
   st.durationMinutes = mins;
   recalcEndTime(prefix);
-  renderEventTimeSelects(prefix);
+
+  const endInput = document.getElementById(`${prefix}ev-end-time`);
+  if (endInput && st.selectedEndTime) {
+    endInput.value = st.selectedEndTime;
+  }
+
+  const endHint = document.getElementById(`${prefix}ev-end-time-hint`);
+  if (endHint) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const durText = (h > 0 ? `${h} soat ` : '') + (m > 0 ? `${m} daqiqa` : '');
+    endHint.innerHTML = `<span style="color:#059669;">⏱️ Davomiyligi: <strong>${durText.trim()}</strong></span>`;
+  }
+
+  updateDurationButtons(prefix);
   updateEventDateTimeSummary(prefix);
   if (prefix === '' && typeof syncEventObNoteAuto === 'function') syncEventObNoteAuto();
 }
@@ -4173,14 +4256,17 @@ function updateEventDateTimeSummary(prefix = '') {
   const dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
   const dateFormatted = `${dayNames[d.getDay()]}, ${d.getDate()}-${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
 
-  const now = new Date();
+  const tNow = getTashkentNow();
   const startsAt = new Date(`${st.selectedDate}T${st.selectedStartTime}:00+05:00`);
   let endsAt = new Date(`${st.selectedDate}T${st.selectedEndTime}:00+05:00`);
   if (endsAt <= startsAt) {
-    endsAt = new Date(endsAt.getTime() + 24 * 60 * 60 * 1000);
+    summaryEl.style.background = '#FEF2F2';
+    summaryEl.style.border = '1.5px solid #FECACA';
+    summaryEl.style.color = '#B91C1C';
+    summaryEl.innerHTML = `🚫 <strong>Tugash vaqti boshlanish vaqtidan keyin bo'lishi shart!</strong> (${st.selectedStartTime} &rarr; ${st.selectedEndTime})`;
+    return { valid: false, error: "Tugash vaqti boshlanish vaqtidan keyin bo'lishi shart!" };
   }
 
-  const minStartMs = now.getTime() + 10 * 60 * 1000;
   const durationMs = endsAt.getTime() - startsAt.getTime();
   const durHours = Math.floor(durationMs / (60 * 60 * 1000));
   const durMins = Math.floor((durationMs % (60 * 60 * 1000)) / (60 * 1000));
@@ -4190,6 +4276,7 @@ function updateEventDateTimeSummary(prefix = '') {
   if (!durStr) durStr = '0 daqiqa';
 
   // 1. Qoida: kamida 10 daqiqa keyin bo'lishi kerak
+  const minStartMs = tNow.getTime() + 10 * 60 * 1000;
   if (startsAt.getTime() < minStartMs) {
     const minStartDt = new Date(minStartMs);
     const minStartStr = `${String(minStartDt.getHours()).padStart(2, '0')}:${String(minStartDt.getMinutes()).padStart(2, '0')}`;
@@ -4200,25 +4287,16 @@ function updateEventDateTimeSummary(prefix = '') {
       <div style="display:flex; align-items:flex-start; gap:8px;">
         <span style="font-size:20px;">🚫</span>
         <div>
-          <strong>Boshlanish vaqti juda erta!</strong> Hozirgi vaqtdan kamida 10 daqiqa keyin bo'lishi shart.<br>
-          <span style="font-size:12px;">Hozirgi vaqt: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} &bull; Eng erta boshlanish vaqti: <strong>${minStartStr}</strong></span>
+          <strong>Boshlanish vaqti o'tib ketgan yoki juda erta!</strong> Hozirgi vaqtdan kamida 10 daqiqa keyin bo'lishi shart.<br>
+          <span style="font-size:12px;">Hozirgi vaqt: ${String(tNow.getHours()).padStart(2,'0')}:${String(tNow.getMinutes()).padStart(2,'0')} &bull; Eng erta ruxsat etilgan boshlanish: <strong>${minStartStr}</strong></span>
         </div>
       </div>
     `;
     return { valid: false, error: `Tadbir boshlanish vaqti hozirdan kamida 10 daqiqa keyin bo'lishi kerak (eng ertasi: ${minStartStr})` };
   }
 
-  // 2. Qoida: tugash vaqti boshlanishidan keyin bo'lishi kerak
-  if (durationMs <= 0) {
-    summaryEl.style.background = '#FEF2F2';
-    summaryEl.style.border = '1.5px solid #FECACA';
-    summaryEl.style.color = '#B91C1C';
-    summaryEl.innerHTML = `🚫 <strong>Tugash vaqti boshlanish vaqtidan keyin bo'lishi shart!</strong>`;
-    return { valid: false, error: "Tugash vaqti boshlanishidan keyin bo'lishi shart!" };
-  }
-
   // Muvaffaqiyatli xulosa
-  const remainMinutes = Math.round((startsAt - now) / (60 * 1000));
+  const remainMinutes = Math.round((startsAt - tNow) / (60 * 1000));
   let remainStr = '';
   if (remainMinutes < 60) {
     remainStr = `${remainMinutes} daqiqa qoldi`;

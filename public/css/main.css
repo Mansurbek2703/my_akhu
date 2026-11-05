@@ -3308,6 +3308,45 @@ body {
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
 }
 
+/* Windows-style Time Picker Controls */
+.windows-time-box {
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 9px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.windows-time-box:focus-within {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.windows-time-picker {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #0F172A !important;
+  background: transparent !important;
+  padding: 4px 0 !important;
+  width: 100% !important;
+  cursor: pointer;
+}
+.windows-time-picker::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(30%) sepia(80%) saturate(1500%) hue-rotate(200deg);
+  opacity: 0.85;
+  transition: transform 0.15s ease;
+}
+.windows-time-picker::-webkit-calendar-picker-indicator:hover {
+  transform: scale(1.15);
+  opacity: 1;
+}
+
 /* ====================================================================
    MOBILE & RESPONSIVE LAYOUT (SMARTPHONE & TABLET MOSLASHUVCHANLIGI)
    ==================================================================== */
