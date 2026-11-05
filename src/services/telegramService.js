@@ -5,6 +5,7 @@ const { db } = require('../db/database');
 const config = require('../config');
 const { recalculateStudentScores } = require('./ratingService');
 const { logAudit, awardWelcomeBonus } = require('./pointService');
+const { formatUzDateTime, formatUzDate, formatUzTime, formatUzRange } = require('../utils/dateTime');
 
 const BOT_TOKEN = config.telegram.botToken;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
@@ -315,9 +316,9 @@ async function broadcastNewEventToStudents(event) {
 
     if (!students || students.length === 0) return;
 
-    const startsDate = new Date(event.starts_at);
-    const dateFormatted = startsDate.toLocaleDateString('uz-UZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeFormatted = startsDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const dateFormatted = formatUzDate(event.starts_at);
+    const timeFormatted = formatUzTime(event.starts_at);
+    const rangeFormatted = formatUzRange(event.starts_at, event.ends_at);
     const attOpenMin = event.attendance_open_minutes_before ?? 5;
 
     const text = `📢 <b>YANGI TADBIR E'LON QILINDI!</b> 🎓\n\n` +
@@ -326,7 +327,8 @@ async function broadcastNewEventToStudents(event) {
       `📍 O'tkazilish joyi: <b>${event.place}</b>\n` +
       `📅 Sana: <b>${dateFormatted}</b>\n` +
       `🕒 Boshlanish vaqti: <b>${timeFormatted}</b>\n` +
-      `⏱️ Davomat boshlanadi: <b>Tadbirdan ${attOpenMin} daqiqa oldin</b>\n\n` +
+      `⏱️ Vaqti: <b>${rangeFormatted}</b>\n` +
+      `⏳ Davomat boshlanadi: <b>Tadbirdan ${attOpenMin} daqiqa oldin</b>\n\n` +
       `<i>Tadbir boshlanganda Telegram Mini App orqali QR kodni skanerlab ballingizni qo'lga kiriting!</i>`;
 
     const replyMarkup = {
@@ -391,9 +393,9 @@ async function notifyStudentEventRegistration(studentId, event, inWaitlist = fal
     const student = db.prepare(`SELECT * FROM student WHERE id = ?`).get(studentId);
     if (!student || !student.telegram_user_id) return;
 
-    const startsDate = new Date(event.starts_at);
-    const dateFormatted = startsDate.toLocaleDateString('uz-UZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeFormatted = startsDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const dateFormatted = formatUzDate(event.starts_at);
+    const timeFormatted = formatUzTime(event.starts_at);
+    const rangeFormatted = formatUzRange(event.starts_at, event.ends_at);
     const attOpenMin = event.attendance_open_minutes_before ?? 5;
 
     let text = '';
@@ -402,7 +404,7 @@ async function notifyStudentEventRegistration(studentId, event, inWaitlist = fal
         `📌 <b>Tadbir:</b> ${event.title}\n` +
         `🔢 <b>Navbatingiz:</b> #${waitlistPos}\n` +
         `📍 <b>O'tkazilish joyi:</b> ${event.place}\n` +
-        `🕒 <b>Vaqt:</b> ${dateFormatted}, soat ${timeFormatted}\n` +
+        `🕒 <b>Vaqti:</b> ${rangeFormatted}\n` +
         `⭐ <b>Ball:</b> +${event.points} ball\n\n` +
         `<i>Joy bo'shashi bilan avtomatik asosiy ro'yxatga o'tasiz va sizga xabar beriladi.</i>`;
     } else {
@@ -412,7 +414,8 @@ async function notifyStudentEventRegistration(studentId, event, inWaitlist = fal
         `📍 <b>O'tkazilish joyi:</b> ${event.place}\n` +
         `📅 <b>Sana:</b> ${dateFormatted}\n` +
         `🕒 <b>Boshlanish vaqti:</b> ${timeFormatted}\n` +
-        `⏱️ <b>Davomat ochiladi:</b> Tadbirdan ${attOpenMin} daqiqa oldin\n\n` +
+        `⏱️ <b>Vaqti:</b> ${rangeFormatted}\n` +
+        `⏳ <b>Davomat ochiladi:</b> Tadbirdan ${attOpenMin} daqiqa oldin\n\n` +
         `💡 <b>Eslatma:</b> Davomat vaqtida tadbir zalidagi QR kodni Mini App orqali skanerlab ballni qo'lga kiriting!`;
     }
 
@@ -978,7 +981,7 @@ async function buildAttendanceTelegramReport(targetDate = null, filter = 'summar
     } else {
       const topStudents = inCampusStudents.slice(0, 25);
       topStudents.forEach((st, idx) => {
-        const t = st.first_in_at ? new Date(st.first_in_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        const t = st.first_in_at ? formatUzTime(st.first_in_at) : '-';
         msg += `${idx + 1}. <b>${st.first_name} ${st.last_name}</b> (${st.group_code}) — 🟢 Kirgan: ${t}\n`;
       });
       if (inCampusStudents.length > 25) {
@@ -993,7 +996,7 @@ async function buildAttendanceTelegramReport(targetDate = null, filter = 'summar
       msg += `<i>Hozir bino hududida birorta ham mas'ul xodim qayd etilmagan.</i>\n\n`;
     } else {
       inCampusStaffList.forEach((item, idx) => {
-        const t = item.firstIn ? new Date(item.firstIn).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        const t = item.firstIn ? formatUzTime(item.firstIn) : '-';
         let rName = 'Xodim';
         try { const rArr = JSON.parse(item.staff.roles); rName = rArr[0] || 'Xodim'; } catch(e){}
         msg += `${idx + 1}. <b>${item.staff.full_name}</b> (${rName}) — 🟢 Kirgan: ${t}\n`;
@@ -1067,7 +1070,7 @@ async function buildAttendanceTelegramReport(targetDate = null, filter = 'summar
       msg += `🎉 <i>Bugun 09:15 dan kechikkan talabalar yo'q!</i>\n\n`;
     } else {
       lateStudents.forEach((st, idx) => {
-        const t = st.first_in_at ? new Date(st.first_in_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        const t = st.first_in_at ? formatUzTime(st.first_in_at) : '-';
         msg += `${idx + 1}. <b>${st.first_name} ${st.last_name}</b> (${st.group_code}) — ⏱️ Kirgan vaqti: <b>${t}</b>\n`;
       });
       msg += `\n`;
@@ -1079,7 +1082,7 @@ async function buildAttendanceTelegramReport(targetDate = null, filter = 'summar
       msg += `<i>09:15 dan keyin kelgan xodimlar yo'q.</i>\n\n`;
     } else {
       lateStaffList.forEach((item, idx) => {
-        const t = item.firstIn ? new Date(item.firstIn).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+        const t = item.firstIn ? formatUzTime(item.firstIn) : '-';
         let rName = 'Xodim';
         try { const rArr = JSON.parse(item.staff.roles); rName = rArr[0] || 'Xodim'; } catch(e){}
         msg += `${idx + 1}. <b>${item.staff.full_name}</b> (${rName}) — ⏱️ Kirgan: <b>${t}</b>\n`;
@@ -1115,8 +1118,8 @@ async function buildAttendanceTelegramReport(targetDate = null, filter = 'summar
         statusText = 'Turniketdan o\'tmagan';
       }
 
-      const inTime = item.firstIn ? new Date(item.firstIn).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
-      const outTime = item.lastOut ? new Date(item.lastOut).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const inTime = item.firstIn ? formatUzTime(item.firstIn) : '-';
+      const outTime = item.lastOut ? formatUzTime(item.lastOut) : '-';
 
       msg += `${idx + 1}. ${icon} <b>${item.staff.full_name}</b>\n` +
         `   🪪 Pasport: <code>${item.staff.passport_id || 'Kiritilmagan'}</code> | <b>${statusText}</b>\n` +

@@ -10,6 +10,7 @@ ssh.connect('192.168.1.2', port=22, username='boss', password='Sshtelnet27032004
 # Deploy skripti - HECH QACHON talabalarni yoki ma'lumotlarni o'chirmaydi!
 remote_script = '''
 set -e
+echo Sshtelnet27032004! | sudo -S timedatectl set-timezone Asia/Tashkent 2>/dev/null || true
 cd /home/boss/my_akhu
 git checkout -- . 2>/dev/null || true
 git pull origin main

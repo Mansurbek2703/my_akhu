@@ -1,3 +1,6 @@
+// O'zbekiston vaqt mintaqasi (UTC+5) barcha Date va cronlar uchun qat'iy o'rnatiladi
+process.env.TZ = 'Asia/Tashkent';
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { db } = require('../db/database');
 const { generateEventQrDataUrl } = require('../services/qrService');
 const { logAudit } = require('../services/pointService');
+const { formatUzRange, formatUzDateTime, formatUzDate, formatUzTime } = require('../utils/dateTime');
 
 const LEVEL_POINTS = {
   klub: 3,
@@ -280,7 +281,7 @@ router.post('/', (req, res) => {
           departments.push({ code: 'dep_ob', name: "O'quv bo'limi", reqNote: finalReqOb });
         }
 
-        const startsStr = new Date(starts_at).toLocaleString('uz-UZ', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const startsStr = formatUzRange(starts_at, ends_at);
         
         for (const dept of departments) {
           const staffUsers = db.prepare(`SELECT telegram_user_id FROM staff_user WHERE roles LIKE ? AND active = 1 AND telegram_user_id IS NOT NULL`).all(`%${dept.code}%`);

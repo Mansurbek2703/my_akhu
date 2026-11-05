@@ -11,6 +11,90 @@ const AppState = {
   adminMode: localStorage.getItem('akhu_admin_mode') || 'normal' // 'normal' | 'super' (default: 'normal')
 };
 
+
+// ====================================================================
+// O'ZBEKISTON STANDARTI (Asia/Tashkent, UTC+5, 24-SOATLIK REJIM)
+// Qat'iy talab: kun.oy.yil hh:mm (soat 24 soatlik, masalan 11:00, 14:30)
+// ====================================================================
+function formatUzDateTime(isoStr, includeSeconds = false) {
+  if (!isoStr) return '-';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return String(isoStr);
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: includeSeconds ? '2-digit' : undefined,
+      hour12: false
+    }).formatToParts(d);
+    const get = (type) => (parts.find(p => p.type === type) || {}).value || '';
+    const day = get('day');
+    const month = get('month');
+    const year = get('year');
+    const hour = get('hour');
+    const min = get('minute');
+    const sec = includeSeconds ? `:${get('second')}` : '';
+    return `${day}.${month}.${year} ${hour}:${min}${sec}`;
+  } catch (e) {
+    return String(isoStr);
+  }
+}
+
+function formatUzDate(isoStr) {
+  if (!isoStr) return '-';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return String(isoStr);
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(d);
+    const get = (type) => (parts.find(p => p.type === type) || {}).value || '';
+    return `${get('day')}.${get('month')}.${get('year')}`;
+  } catch (e) {
+    return String(isoStr);
+  }
+}
+
+function formatUzTime(isoStr, includeSeconds = false) {
+  if (!isoStr) return '-';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return String(isoStr);
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: includeSeconds ? '2-digit' : undefined,
+      hour12: false
+    }).formatToParts(d);
+    const get = (type) => (parts.find(p => p.type === type) || {}).value || '';
+    const sec = includeSeconds ? `:${get('second')}` : '';
+    return `${get('hour')}:${get('minute')}${sec}`;
+  } catch (e) {
+    return String(isoStr);
+  }
+}
+
+function formatUzRange(startsAt, endsAt) {
+  if (!startsAt) return '-';
+  const sStr = formatUzDateTime(startsAt);
+  if (!endsAt) return sStr;
+  const eStr = formatUzDateTime(endsAt);
+  return `${sStr} — ${eStr}`;
+}
+
+window.formatUzDateTime = formatUzDateTime;
+window.formatUzDate = formatUzDate;
+window.formatUzTime = formatUzTime;
+window.formatUzRange = formatUzRange;
+
 const ROLE_META = {
   'superadmin': { label: 'Superadmin', color: '#EF4444', bg: '#FEF2F2' },
   'rector': { label: 'Rektor (Rektorat)', color: '#4338CA', bg: '#EEF2FF' },
@@ -3305,8 +3389,8 @@ async function renderDeptEvents(container) {
           ${events.map(ev => {
             const startsDate = new Date(ev.starts_at);
             const endsDate = new Date(ev.ends_at);
-            const startsFormatted = startsDate.toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const endsFormatted = endsDate.toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const startsFormatted = formatUzDateTime(ev.starts_at);
+            const endsFormatted = formatUzDateTime(ev.ends_at);
             
             const now = new Date();
             // Davomat vaqti: tadbir boshlanishidan 5 daqiqa oldin to tugashidan keyingi 5 daqiqagacha
@@ -3697,11 +3781,21 @@ function initEventDateTimeControls(prefix = '', initialStartsAt = null, initialE
   if (initialStartsAt && initialEndsAt) {
     const sDate = new Date(initialStartsAt);
     const eDate = new Date(initialEndsAt);
-    st.selectedDate = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
-    st.selectedStartTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
-    st.selectedEndTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
-    st.calYear = sDate.getFullYear();
-    st.calMonth = sDate.getMonth();
+    const sParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(sDate);
+    const getS = (t) => (sParts.find(p => p.type === t) || {}).value || '';
+    const eParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(eDate);
+    const getE = (t) => (eParts.find(p => p.type === t) || {}).value || '';
+
+    st.selectedDate = `${getS('year')}-${getS('month')}-${getS('day')}`;
+    st.selectedStartTime = `${getS('hour')}:${getS('minute')}`;
+    st.selectedEndTime = `${getE('hour')}:${getE('minute')}`;
+    st.calYear = Number(getS('year'));
+    st.calMonth = Number(getS('month')) - 1;
     st.durationMinutes = Math.max(15, Math.round((eDate - sDate) / (60 * 1000)));
   } else {
     const defaultStart = new Date(now.getTime() + 15 * 60 * 1000);
@@ -4080,8 +4174,8 @@ function updateEventDateTimeSummary(prefix = '') {
   const dateFormatted = `${dayNames[d.getDay()]}, ${d.getDate()}-${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
 
   const now = new Date();
-  const startsAt = new Date(`${st.selectedDate}T${st.selectedStartTime}:00`);
-  let endsAt = new Date(`${st.selectedDate}T${st.selectedEndTime}:00`);
+  const startsAt = new Date(`${st.selectedDate}T${st.selectedStartTime}:00+05:00`);
+  let endsAt = new Date(`${st.selectedDate}T${st.selectedEndTime}:00+05:00`);
   if (endsAt <= startsAt) {
     endsAt = new Date(endsAt.getTime() + 24 * 60 * 60 * 1000);
   }
@@ -4710,8 +4804,8 @@ async function showEventDetailsModal(eventId) {
   const ev = event;
   const startsDate = new Date(ev.starts_at);
   const endsDate = new Date(ev.ends_at);
-  const startsFormatted = startsDate.toLocaleString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const endsFormatted = endsDate.toLocaleString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  const startsFormatted = formatUzDateTime(ev.starts_at);
+  const endsFormatted = formatUzDateTime(ev.ends_at);
   const now = new Date();
   const minutesUntilStart = (startsDate.getTime() - now.getTime()) / (60 * 1000);
   const isPendingAgreement = (ev.status === 'pending_agreement');
@@ -11985,20 +12079,7 @@ async function deleteStaffUser(userId) {
 // SUPERADMIN: XODIM MONITORINGI, TELEGRAM BOT VA O'CHMAS JURNAL
 // ====================================================================
 function formatDateTimeUz(isoStr) {
-  if (!isoStr) return '-';
-  try {
-    const d = new Date(isoStr);
-    if (isNaN(d.getTime())) return isoStr;
-    return d.toLocaleString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch (e) {
-    return isoStr;
-  }
+  return formatUzDateTime(isoStr);
 }
 
 async function showStaffMonitoringModal(userId) {

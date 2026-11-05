@@ -153,6 +153,33 @@
   </div>
 
   <script>
+
+    function formatUzDateTime(isoStr) {
+      if (!isoStr) return '-';
+      try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return String(isoStr);
+        const parts = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Tashkent',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).formatToParts(d);
+        const get = (type) => (parts.find(p => p.type === type) || {}).value || '';
+        return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}`;
+      } catch (e) {
+        return String(isoStr);
+      }
+    }
+
+    function formatUzRange(startsAt, endsAt) {
+      if (!startsAt) return '-';
+      const sStr = formatUzDateTime(startsAt);
+      if (!endsAt) return sStr;
+      const eStr = formatUzDateTime(endsAt);
+      return `${sStr} — ${eStr}`;
+    }
+
+
     // Soat va sana
     function updateClock() {
       const now = new Date();
@@ -407,7 +434,7 @@
                   <span>📍</span> <span style="font-weight: 600; color: #E2E8F0;">${e.place}</span>
                 </p>
                 <p style="color: #94A3B8; font-size: 15px; margin-bottom: 0; display: flex; align-items: center; gap: 8px;">
-                  <span>🕒</span> <span style="font-weight: 700; color: #38BDF8;">${new Date(e.starts_at).toLocaleString('uz-UZ', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>🕒</span> <span style="font-weight: 700; color: #38BDF8;">${formatUzRange(e.starts_at, e.ends_at)}</span>
                 </p>
               </div>
             </div>
