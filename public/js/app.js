@@ -9010,6 +9010,11 @@ async function downloadStudentsPhotosZip() {
 
 
 async function renderStudentsManagement(container, roleTitle = 'Registrator') {
+  const canImport = hasPermission('students_import_excel');
+  const canCreate = hasPermission('students_create');
+  const canSyncPhotos = hasPermission('students_sync_turniket_photos');
+  const canExportZip = hasPermission('students_export_zip') || hasPermission('students_view');
+
   container.innerHTML = `
     <!-- RASMIY SOHAVIY HERO BANNER -->
     <div class="admin-hero-card">
@@ -9053,19 +9058,25 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: background 0.15s ease;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#FFFFFF'" title="Excel import uchun namunaviy shablon faylini yuklab olish">
-            <span style="color: #2563EB; display: inline-flex; align-items: center;">${icon('download', 15)}</span>
-            <span style="color: #1E293B;">Shablonni Yuklab Olish</span>
-          </a>
-          <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: inline-flex; align-items: center; gap: 6px;">
-            ${icon('fileSpreadsheet', 14)} <span>Excel Import</span>
-          </button>
-          <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #059669; border-color: #059669;">
-            ${icon('userPlus', 14)} <span>Yangi Talaba</span>
-          </button>
-          <button id="btn-sync-students-photos" class="btn btn-outline" onclick="triggerHikPhotosSync(this)" style="display: inline-flex; align-items: center; gap: 6px; border-color: #CBD5E1; color: #1E293B;" title="Turniket serveridan rasmi yo'q talabalarning rasmlarini yuklab to'ldirish">
-            📸 <span>Turniket Rasmlari</span>
-          </button>
+          ${canImport ? `
+            <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: background 0.15s ease;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#FFFFFF'" title="Excel import uchun namunaviy shablon faylini yuklab olish">
+              <span style="color: #2563EB; display: inline-flex; align-items: center;">${icon('download', 15)}</span>
+              <span style="color: #1E293B;">Shablonni Yuklab Olish</span>
+            </a>
+            <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: inline-flex; align-items: center; gap: 6px;">
+              ${icon('fileSpreadsheet', 14)} <span>Excel Import</span>
+            </button>
+          ` : ''}
+          ${canCreate ? `
+            <button class="btn btn-success" onclick="showCreateStudentModal()" style="display: inline-flex; align-items: center; gap: 6px; background: #059669; border-color: #059669;">
+              ${icon('userPlus', 14)} <span>Yangi Talaba</span>
+            </button>
+          ` : ''}
+          ${canSyncPhotos ? `
+            <button id="btn-sync-students-photos" class="btn btn-outline" onclick="triggerHikPhotosSync(this)" style="display: inline-flex; align-items: center; gap: 6px; border-color: #CBD5E1; color: #1E293B;" title="Turniket serveridan rasmi yo'q talabalarning rasmlarini yuklab to'ldirish">
+              📸 <span>Turniket Rasmlari</span>
+            </button>
+          ` : ''}
         </div>
       </div>
     </div>
@@ -9689,6 +9700,9 @@ function renderAdminStudentsTable(students) {
   const tbody = document.getElementById('admin-students-table-body');
   if (!tbody) return;
 
+  const canEdit = hasPermission('students_edit');
+  const canDelete = hasPermission('students_delete');
+
   if (students.length === 0) {
     tbody.innerHTML = `
       <tr>
@@ -9770,18 +9784,24 @@ function renderAdminStudentsTable(students) {
                 ${icon('download', 14)}
               </button>
             ` : ''}
-            <button class="btn-action btn-action-primary" onclick="showEditStudentModal('${st.id}')" title="Tahrirlash">
-              ${icon('edit', 14)}
-            </button>
-            <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStudentStatus('${st.id}', '${st.status}')" title="${isActive ? 'Nofaol qilish' : 'Faollashtirish'}">
-              ${isActive ? icon('pause', 13) : icon('play', 13)}
-            </button>
+            ${canEdit ? `
+              <button class="btn-action btn-action-primary" onclick="showEditStudentModal('${st.id}')" title="Tahrirlash">
+                ${icon('edit', 14)}
+              </button>
+            ` : ''}
+            ${(canDelete || canEdit) ? `
+              <button class="btn-action ${isActive ? 'btn-action-warning' : 'btn-action-primary'}" onclick="toggleStudentStatus('${st.id}', '${st.status}')" title="${isActive ? 'Nofaol qilish' : 'Faollashtirish'}">
+                ${isActive ? icon('pause', 13) : icon('play', 13)}
+              </button>
+            ` : ''}
             <button class="btn-action" onclick="showStudentDetailsModal('${st.id}')" title="Profilni ko'rish">
               ${icon('eye', 14)}
             </button>
-            <button class="btn-action btn-action-danger" onclick="deleteStudentConfirm('${st.id}', '${st.first_name} ${st.last_name}')" title="O'chirish">
-              ${icon('trash', 14)}
-            </button>
+            ${canDelete ? `
+              <button class="btn-action btn-action-danger" onclick="deleteStudentConfirm('${st.id}', '${(st.first_name || '').replace(/'/g, "\\'")} ${(st.last_name || '').replace(/'/g, "\\'")}')" title="O'chirish">
+                ${icon('trash', 14)}
+              </button>
+            ` : ''}
           </div>
         </td>
       </tr>
@@ -10351,9 +10371,6 @@ async function showStudentDetailsModal(studentId) {
   modalBody.innerHTML = `<div style="text-align:center; padding:30px;"><div class="spinner"></div><p style="margin-top:8px;">Yuklanmoqda...</p></div>`;
   modalFooter.innerHTML = `
     <button class="btn btn-outline" onclick="closeStudentModalCleanly()">Yopish</button>
-    <button class="btn btn-primary" onclick="showEditStudentModal('${studentId}')" style="display:inline-flex; align-items:center; gap:6px;">
-      ${icon('edit', 14)} Tahrirlash
-    </button>
   `;
   openModal();
 
@@ -10369,6 +10386,7 @@ async function showStudentDetailsModal(studentId) {
         (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('executive_director') || AppState.user.roles.includes('rector') || AppState.user.roles.includes('prorektor')))
       )
     );
+    const canEditStudent = isSuperadmin || hasPermission('students_edit');
 
     const escapeHtmlText = (str) => String(str || '')
       .replace(/&/g, '&amp;')
@@ -10384,9 +10402,11 @@ async function showStudentDetailsModal(studentId) {
           ${icon('trash', 14)} Barcha ballarni 0 ga tushirish
         </button>
       ` : ''}
-      <button class="btn btn-primary" onclick="showEditStudentModal('${studentId}')" style="display:inline-flex; align-items:center; gap:6px;">
-        ${icon('edit', 14)} Tahrirlash
-      </button>
+      ${canEditStudent ? `
+        <button class="btn btn-primary" onclick="showEditStudentModal('${studentId}')" style="display:inline-flex; align-items:center; gap:6px;">
+          ${icon('edit', 14)} Tahrirlash
+        </button>
+      ` : ''}
     `;
 
     const isFemale = st.gender === 'female' || st.gender === 'f';
