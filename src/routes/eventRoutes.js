@@ -222,7 +222,7 @@ router.post('/', (req, res) => {
       requires_registration ? 1 : 0,
       initialStatus,
       qrSecret,
-      attendance_open_minutes_before !== undefined ? Number(attendance_open_minutes_before) : 5,
+      5, // Qat'iy reglament: tadbir boshlanishidan 5 daqiqa oldin davomat ochiladi
       createdBy,
       nowIso,
       finalLeadType,
@@ -737,14 +737,8 @@ router.put('/:id', (req, res) => {
 
     const points = LEVEL_POINTS[level] || event.points || 5;
 
-    // Davomat boshlanish vaqti sozlamasi
-    let attendanceOpenMinutes = event.attendance_open_minutes_before ?? 5;
-    if (attendance_open_minutes_before !== undefined && attendance_open_minutes_before !== null) {
-      const rawOpen = Number(attendance_open_minutes_before);
-      if (!isNaN(rawOpen) && rawOpen >= 0) {
-        attendanceOpenMinutes = rawOpen;
-      }
-    }
+    // Davomat boshlanish vaqti reglament bo'yicha qat'iy 5 daqiqa
+    const attendanceOpenMinutes = 5;
 
     let photoUrl = event.photo_url || event.image_url;
     if (req.body.photo_url !== undefined) {

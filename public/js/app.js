@@ -4601,13 +4601,15 @@ async function openCreateEventModal() {
             </div>
           </div>
 
-          <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px;">
-            <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 2px; font-size: 12px;">
-              ⏱️ Davomat Boshlanish Vaqti *
+          <div class="form-group mb-3" style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 10px; padding: 10px 12px;">
+            <label class="form-label" style="font-weight: 700; color: #166534; margin-bottom: 2px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+              <span>⏱️</span> Davomat Boshlanish Vaqti (Reglament)
             </label>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <input type="number" id="ev-att-open-minutes" class="form-control" min="0" max="180" value="5" style="max-width: 90px; font-weight: 700; font-size: 13px;">
-              <span style="font-size: 12px; font-weight: 600; color: #334155;">daqiqa oldin ochiladi</span>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+              <span style="background: #DCFCE7; color: #15803D; font-weight: 800; font-size: 12.5px; padding: 4px 10px; border-radius: 6px; border: 1px solid #86EFAC; display: inline-flex; align-items: center; gap: 5px;">
+                <span>⚡</span> Avtomatik 5 daqiqa oldin ochiladi
+              </span>
+              <input type="hidden" id="ev-att-open-minutes" value="5">
             </div>
           </div>
         </div>
@@ -5417,13 +5419,15 @@ async function openEditEventModal(eventId) {
         </div>
 
         <!-- DAVOMAT BOSHLANISH VAQTI SOZLAMASI -->
-        <div class="form-group mb-3" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px;">
-          <label class="form-label" style="font-weight: 700; color: #1E293B; margin-bottom: 4px;">
-            ⏱️ Davomat Boshlanish Vaqti (Attendance Window) *
+        <div class="form-group mb-3" style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 10px; padding: 12px 14px;">
+          <label class="form-label" style="font-weight: 700; color: #166534; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <span>⏱️</span> Davomat Boshlanish Vaqti (Reglament)
           </label>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <input type="number" id="edit-ev-att-open-minutes" class="form-control" min="0" max="180" value="${attOpen}" style="max-width: 130px; font-weight: 700; font-size: 14px;">
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">daqiqa oldin boshlanadi</span>
+          <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
+            <span style="background: #DCFCE7; color: #15803D; font-weight: 800; font-size: 13px; padding: 5px 12px; border-radius: 8px; border: 1px solid #86EFAC; display: inline-flex; align-items: center; gap: 6px;">
+              <span>⚡</span> Avtomatik 5 daqiqa oldin ochiladi
+            </span>
+            <input type="hidden" id="edit-ev-att-open-minutes" value="5">
           </div>
         </div>
       </form>
