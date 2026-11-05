@@ -35,8 +35,8 @@ router.get('/', authenticateStaff, (req, res) => {
   let whereClauses = [];
   let params = [];
 
-  // Superadmin barcha kutayotgan arizalarni ko'radi
-  if (user.roles.includes('superadmin')) {
+  // Superadmin va Oliy rahbariyat barcha kutayotgan arizalarni ko'radi
+  if (user.roles.includes('superadmin') || user.roles.includes('executive_director') || user.roles.includes('rector')) {
     whereClauses.push("pe.status IN ('pending', 'pending_pv')");
   } else if (user.roles.includes('prorektor')) {
     whereClauses.push("(pe.status = 'pending_pv' OR (pe.status = 'pending' AND pe.approver_role = 'prorektor'))");

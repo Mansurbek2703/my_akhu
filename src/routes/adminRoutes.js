@@ -1140,8 +1140,8 @@ router.post('/students/clear-all', authenticateSuperadmin, (req, res) => {
  */
 router.post('/students/:id/reset-scores', authenticateSuperadminOrRegistrator, (req, res) => {
   try {
-    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('prorektor')) {
-      return res.status(403).json({ error: 'Faqat Superadmin yoki Prorektor talaba ballarini nolga tushira oladi' });
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('executive_director') && !req.staffUser.roles.includes('rector') && !req.staffUser.roles.includes('prorektor')) {
+      return res.status(403).json({ error: 'Faqat Rahbariyat (Superadmin, Ijrochi direktor, Rektor, Prorektor) talaba ballarini nolga tushira oladi' });
     }
 
     const student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(req.params.id, req.params.id);
@@ -1196,8 +1196,8 @@ router.post('/students/:id/reset-scores', authenticateSuperadminOrRegistrator, (
  */
 router.delete('/point-entries/:id', authenticateSuperadminOrRegistrator, (req, res) => {
   try {
-    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('prorektor')) {
-      return res.status(403).json({ error: 'Faqat Superadmin yoki Prorektor ball yozuvini o\'chira oladi' });
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('executive_director') && !req.staffUser.roles.includes('rector') && !req.staffUser.roles.includes('prorektor')) {
+      return res.status(403).json({ error: 'Faqat Rahbariyat (Superadmin, Ijrochi direktor, Rektor, Prorektor) ball yozuvini o\'chira oladi' });
     }
 
     const entry = db.prepare(`SELECT * FROM point_entry WHERE id = ?`).get(req.params.id);
@@ -1241,8 +1241,8 @@ router.delete('/point-entries/:id', authenticateSuperadminOrRegistrator, (req, r
  */
 router.post('/point-entries/:id/revoke', authenticateSuperadminOrRegistrator, (req, res) => {
   try {
-    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('prorektor')) {
-      return res.status(403).json({ error: 'Faqat Superadmin yoki Prorektor ball yozuvini bekor qila oladi' });
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('executive_director') && !req.staffUser.roles.includes('rector') && !req.staffUser.roles.includes('prorektor')) {
+      return res.status(403).json({ error: 'Faqat Rahbariyat (Superadmin, Ijrochi direktor, Rektor, Prorektor) ball yozuvini bekor qila oladi' });
     }
 
     const { revokeEntry } = require('../services/pointService');
@@ -1270,6 +1270,8 @@ router.post('/point-entries/:id/revoke', authenticateSuperadminOrRegistrator, (r
 router.get('/roles-list', authenticateSuperadmin, (req, res) => {
   const roles = [
     { id: 'superadmin', key: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish, barcha xodimlar va parametrlar boshqaruvi' },
+    { id: 'executive_director', key: 'executive_director', name: 'Ijrochi direktor', desc: 'Universitet Ijrochi direktori — Oliy rahbariyat to\'liq nazorati va vakolatlari' },
+    { id: 'rector', key: 'rector', name: 'Rektor (Rektorat)', desc: 'Universitet Rektori — Oliy rahbariyat monitoring va nazorati' },
     { id: 'prorektor', key: 'prorektor', name: 'Yoshlar bo\'yicha Prorektor', desc: '25+ ballik yutuqlar, -30 jarimalar (PV tasdiq), apellyatsiyalar va xavf monitoringi' },
     { id: 'dep_yb', key: 'dep_yb', name: 'Yoshlar bilan ishlash bo\'limi', desc: 'Ijtimoiy, Sport, Liderlik sohalarini tasdiqlash, tadbirlar yaratish va QR chiqarish' },
     { id: 'dep_mb', key: 'dep_mb', name: 'Ma\'naviyat va ma\'rifat bo\'limi', desc: 'Ma\'naviy-ma\'rifiy, Madaniyat va san\'at sohalarini tasdiqlash, tadbirlar' },
@@ -1386,7 +1388,7 @@ router.get('/users', authenticateSuperadmin, (req, res) => {
     const meaningful = roles.filter(r => r && r !== 'staff');
     if (meaningful.length === 0) return 0;
     if (meaningful.includes('superadmin')) return 100;
-    if (meaningful.includes('rector')) return 95;
+    if (meaningful.includes('executive_director') || meaningful.includes('rector')) return 95;
     if (meaningful.includes('prorektor')) return 90;
     if (meaningful.some(r => r.startsWith('dep_'))) return 80;
     if (meaningful.includes('tutor')) return 70;

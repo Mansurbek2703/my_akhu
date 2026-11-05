@@ -58,11 +58,14 @@ router.get('/dashboard', (req, res) => {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayEventsCount = db.prepare(`SELECT COUNT(*) as c FROM event WHERE starts_at LIKE ?`).get(`${todayStr}%`).c;
 
-  // 2. Haftaning yulduzlari
-  const weeklyStarsRow = db.prepare(`SELECT payload FROM weekly_stars ORDER BY week_start DESC LIMIT 1`).get();
-  let rawStars = weeklyStarsRow ? JSON.parse(weeklyStarsRow.payload) : null;
-  if (!rawStars || ((!rawStars.hero?.score && !rawStars.hero?.week_points) && totalSeasonPoints > 0)) {
+  // 2. Haftaning yulduzlari - jonli hisoblash (baza ballari bilan to'liq sinxron)
+  let rawStars = null;
+  try {
     rawStars = calculateWeeklyStars();
+  } catch (err) {
+    console.error('Error calculating live weekly stars:', err);
+    const weeklyStarsRow = db.prepare(`SELECT payload FROM weekly_stars ORDER BY week_start DESC LIMIT 1`).get();
+    rawStars = weeklyStarsRow ? JSON.parse(weeklyStarsRow.payload) : null;
   }
 
   const formatStar = (s) => {

@@ -97,6 +97,7 @@ window.formatUzRange = formatUzRange;
 
 const ROLE_META = {
   'superadmin': { label: 'Superadmin', color: '#EF4444', bg: '#FEF2F2' },
+  'executive_director': { label: 'Ijrochi direktor', color: '#4F46E5', bg: '#EEF2FF' },
   'rector': { label: 'Rektor (Rektorat)', color: '#4338CA', bg: '#EEF2FF' },
   'prorektor': { label: 'Prorektor', color: '#8B5CF6', bg: '#F5F3FF' },
   'tutor': { label: 'Tyutor', color: '#10B981', bg: '#ECFDF5' },
@@ -115,6 +116,7 @@ const ROLE_META = {
 function formatApproverRole(role) {
   if (!role || role === '-') return '-';
   const roleNames = {
+    'executive_director': "Ijrochi direktor",
     'rector': "Rektor (Rektorat)",
     'dep_yb': "Yoshlar bo'limi",
     'dep_mb': "Ma'naviyat bo'limi",
@@ -250,12 +252,12 @@ function isPagePermittedForUser(pageName, userRoles = []) {
     );
   }
   if (pageName === 'observe-events') {
-    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'superadmin'));
+    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector' || r === 'superadmin'));
   }
 
   // Tasdiqlash & Ijro
   if (pageName === 'dept-approvals' || pageName === 'prorektor-queue' || pageName === 'prorektor-risks' || pageName === 'prorektor-appeals') {
-    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'superadmin'));
+    return userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector' || r === 'superadmin'));
   }
 
   // Tizim sozlamalari, xodimlar boshqaruvi, audit
@@ -263,9 +265,9 @@ function isPagePermittedForUser(pageName, userRoles = []) {
     return userRoles.includes('superadmin');
   }
 
-  // Rahbariyat monitoringi (Faqat Prorektor va Superadmin)
+  // Rahbariyat monitoringi (Superadmin, Ijrochi direktor, Rektor va Prorektor)
   if (pageName.startsWith('observe-')) {
-    return userRoles.includes('prorektor') || userRoles.includes('superadmin');
+    return userRoles.includes('executive_director') || userRoles.includes('rector') || userRoles.includes('prorektor') || userRoles.includes('superadmin');
   }
 
   return false;
@@ -790,7 +792,7 @@ function renderModuleSubNav(pageName) {
       { id: 'dept-events', label: '📅 Tadbirlar & QR' }
     ];
 
-    const canApprove = isSuperadmin || userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor'));
+    const canApprove = isSuperadmin || userRoles.some(r => r && (r.startsWith('dep_') || r === 'prorektor' || r === 'executive_director' || r === 'rector'));
     if (canApprove) {
       const pCount = window._pendingApprovalsCount || 0;
       tabs.push({ 
@@ -799,7 +801,7 @@ function renderModuleSubNav(pageName) {
       });
     }
 
-    const canSeeRector = isSuperadmin || userRoles.includes('rector') || userRoles.includes('prorektor');
+    const canSeeRector = isSuperadmin || userRoles.includes('executive_director') || userRoles.includes('rector') || userRoles.includes('prorektor');
     if (canSeeRector) {
       tabs.push({ id: 'prorektor-queue', label: '🏛️ Rektorat (25+ / -30)' });
       tabs.push({ id: 'prorektor-risks', label: '⚠️ Xavf va Monitoring' });
@@ -1142,10 +1144,10 @@ async function renderObserveDashboard(container) {
               `}
               <div class="podium-badge-medal">${medal}</div>
             </div>
-            <div class="podium-name" ${rank === 1 ? 'style="font-size:17px;"' : ''} title="${p.first_name} ${p.last_name}">${p.first_name} ${p.last_name}</div>
-            <div style="display:flex; justify-content:center; gap:4px; margin:4px 0 6px;">
+            <div class="podium-name" ${rank === 1 ? 'style="font-size:14.5px;"' : ''} title="${p.first_name} ${p.last_name}">${p.first_name} ${p.last_name}</div>
+            <div style="display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:3px; margin:4px 0 6px;">
               <span class="podium-group" ${rank === 1 ? 'style="background:#FEF3C7; color:#92400E; font-weight:700;"' : ''}>${p.group_code || '—'}</span>
-              <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10.5px; padding:2px 6px; border-radius:8px;">${levelText}</span>
+              <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10px; padding:2px 5px; border-radius:6px;">${levelText}</span>
             </div>
             <div class="podium-score" ${rank === 1 ? 'style="font-size:22px; color:#D97706;"' : ''}>${p.season || p.total || 0} <span>ball</span></div>
             <div style="font-size:11px; font-weight:700; color:${rank === 1 ? '#B45309' : (rank === 2 ? '#64748B' : '#9A3412')}; margin-top:4px;">
@@ -1490,10 +1492,10 @@ async function renderObserveRating(container) {
                 `}
                 <div class="podium-badge-medal">${medal}</div>
               </div>
-              <div class="podium-name" ${rank === 1 ? 'style="font-size:18px;"' : ''} title="${p.first_name} ${p.last_name}">
+              <div class="podium-name" ${rank === 1 ? 'style="font-size:15px;"' : ''} title="${p.first_name} ${p.last_name}">
                 ${p.first_name} ${p.last_name}
               </div>
-              <div style="display:flex; justify-content:center; gap:6px; margin:4px 0 8px; flex-wrap:wrap;">
+              <div style="display:flex; justify-content:center; align-items:center; gap:4px; margin:4px 0 6px; flex-wrap:wrap;">
                 <span class="podium-group" ${rank === 1 ? 'style="background:#FEF3C7; color:#92400E; font-weight:700;"' : ''}>${p.group_code || '—'}</span>
                 <span class="badge" style="background:#F1F5F9; color:#475569; font-size:11px; padding:3px 8px; border-radius:10px;">${levelText}</span>
               </div>
@@ -8252,7 +8254,7 @@ async function showStudentModal(studentId) {
       AppState.user && (
         AppState.user.id === 'superadmin' ||
         AppState.user.user_type === 'superadmin' ||
-        (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('prorektor')))
+        (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('executive_director') || AppState.user.roles.includes('rector') || AppState.user.roles.includes('prorektor')))
       )
     );
 
@@ -10275,7 +10277,7 @@ async function showStudentDetailsModal(studentId) {
       AppState.user && (
         AppState.user.id === 'superadmin' ||
         AppState.user.user_type === 'superadmin' ||
-        (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('prorektor')))
+        (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('executive_director') || AppState.user.roles.includes('rector') || AppState.user.roles.includes('prorektor')))
       )
     );
 
@@ -10758,6 +10760,8 @@ async function renderStaffUsersManagement(container) {
         <select id="filter-staff-role" class="admin-filter-select">
           <option value="">Barcha rollar</option>
           <option value="superadmin">Superadmin</option>
+          <option value="executive_director">Ijrochi direktor</option>
+          <option value="rector">Rektor</option>
           <option value="prorektor">Prorektor</option>
           <option value="tutor">Tyutor</option>
           <option value="dep_yb">Yoshlar bo'limi</option>
@@ -10924,10 +10928,11 @@ function renderStaffTableRows() {
     });
   }
 
-  // Muhim: Biriktirilgan rollarga ega xodimlar (Superadmin, Prorektor, Bo'limlar, Tyutorlar) ro'yxatning eng yuqorisida chiqishi shart!
+  // Muhim: Biriktirilgan rollarga ega xodimlar (Superadmin, Ijrochi direktor, Rektor, Prorektor, Bo'limlar, Tyutorlar) ro'yxatning eng yuqorisida chiqishi shart!
   const getStaffRoleWeight = (u) => {
     const roles = Array.isArray(u.roles) ? u.roles : [];
     if (roles.includes('superadmin')) return 1000;
+    if (roles.includes('executive_director') || roles.includes('rector')) return 950;
     if (roles.includes('prorektor')) return 900;
     if (roles.some(r => r.startsWith('dep_'))) return 800;
     if (roles.includes('tutor')) return 700;
@@ -10963,6 +10968,8 @@ function renderStaffTableRows() {
     const roleBadges = validRoles.map(r => {
       let bg = '#F1F5F9', color = '#475569', label = r;
       if (r === 'superadmin') { bg = '#FEF2F2'; color = '#DC2626'; label = 'Superadmin'; }
+      else if (r === 'executive_director') { bg = '#EEF2FF'; color = '#4F46E5'; label = 'Ijrochi direktor'; }
+      else if (r === 'rector') { bg = '#EEF2FF'; color = '#4338CA'; label = 'Rektor'; }
       else if (r === 'prorektor') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Prorektor'; }
       else if (r === 'tutor') { bg = '#ECFDF5'; color = '#059669'; label = 'Tyutor'; }
       else if (r === 'dep_yb') { bg = '#EFF6FF'; color = '#2563EB'; label = 'Yoshlar bo\'limi'; }
@@ -11096,6 +11103,8 @@ async function showCreateStaffModal() {
   } catch (e) {
     rolesList = [
       { key: 'superadmin', id: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish va parametrlar' },
+      { key: 'executive_director', id: 'executive_director', name: 'Ijrochi direktor', desc: 'Universitet Ijrochi direktori — Oliy rahbariyat to\'liq nazorati' },
+      { key: 'rector', id: 'rector', name: 'Rektor (Rektorat)', desc: 'Universitet Rektori — Oliy rahbariyat monitoring va nazorati' },
       { key: 'prorektor', id: 'prorektor', name: "Yoshlar bo'yicha Prorektor", desc: '25+ yutuqlar va -30 jarimalar tasdig\'i' },
       { key: 'dep_yb', id: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi", desc: 'Ijtimoiy, Sport, Liderlik sohalari va tadbirlar' },
       { key: 'dep_ob', id: 'dep_ob', name: "O'quv bo'limi (Registrator)", desc: 'Talabalar, GPA, Davomat va Akademik soha' },
@@ -11508,6 +11517,8 @@ async function renderStaffEditPage(container, targetUserId) {
   } catch (e) {
     rolesList = [
       { key: 'superadmin', id: 'superadmin', name: 'Superadmin (IT Markazi)', desc: 'Tizimni to\'liq boshqarish va parametrlar' },
+      { key: 'executive_director', id: 'executive_director', name: 'Ijrochi direktor', desc: 'Universitet Ijrochi direktori — Oliy rahbariyat to\'liq nazorati' },
+      { key: 'rector', id: 'rector', name: 'Rektor (Rektorat)', desc: 'Universitet Rektori — Oliy rahbariyat monitoring va nazorati' },
       { key: 'prorektor', id: 'prorektor', name: "Yoshlar bo'yicha Prorektor", desc: '25+ yutuqlar va -30 jarimalar tasdig\'i' },
       { key: 'dep_yb', id: 'dep_yb', name: "Yoshlar bilan ishlash bo'limi", desc: 'Ijtimoiy, Sport, Liderlik sohalari va tadbirlar' },
       { key: 'dep_ob', id: 'dep_ob', name: "O'quv bo'limi (Registrator)", desc: 'Talabalar, GPA, Davomat va Akademik soha' },
@@ -12370,6 +12381,8 @@ async function showStaffMonitoringModal(userId) {
     const roleBadges = validRoles.map(r => {
       let bg = '#F1F5F9', color = '#475569', label = r;
       if (r === 'superadmin') { bg = '#FEF2F2'; color = '#DC2626'; label = 'Superadmin'; }
+      else if (r === 'executive_director') { bg = '#EEF2FF'; color = '#4F46E5'; label = 'Ijrochi direktor'; }
+      else if (r === 'rector') { bg = '#EEF2FF'; color = '#4338CA'; label = 'Rektor'; }
       else if (r === 'prorektor') { bg = '#F5F3FF'; color = '#7C3AED'; label = 'Prorektor'; }
       else if (r === 'tutor') { bg = '#ECFDF5'; color = '#059669'; label = 'Tyutor'; }
       else if (r === 'dep_yb') { bg = '#EFF6FF'; color = '#2563EB'; label = 'Yoshlar bo\'limi'; }

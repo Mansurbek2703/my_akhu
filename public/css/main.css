@@ -1553,10 +1553,12 @@ body {
 
 .observe-podium-grid {
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr) minmax(0, 1fr);
+  gap: 10px;
   align-items: flex-end;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
@@ -1569,12 +1571,15 @@ body {
 .podium-card {
   background: #FFFFFF;
   border-radius: 16px;
-  padding: 20px 16px;
+  padding: 16px 8px;
   text-align: center;
   position: relative;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   border: 1.5px solid #E2E8F0;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .podium-card:hover {
@@ -1586,8 +1591,8 @@ body {
   border-color: #F59E0B;
   background: linear-gradient(180deg, #FFFDF5 0%, #FFFFFF 100%);
   box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
-  padding-top: 28px;
-  padding-bottom: 28px;
+  padding-top: 22px;
+  padding-bottom: 22px;
 }
 
 .podium-card.rank-2 {
@@ -1632,13 +1637,14 @@ body {
 }
 
 .podium-name {
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #0F172A;
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .podium-group {
@@ -1851,10 +1857,10 @@ body {
    YETAKCHILAR FAXRIY DOSKASI - PODIUM VA AVATAR FOTO STILLARI
    ======================================================== */
 .podium-photo-box {
-  width: 76px;
-  height: 76px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  margin: 0 auto 12px;
+  margin: 0 auto 10px;
   position: relative;
   display: flex;
   align-items: center;
@@ -1863,24 +1869,24 @@ body {
 }
 
 .podium-card.rank-1 .podium-photo-box {
-  width: 90px;
-  height: 90px;
-  border: 4px solid #F59E0B;
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2), 0 10px 20px rgba(245, 158, 11, 0.3);
+  width: 76px;
+  height: 76px;
+  border: 3.5px solid #F59E0B;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2), 0 8px 18px rgba(245, 158, 11, 0.25);
 }
 
 .podium-card.rank-2 .podium-photo-box {
-  width: 78px;
-  height: 78px;
-  border: 3.5px solid #94A3B8;
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2), 0 6px 14px rgba(0, 0, 0, 0.08);
+  width: 64px;
+  height: 64px;
+  border: 3px solid #94A3B8;
+  box-shadow: 0 0 0 2.5px rgba(148, 163, 184, 0.2), 0 5px 12px rgba(0, 0, 0, 0.08);
 }
 
 .podium-card.rank-3 .podium-photo-box {
-  width: 78px;
-  height: 78px;
-  border: 3.5px solid #D97706;
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2), 0 6px 14px rgba(217, 119, 6, 0.2);
+  width: 64px;
+  height: 64px;
+  border: 3px solid #D97706;
+  box-shadow: 0 0 0 2.5px rgba(217, 119, 6, 0.2), 0 5px 12px rgba(217, 119, 6, 0.2);
 }
 
 .podium-photo-img {
@@ -1920,17 +1926,17 @@ body {
 
 .podium-badge-medal {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
-  width: 28px;
-  height: 28px;
+  bottom: -3px;
+  right: -3px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #FFFFFF;
   box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 13px;
   border: 1.5px solid #FFFFFF;
 }
 

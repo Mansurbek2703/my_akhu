@@ -107,6 +107,16 @@ const ALL_PERMISSIONS = PERMISSION_CATEGORIES.flatMap(c => c.permissions.map(p =
 // Standart rollar uchun tavsiya etiladigan bazaviy ruxsatlar
 const ROLE_DEFAULT_PERMISSIONS = {
   superadmin: ALL_PERMISSIONS,
+  executive_director: [
+    'observe_analytics', 'observe_tv_screen', 'attendance_view', 'attendance_view_history',
+    'attendance_export_excel', 'students_view', 'events_view', 'events_create',
+    'points_history_view', 'points_approve_prorektor', 'settings_audit_logs', 'settings_risk_monitoring'
+  ],
+  rector: [
+    'observe_analytics', 'observe_tv_screen', 'attendance_view', 'attendance_view_history',
+    'attendance_export_excel', 'students_view', 'events_view', 'events_create',
+    'points_history_view', 'points_approve_prorektor', 'settings_audit_logs', 'settings_risk_monitoring'
+  ],
   dep_ob: [
     'students_view', 'students_create', 'students_edit', 'students_import_excel', 
     'students_import_gpa', 'students_export_zip', 'students_sync_turniket_photos', 
