@@ -1110,6 +1110,132 @@ router.post('/students/clear-all', authenticateSuperadmin, (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/students/:id/reset-scores
+ * Muayyan talabaning barcha ballarini va tarixini butunlay tozalash (0 ga tushirish)
+ * (Faqat Superadmin yoki Prorektor)
+ */
+router.post('/students/:id/reset-scores', authenticateSuperadminOrRegistrator, (req, res) => {
+  try {
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('prorektor')) {
+      return res.status(403).json({ error: 'Faqat Superadmin yoki Prorektor talaba ballarini nolga tushira oladi' });
+    }
+
+    const student = db.prepare(`SELECT * FROM student WHERE id = ? OR external_id = ?`).get(req.params.id, req.params.id);
+    if (!student) return res.status(404).json({ error: 'Talaba topilmadi' });
+
+    const entries = db.prepare(`SELECT id, points, item_id, note FROM point_entry WHERE student_id = ?`).all(student.id);
+
+    db.transaction(() => {
+      for (const e of entries) {
+        try { db.prepare(`DELETE FROM appeal WHERE entry_id = ?`).run(e.id); } catch (err) {}
+        try { db.prepare(`DELETE FROM point_entry_history WHERE entry_id = ?`).run(e.id); } catch (err) {}
+        try { db.prepare(`DELETE FROM checkin WHERE entry_id = ?`).run(e.id); } catch (err) {}
+      }
+      try { db.prepare(`DELETE FROM checkin WHERE student_id = ?`).run(student.id); } catch (err) {}
+      db.prepare(`DELETE FROM point_entry WHERE student_id = ?`).run(student.id);
+      db.prepare(`
+        UPDATE student_score 
+        SET total = 0, season = 0, week_cur = 0, week_prev = 0, 
+            by_category = '{}', events_count = 0, last_point_at = NULL, rank_cohort = 1, is_passive = 1,
+            updated_at = ?
+        WHERE student_id = ?
+      `).run(new Date().toISOString(), student.id);
+    })();
+
+    recalculateStudentScores();
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: req.staffUser.roles ? req.staffUser.roles.join(',') : 'superadmin',
+      action: 'RESET_STUDENT_SCORES',
+      object_type: 'student',
+      object_id: student.id,
+      before: { cleared_entries_count: entries.length },
+      after: { total: 0, season: 0 },
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({
+      success: true,
+      message: `${student.first_name} ${student.last_name}ning barcha ballari (${entries.length} ta yozuv) va tarixi to'liq o'chirildi va 0 ga tushirildi`,
+      student_id: student.id
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/point-entries/:id
+ * Yagona ball yozuvini tarixi bilan birga butunlay o'chirish
+ * (Faqat Superadmin yoki Prorektor)
+ */
+router.delete('/point-entries/:id', authenticateSuperadminOrRegistrator, (req, res) => {
+  try {
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('prorektor')) {
+      return res.status(403).json({ error: 'Faqat Superadmin yoki Prorektor ball yozuvini o\'chira oladi' });
+    }
+
+    const entry = db.prepare(`SELECT * FROM point_entry WHERE id = ?`).get(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Ball yozuvi topilmadi' });
+
+    db.transaction(() => {
+      try { db.prepare(`DELETE FROM appeal WHERE entry_id = ?`).run(entry.id); } catch (err) {}
+      try { db.prepare(`DELETE FROM point_entry_history WHERE entry_id = ?`).run(entry.id); } catch (err) {}
+      try { db.prepare(`DELETE FROM checkin WHERE entry_id = ?`).run(entry.id); } catch (err) {}
+      db.prepare(`DELETE FROM point_entry WHERE id = ?`).run(entry.id);
+    })();
+
+    recalculateStudentScores();
+
+    logAudit({
+      actor_id: req.staffUser.id,
+      actor_role: req.staffUser.roles ? req.staffUser.roles.join(',') : 'superadmin',
+      action: 'DELETE_POINT_ENTRY',
+      object_type: 'point_entry',
+      object_id: entry.id,
+      before: entry,
+      after: null,
+      ip: req.ip || '127.0.0.1'
+    });
+
+    res.json({
+      success: true,
+      message: "Ball yozuvi tarixi bilan birga muvaffaqiyatli o'chirildi",
+      entry_id: entry.id,
+      student_id: entry.student_id
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/point-entries/:id/revoke
+ * Ball yozuvini bekor qilish (Revoke)
+ * (Superadmin yoki Prorektor)
+ */
+router.post('/point-entries/:id/revoke', authenticateSuperadminOrRegistrator, (req, res) => {
+  try {
+    if (!req.staffUser.roles.includes('superadmin') && !req.staffUser.roles.includes('prorektor')) {
+      return res.status(403).json({ error: 'Faqat Superadmin yoki Prorektor ball yozuvini bekor qila oladi' });
+    }
+
+    const { revokeEntry } = require('../services/pointService');
+    const reason = req.body.reason || 'Superadmin tomonidan bekor qilindi';
+    const result = revokeEntry(req.params.id, req.staffUser, reason, req.ip || '127.0.0.1');
+
+    res.json({
+      success: true,
+      message: result.message || 'Ball yozuvi bekor qilindi',
+      result
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ====================================================================
 // XODIMLAR VA ROLLAR BOSHQARUVI (SUPERADMIN FULL ACCESS)
 // ====================================================================

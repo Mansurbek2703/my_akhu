@@ -8247,6 +8247,33 @@ async function showStudentModal(studentId) {
 
     const isFemale = st.gender === 'female' || st.gender === 'f';
     const initials = `${(st.first_name || '').charAt(0)}${(st.last_name || '').charAt(0)}`.toUpperCase();
+
+    const isSuperadmin = Boolean(
+      AppState.user && (
+        AppState.user.id === 'superadmin' ||
+        AppState.user.user_type === 'superadmin' ||
+        (Array.isArray(AppState.user.roles) && (AppState.user.roles.includes('superadmin') || AppState.user.roles.includes('prorektor')))
+      )
+    );
+
+    const escapeHtmlText = (str) => String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeStudentModalCleanly()">Yopish</button>
+      ${isSuperadmin ? `
+        <button class="btn btn-outline text-danger" onclick="confirmResetStudentScores('${st.id}', '${escapeHtmlText(st.first_name)} ${escapeHtmlText(st.last_name)}')" style="border-color: #FECACA; color: #DC2626; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+          ${icon('trash', 14)} Barcha ballarni 0 ga tushirish
+        </button>
+      ` : ''}
+      <button class="btn btn-primary" onclick="showEditStudentModal('${studentId}')" style="display:inline-flex; align-items:center; gap:6px;">
+        ${icon('edit', 14)} Tahrirlash
+      </button>
+    `;
     const avatarHtml = st.photo_url
       ? `<img src="${st.photo_url}" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #2563EB;" alt="${st.first_name}">`
       : `<span class="avatar-badge ${isFemale ? 'female' : ''}" style="width: 64px; height: 64px; font-size: 22px;">${initials}</span>`;
@@ -10240,27 +10267,58 @@ async function showStudentDetailsModal(studentId) {
         <div>
           <p style="margin-bottom: 6px;"><strong>Telefon:</strong> ${st.phone || '-'}</p>
           <p style="margin-bottom: 6px;"><strong>Telegram:</strong> ${st.telegram_user_id ? '<span class="text-success">Ulangan</span>' : '<span class="text-muted">Ulanmagan</span>'}</p>
-          <p style="margin-bottom: 6px;"><strong>Mavsumiy Ball:</strong> <strong style="color: #2563EB; font-size: 16px;">${st.season || st.total || 0}</strong></p>
+          <p style="margin-bottom: 6px;"><strong>Mavsumiy Ball:</strong> <strong style="color: #2563EB; font-size: 16px;">${st.season || 0}</strong> <span style="font-size: 12px; color: var(--text-muted);">(Jami: ${st.total || 0} ball)</span></p>
         </div>
       </div>
 
-      <!-- BALLAR TARIXI -->
-      <h4 style="font-size: 14px; font-weight: 700; margin: 16px 0 10px; color: var(--text-main);">
-        Ballar va Faollik Tarixi (${entries.length} ta yozuv)
-      </h4>
-      <div style="max-height: 200px; overflow-y: auto;">
-        ${entries.length === 0 ? '<p style="color:var(--text-muted); font-size:12px;">Hozircha ball yozuvlari mavjud emas.</p>' : `
-          <table class="data-table" style="font-size: 12px;">
+      <!-- BALLAR TARIXI & SUPERADMIN NAZORATI -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 18px 0 10px; flex-wrap: wrap; gap: 8px;">
+        <h4 style="font-size: 14px; font-weight: 700; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+          ${icon('award', 16)} Ballar va Faollik Tarixi (${entries.length} ta yozuv)
+        </h4>
+        ${isSuperadmin ? `
+          <button type="button" class="btn btn-sm" onclick="confirmResetStudentScores('${st.id}', '${escapeHtmlText(st.first_name)} ${escapeHtmlText(st.last_name)}')" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+            ${icon('trash', 13)} Barcha ballarni 0 ga tushirish (Tarixni tozalash)
+          </button>
+        ` : ''}
+      </div>
+
+      <div style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 8px;">
+        ${entries.length === 0 ? '<p style="color:var(--text-muted); font-size:12px; padding: 14px; text-align: center; margin: 0;">Hozircha ball yozuvlari mavjud emas (barcha ballar 0).</p>' : `
+          <table class="data-table" style="font-size: 12px; margin: 0;">
             <thead>
-              <tr><th>Sana</th><th>Tadbir / Mezon</th><th>Ball</th><th>Holat</th></tr>
+              <tr style="position: sticky; top: 0; background: #F8FAFC; z-index: 1;">
+                <th>Sana</th>
+                <th>Tadbir / Mezon / Izoh</th>
+                <th>Ball</th>
+                <th>Holat</th>
+                ${isSuperadmin ? '<th style="text-align: right; min-width: 140px;">Ball nazorati</th>' : ''}
+              </tr>
             </thead>
             <tbody>
               ${entries.map(e => `
                 <tr>
-                  <td>${e.event_date || (e.created_at || '').substring(0, 10)}</td>
-                  <td>${e.catalog_title || '-'}</td>
-                  <td><strong>+${e.points}</strong></td>
+                  <td style="white-space: nowrap;">${e.event_date || (e.created_at || '').substring(0, 10)}</td>
+                  <td>
+                    <div style="font-weight: 600;">${escapeHtmlText(e.catalog_title || e.item_id || '-')}</div>
+                    ${e.note ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtmlText(e.note)}</div>` : ''}
+                  </td>
+                  <td style="white-space: nowrap;"><strong style="color: ${e.points >= 0 ? '#16A34A' : '#DC2626'}; font-size: 13px;">${e.points > 0 ? '+' : ''}${e.points}</strong></td>
                   <td><span class="status-badge status-${e.status}">${e.status}</span></td>
+                  ${isSuperadmin ? `
+                    <td style="text-align: right; white-space: nowrap;">
+                      <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+                        ${e.status === 'approved' ? `
+                          <button type="button" class="btn btn-outline btn-sm" onclick="handleRevokePointEntry('${e.id}', '${st.id}')" title="Ballni bekor qilish (Revoke)" style="padding: 2px 7px; font-size: 11px; color: #D97706; border-color: #FDE68A; background: #FFFBEB;">
+                            Bekor qilish
+                          </button>
+                        ` : ''}
+                        <button type="button" class="btn btn-outline btn-sm" onclick="handleDeletePointEntry('${e.id}', '${st.id}')" title="Ballni tarixi bilan butunlay o'chirish" style="padding: 2px 7px; font-size: 11px; color: #DC2626; border-color: #FECACA; background: #FEF2F2;">
+                          ${icon('trash', 12)} O'chirish
+                        </button>
+                      </div>
+                    </td>
+                  ` : ''}
                 </tr>
               `).join('')}
             </tbody>
@@ -15673,3 +15731,76 @@ window.switchTimetableMode = switchTimetableMode;
 
 
 
+
+
+// ====================================================================
+// SUPERADMIN BALLAR NAZORATI & TOZALASH
+// ====================================================================
+
+async function confirmResetStudentScores(studentId, studentName) {
+  const sure = confirm(
+    "Haqiqatan ham " + studentName + "ning barcha ballarini va ball tarixini butunlay o'chirib, 0 ga tushirmoqchimisiz?\n\nBu amal barcha ballar tarixini, tadbirlardagi ishtirok ballarini tozalaydi va talaba reytingini to'liq 0 qiladi!"
+  );
+  if (!sure) return;
+
+  try {
+    showToast("Talaba ballari tozalanmoqda...", "info");
+    const res = await apiFetch(`/api/admin/students/${encodeURIComponent(studentId)}/reset-scores`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: "Superadmin tomonidan ballar tozalandi" })
+    });
+    showToast(res.message || "Barcha ballar muvaffaqiyatli 0 ga tushirildi!", "success");
+    
+    // Modaldagi ma'lumotlarni darhol yangilash
+    showStudentDetailsModal(studentId);
+    
+    // Ro'yxat jadvallarini yangilash
+    if (typeof loadAdminStudents === 'function') loadAdminStudents();
+    if (typeof loadObserveStudentsList === 'function') loadObserveStudentsList();
+  } catch (err) {
+    showToast("Xatolik: " + err.message, "error");
+  }
+}
+
+async function handleDeletePointEntry(entryId, studentId) {
+  const sure = confirm("Ushbu ball yozuvini va uning tarixini butunlay o'chirmoqchimisiz? Ballar avtomatik qayta hisoblanadi.");
+  if (!sure) return;
+
+  try {
+    showToast("Ball yozuvi o'chirilmoqda...", "info");
+    const res = await apiFetch(`/api/admin/point-entries/${encodeURIComponent(entryId)}`, {
+      method: 'DELETE'
+    });
+    showToast(res.message || "Ball yozuvi muvaffaqiyatli o'chirildi!", "success");
+    
+    showStudentDetailsModal(studentId);
+    if (typeof loadAdminStudents === 'function') loadAdminStudents();
+    if (typeof loadObserveStudentsList === 'function') loadObserveStudentsList();
+  } catch (err) {
+    showToast("Xatolik: " + err.message, "error");
+  }
+}
+
+async function handleRevokePointEntry(entryId, studentId) {
+  const reason = prompt("Ballni bekor qilish sababini kiriting:", "Superadmin tomonidan bekor qilindi");
+  if (reason === null) return;
+
+  try {
+    showToast("Ball bekor qilinmoqda...", "info");
+    const res = await apiFetch(`/api/admin/point-entries/${encodeURIComponent(entryId)}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason.trim() || "Superadmin tomonidan bekor qilindi" })
+    });
+    showToast(res.message || "Ball muvaffaqiyatli bekor qilindi!", "success");
+    
+    showStudentDetailsModal(studentId);
+    if (typeof loadAdminStudents === 'function') loadAdminStudents();
+    if (typeof loadObserveStudentsList === 'function') loadObserveStudentsList();
+  } catch (err) {
+    showToast("Xatolik: " + err.message, "error");
+  }
+}
+
+window.confirmResetStudentScores = confirmResetStudentScores;
+window.handleDeletePointEntry = handleDeletePointEntry;
+window.handleRevokePointEntry = handleRevokePointEntry;
