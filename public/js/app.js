@@ -12860,6 +12860,36 @@ async function switchUnifiedAttTab(tabName) {
   }
 }
 
+function formatTimetableDateLabel(dateStr) {
+  if (!dateStr) return 'Bugun';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const day = parts[2];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthNames = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+  return `${day}-${monthNames[monthIdx] || parts[1]}`;
+}
+
+function formatTimetableDateLabel(dateStr) {
+  if (!dateStr) return 'Bugun';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const day = parts[2];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthNames = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+  return `${day}-${monthNames[monthIdx] || parts[1]}`;
+}
+
+function formatTimetableDateLabel(dateStr) {
+  if (!dateStr) return 'Bugun';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const day = parts[2];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthNames = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+  return `${day}-${monthNames[monthIdx] || parts[1]}`;
+}
+
 // 1. HAFTALIK DARS JADVALI TABI (TIMETABLE)
 async function renderUnifiedTimetableTab(container) {
   container.innerHTML = `
@@ -12870,8 +12900,9 @@ async function renderUnifiedTimetableTab(container) {
   `;
 
   try {
+    const selectedGroup = unifiedAttState.group || '';
     const [ttRes, grpRes] = await Promise.all([
-      apiFetch('/api/lms/timetable'),
+      apiFetch('/api/lms/timetable' + (selectedGroup ? `?group=${encodeURIComponent(selectedGroup)}` : '')),
       apiFetch('/api/admin/groups-list').catch(() => ({ groups: [] }))
     ]);
 
@@ -12883,6 +12914,9 @@ async function renderUnifiedTimetableTab(container) {
     const dayMap = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7 };
     const currentWeekday = dayMap[dayStr] || 1;
 
+    const todayDateLabel = formatTimetableDateLabel(ttRes.today?.date);
+    const tomorrowDateLabel = formatTimetableDateLabel(ttRes.tomorrow?.date);
+
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
         <!-- FILTRLAR VA REJIM TANLASH PANELI -->
@@ -12893,10 +12927,10 @@ async function renderUnifiedTimetableTab(container) {
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">Tanlov:</span>
               <button id="btn-mode-today" class="btn btn-sm ${unifiedAttState.timetableMode === 'today' ? 'btn-primary' : 'btn-outline'}" onclick="switchTimetableMode('today')">
-                ⚡ Bugungi darslar (${ttRes.today?.date ? ttRes.today.date.slice(8,10) + '-oktabr' : 'Bugun'}) <span class="badge" style="background:#22C55E; color:white; margin-left:4px;">${ttRes.today?.count || 0} ta</span>
+                ⚡ Bugungi darslar (${todayDateLabel}) <span id="u-tt-today-badge" class="badge" style="background:#22C55E; color:white; margin-left:4px;">${ttRes.today?.count || 0} ta</span>
               </button>
               <button id="btn-mode-tomorrow" class="btn btn-sm ${unifiedAttState.timetableMode === 'tomorrow' ? 'btn-primary' : 'btn-outline'}" onclick="switchTimetableMode('tomorrow')">
-                ⏩ Ertangi darslar (${ttRes.tomorrow?.date ? ttRes.tomorrow.date.slice(8,10) + '-oktabr' : 'Ertaga'}) <span class="badge" style="background:#3B82F6; color:white; margin-left:4px;">${ttRes.tomorrow?.count || 0} ta</span>
+                ⏩ Ertangi darslar (${tomorrowDateLabel}) <span id="u-tt-tomorrow-badge" class="badge" style="background:#3B82F6; color:white; margin-left:4px;">${ttRes.tomorrow?.count || 0} ta</span>
               </button>
               <button id="btn-mode-week" class="btn btn-sm ${unifiedAttState.timetableMode === 'week' ? 'btn-primary' : 'btn-outline'}" onclick="switchTimetableMode('week')">
                 🗓️ Haftalik umumiy jadval
@@ -12914,9 +12948,9 @@ async function renderUnifiedTimetableTab(container) {
               <!-- Guruh tanlash -->
               <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-size:12px; font-weight:700; color:#475569;">🎓 Guruh:</span>
-                <select id="u-tt-group-select" class="form-control" onchange="handleUnifiedTimetableFilter()" style="font-size:12.5px; padding:5px 8px; border-radius:6px; min-width:130px;">
+                <select id="u-tt-group-select" class="form-control" onchange="handleUnifiedTimetableFilter(true)" style="font-size:12.5px; padding:5px 8px; border-radius:6px; min-width:130px;">
                   <option value="">Barcha guruhlar</option>
-                  ${groupsList.map(g => `<option value="${g}" ${unifiedAttState.group === g ? 'selected' : ''}>${g}</option>`).join('')}
+                  ${groupsList.map(g => `<option value="${g}" ${selectedGroup === g ? 'selected' : ''}>${g}</option>`).join('')}
                 </select>
               </div>
 
@@ -12934,7 +12968,7 @@ async function renderUnifiedTimetableTab(container) {
 
             <!-- Qidiruv -->
             <div>
-              <input type="text" id="u-tt-search-input" value="${unifiedAttState.timetableSearch}" placeholder="🔍 Fan, o'qituvchi yoki xona..." oninput="handleUnifiedTimetableFilter()" class="form-control" style="font-size:12.5px; padding:5px 10px; border-radius:6px; width:220px;">
+              <input type="text" id="u-tt-search-input" value="${unifiedAttState.timetableSearch || ''}" placeholder="🔍 Fan, o'qituvchi yoki xona..." oninput="handleUnifiedTimetableFilter(false)" class="form-control" style="font-size:12.5px; padding:5px 10px; border-radius:6px; width:220px;">
             </div>
           </div>
         </div>
@@ -12980,7 +13014,7 @@ function switchTimetableMode(mode) {
 function renderLessonCard(l) {
   const isLab = /lab|laboratoriya/i.test(l.subject_name);
   const isLecture = /lecture|ma'ruza/i.test(l.subject_name);
-  const typeLabel = isLab ? '🔬 Lab' : (isLecture ? '🎓 Ma\'ruza' : '✏️ Amaliyot');
+  const typeLabel = isLab ? '🔬 Lab' : (isLecture ? "🎓 Ma'ruza" : '✏️ Amaliyot');
 
   return `
     <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px;">
@@ -12999,7 +13033,7 @@ function renderLessonCard(l) {
         ${l.subject_name}
       </div>
       <div style="font-size:12px; color:#475569; margin-top:3px; display:flex; flex-direction:column; gap:4px;">
-        <span>👨‍🏫 <b>Ustoz:</b> <span style="font-weight:600; color:#1E293B;">${l.teacher_name || 'Belgilanmagan'}</span></span>
+        <span>👨‍🏫 <b>Ustoz:</b> <span style="font-weight:600; color:#1E293B;">${l.teacher_name || "Kafedra o'qituvchisi"}</span></span>
         <span style="display:flex; align-items:center; gap:5px;">
           📍 <b>Xona:</b>
           ${l.room ? `<span style="font-weight:700; background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0; padding:2px 8px; border-radius:6px;">🏢 ${l.room}</span>` : `<span style="color:#94A3B8; font-style:italic;">Ko'rsatilmagan</span>`}
@@ -13017,7 +13051,6 @@ function renderUnifiedTimetableDays(ttData) {
   const mode = unifiedAttState.timetableMode || 'today';
   const selectedDay = unifiedAttState.weekday || 0;
   const search = (unifiedAttState.timetableSearch || '').toLowerCase().trim();
-  const group = (unifiedAttState.group || '').toLowerCase().trim();
 
   const filterList = (lessons) => {
     let list = lessons || [];
@@ -13030,14 +13063,6 @@ function renderUnifiedTimetableDays(ttData) {
         (l.group_code || '').toLowerCase().includes(search)
       );
     }
-    if (group) {
-      list = list.filter(l => 
-        (l.group_code || '').toLowerCase().includes(group) ||
-        (l.group_name || '').toLowerCase().includes(group) ||
-        (l.subject_code || '').toLowerCase().includes(group) ||
-        (l.subject_name || '').toLowerCase().includes(group)
-      );
-    }
     return list;
   };
 
@@ -13047,12 +13072,13 @@ function renderUnifiedTimetableDays(ttData) {
   if (mode === 'today') {
     const today = ttData.today || { lessons: [] };
     const lessons = filterList(today.lessons);
+    const dateFormatted = today.date ? `${today.date} - ${today.weekday || 'Bugun'}` : 'Bugun';
 
     html = `
       <div class="tt-day-card" style="background:#FFFFFF; border:2px solid #22C55E; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(34,197,94,0.06);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #F1F5F9; padding-bottom:10px;">
           <h4 style="font-size:16px; font-weight:800; color:#166534; margin:0; display:flex; align-items:center; gap:8px;">
-            <span>⚡ Bugungi Dars Jadvali (${today.date || ''} - ${today.weekday || 'Bugun'})</span>
+            <span>⚡ Bugungi Dars Jadvali (${dateFormatted})</span>
             <span class="badge" style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:800; padding:3px 8px;">Jonli Jadval</span>
           </h4>
           <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:12px;">${lessons.length} ta dars</span>
@@ -13075,12 +13101,13 @@ function renderUnifiedTimetableDays(ttData) {
   if (mode === 'tomorrow') {
     const tomorrow = ttData.tomorrow || { lessons: [] };
     const lessons = filterList(tomorrow.lessons);
+    const dateFormatted = tomorrow.date ? `${tomorrow.date} - ${tomorrow.weekday || 'Ertaga'}` : 'Ertaga';
 
     html = `
       <div class="tt-day-card" style="background:#FFFFFF; border:2px solid #3B82F6; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(59,130,246,0.06);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #F1F5F9; padding-bottom:10px;">
           <h4 style="font-size:16px; font-weight:800; color:#1D4ED8; margin:0; display:flex; align-items:center; gap:8px;">
-            <span>⏩ Ertangi Dars Jadvali (${tomorrow.date || ''} - ${tomorrow.weekday || 'Ertaga'})</span>
+            <span>⏩ Ertangi Dars Jadvali (${dateFormatted})</span>
             <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:11px; font-weight:800; padding:3px 8px;">Rejalashtirilgan</span>
           </h4>
           <span class="badge" style="background:#F1F5F9; color:#475569; font-weight:700; font-size:12px;">${lessons.length} ta dars</span>
@@ -13123,12 +13150,16 @@ function renderUnifiedTimetableDays(ttData) {
 
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:12px;">
           ${lessons.length === 0 ? `
-            <div style="color:#94A3B8; font-size:12.5px; padding:10px;">Ushbu mezonlar bo'yicha darslar topilmadi</div>
+            <div style="color:#94A3B8; font-size:12.5px; padding:10px;">Ushbu kun uchun darslar yo'q</div>
           ` : lessons.map(renderLessonCard).join('')}
         </div>
       </div>
     `;
   });
+
+  if (!html) {
+    html = `<div class="card" style="padding:24px; text-align:center; color:#94A3B8;">Tanlangan filtr bo'yicha haftalik darslar topilmadi.</div>`;
+  }
 
   container.innerHTML = html;
 }
@@ -13148,11 +13179,39 @@ function handleUnifiedTtDay(dayNumber, btn) {
   }
 }
 
-function handleUnifiedTimetableFilter() {
+async function handleUnifiedTimetableFilter(reFetch = true) {
   const grpSelect = document.getElementById('u-tt-group-select');
   const searchInput = document.getElementById('u-tt-search-input');
-  if (grpSelect) unifiedAttState.group = grpSelect.value;
-  if (searchInput) unifiedAttState.timetableSearch = searchInput.value;
+  const newGroup = grpSelect ? grpSelect.value : '';
+  const newSearch = searchInput ? searchInput.value : '';
+
+  const groupChanged = (unifiedAttState.group !== newGroup);
+  unifiedAttState.group = newGroup;
+  unifiedAttState.timetableSearch = newSearch;
+
+  if (groupChanged || reFetch) {
+    const grid = document.getElementById('u-tt-grid');
+    if (grid) {
+      grid.innerHTML = `<div style="text-align:center; padding:30px;"><div class="spinner" style="margin:0 auto 10px;"></div><span style="color:#64748B; font-weight:600;">Dars jadvali yangilanmoqda...</span></div>`;
+    }
+    try {
+      const url = '/api/lms/timetable' + (newGroup ? `?group=${encodeURIComponent(newGroup)}` : '');
+      const res = await apiFetch(url);
+      cachedLmsTimetable = res;
+
+      const btnToday = document.getElementById('btn-mode-today');
+      const btnTomorrow = document.getElementById('btn-mode-tomorrow');
+      if (btnToday && res.today) {
+        btnToday.innerHTML = `⚡ Bugungi darslar (${formatTimetableDateLabel(res.today.date)}) <span id="u-tt-today-badge" class="badge" style="background:#22C55E; color:white; margin-left:4px;">${res.today.count || 0} ta</span>`;
+      }
+      if (btnTomorrow && res.tomorrow) {
+        btnTomorrow.innerHTML = `⏩ Ertangi darslar (${formatTimetableDateLabel(res.tomorrow.date)}) <span id="u-tt-tomorrow-badge" class="badge" style="background:#3B82F6; color:white; margin-left:4px;">${res.tomorrow.count || 0} ta</span>`;
+      }
+    } catch (err) {
+      console.error('Timetable refetch error:', err);
+    }
+  }
+
   if (cachedLmsTimetable) {
     renderUnifiedTimetableDays(cachedLmsTimetable);
   }

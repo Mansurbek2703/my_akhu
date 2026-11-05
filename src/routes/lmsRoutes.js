@@ -65,7 +65,65 @@ router.get('/overview', (req, res) => {
 router.get('/timetable', (req, res) => {
   try {
     const { weekday, course_id, group, search, date } = req.query;
-    // Faqat joriy 2026-2027 o'quv yili (2026-09-01 dan keyin) va faol kurslar
+    const { getGroupTimetable } = require('../services/lmsService');
+
+    const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
+    const tomorrowObj = new Date(Date.now() + 24 * 3600 * 1000);
+    const tomorrowDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(tomorrowObj);
+    const todayWeekdayUz = new Intl.DateTimeFormat('uz-UZ', { timeZone: 'Asia/Tashkent', weekday: 'long' }).format(new Date());
+    const tomorrowWeekdayUz = new Intl.DateTimeFormat('uz-UZ', { timeZone: 'Asia/Tashkent', weekday: 'long' }).format(tomorrowObj);
+
+    // Agar aniq guruh so'ralsa - ushbu guruh uchun aniq dars jadvalini to'liq qaytaramiz:
+    if (group && group.trim()) {
+      const gCode = group.trim().toUpperCase();
+      const groupData = getGroupTimetable(gCode);
+      if (groupData) {
+        let todayLessons = groupData.today_classes;
+        let tomorrowLessons = groupData.tomorrow_classes;
+        let schedule = groupData.weekly_schedule;
+        let allLessons = groupData.all_lessons;
+
+        if (search) {
+          const s = search.toLowerCase();
+          const matches = l => (l.subject_name || '').toLowerCase().includes(s) ||
+                               (l.teacher_name || '').toLowerCase().includes(s) ||
+                               (l.room || '').toLowerCase().includes(s);
+          todayLessons = todayLessons.filter(matches);
+          tomorrowLessons = tomorrowLessons.filter(matches);
+          allLessons = allLessons.filter(matches);
+          schedule = schedule.map(day => ({
+            ...day,
+            lessons: day.lessons.filter(matches)
+          }));
+        }
+
+        if (weekday) {
+          schedule = schedule.filter(d => d.weekday === Number(weekday));
+        }
+
+        return res.json({
+          success: true,
+          current_academic_year: '2026-2027 (Fall 26/27)',
+          group: gCode,
+          today: {
+            date: todayDateStr,
+            weekday: todayWeekdayUz,
+            count: todayLessons.length,
+            lessons: todayLessons
+          },
+          tomorrow: {
+            date: tomorrowDateStr,
+            weekday: tomorrowWeekdayUz,
+            count: tomorrowLessons.length,
+            lessons: tomorrowLessons
+          },
+          timetable: allLessons,
+          grouped_by_weekday: schedule
+        });
+      }
+    }
+
+    // Barcha guruhlar / umumiy universitet jadvali:
     let query = `SELECT * FROM lms_timetable WHERE timestart >= 1788220800 AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)`;
     const params = [];
 
@@ -83,24 +141,6 @@ router.get('/timetable', (req, res) => {
       query += ` AND course_id = ?`;
       params.push(Number(course_id));
     }
-    if (group) {
-      const g = group.trim().toUpperCase();
-      const prefix = g.slice(0, 3);
-      let yearCourses = [];
-      if (prefix === 'FMC') yearCourses = [22, 23, 24, 25, 26, 39];
-      else if (prefix === 'FDT') yearCourses = [21, 23, 24, 25, 26, 39];
-      else if (prefix === 'SSE' || prefix === 'SAI') yearCourses = [17, 29, 30, 31, 32, 33, 39];
-      else if (prefix === 'SDT') yearCourses = [17, 18, 19, 20, 21, 39];
-
-      if (yearCourses.length > 0) {
-        const ph = yearCourses.map(() => '?').join(',');
-        query += ` AND ((group_code = ? OR group_name ILIKE ?) OR ((group_code IS NULL OR group_code = '') AND course_id IN (${ph})))`;
-        params.push(group, `%${group}%`, ...yearCourses);
-      } else {
-        query += ` AND (group_code = ? OR group_name ILIKE ?)`;
-        params.push(group, `%${group}%`);
-      }
-    }
     if (search) {
       query += ` AND (subject_name ILIKE ? OR teacher_name ILIKE ? OR room ILIKE ? OR group_name ILIKE ?)`;
       const s = `%${search}%`;
@@ -110,14 +150,14 @@ router.get('/timetable', (req, res) => {
     query += ` ORDER BY weekday ASC, timestart ASC`;
     const timetable = db.prepare(query).all(...params);
 
-    // Hafta kunlari bo'yicha guruhlash (har bir dars vaqti, fan, xona va guruhi bo'yicha takrorlanmas darslar)
+    // Hafta kunlari bo'yicha takrorlanmas darslar
     const weekdays = {
-      1: { name: 'Dushanba', lessons: [] },
-      2: { name: 'Seshanba', lessons: [] },
-      3: { name: 'Chorshanba', lessons: [] },
-      4: { name: 'Payshanba', lessons: [] },
-      5: { name: 'Juma', lessons: [] },
-      6: { name: 'Shanba', lessons: [] }
+      1: { weekday: 1, name: 'Dushanba', lessons: [] },
+      2: { weekday: 2, name: 'Seshanba', lessons: [] },
+      3: { weekday: 3, name: 'Chorshanba', lessons: [] },
+      4: { weekday: 4, name: 'Payshanba', lessons: [] },
+      5: { weekday: 5, name: 'Juma', lessons: [] },
+      6: { weekday: 6, name: 'Shanba', lessons: [] }
     };
 
     const distinctKeys = new Set();
@@ -131,49 +171,61 @@ router.get('/timetable', (req, res) => {
       }
     }
 
-    // Bugun va ertangi kunning aniq darslari (Asia/Tashkent vaqti)
-    const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
-    const tomorrowObj = new Date(Date.now() + 24 * 3600 * 1000);
-    const tomorrowDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(tomorrowObj);
-
     const todayStart = Math.floor(new Date(`${todayDateStr}T00:00:00+05:00`).getTime() / 1000);
     const todayEnd = Math.floor(new Date(`${todayDateStr}T23:59:59+05:00`).getTime() / 1000);
     const tomorrowStart = Math.floor(new Date(`${tomorrowDateStr}T00:00:00+05:00`).getTime() / 1000);
     const tomorrowEnd = Math.floor(new Date(`${tomorrowDateStr}T23:59:59+05:00`).getTime() / 1000);
 
-    const todayLessons = db.prepare(`
+    const rawToday = db.prepare(`
       SELECT * FROM lms_timetable
       WHERE timestart >= ? AND timestart <= ? AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
       ORDER BY timestart ASC
     `).all(todayStart, todayEnd);
 
-    const tomorrowLessons = db.prepare(`
+    const rawTomorrow = db.prepare(`
       SELECT * FROM lms_timetable
       WHERE timestart >= ? AND timestart <= ? AND course_id NOT IN (2, 3, 4, 5, 6, 9, 11, 12, 14, 15)
       ORDER BY timestart ASC
     `).all(tomorrowStart, tomorrowEnd);
+
+    // Bugun va ertangi darslarni ham takrorlanmas qilamiz
+    const todayDistinct = [];
+    const todaySeen = new Set();
+    for (const item of rawToday) {
+      const key = `${item.time_str}_${item.subject_code}_${item.group_code || ''}_${item.room || ''}`;
+      if (!todaySeen.has(key)) {
+        todaySeen.add(key);
+        todayDistinct.push(item);
+      }
+    }
+
+    const tomorrowDistinct = [];
+    const tomorrowSeen = new Set();
+    for (const item of rawTomorrow) {
+      const key = `${item.time_str}_${item.subject_code}_${item.group_code || ''}_${item.room || ''}`;
+      if (!tomorrowSeen.has(key)) {
+        tomorrowSeen.add(key);
+        tomorrowDistinct.push(item);
+      }
+    }
 
     res.json({
       success: true,
       current_academic_year: '2026-2027 (Fall 26/27)',
       today: {
         date: todayDateStr,
-        weekday: new Intl.DateTimeFormat('uz-UZ', { timeZone: 'Asia/Tashkent', weekday: 'long' }).format(new Date()),
-        count: todayLessons.length,
-        lessons: todayLessons
+        weekday: todayWeekdayUz,
+        count: todayDistinct.length,
+        lessons: todayDistinct
       },
       tomorrow: {
         date: tomorrowDateStr,
-        weekday: new Intl.DateTimeFormat('uz-UZ', { timeZone: 'Asia/Tashkent', weekday: 'long' }).format(tomorrowObj),
-        count: tomorrowLessons.length,
-        lessons: tomorrowLessons
+        weekday: tomorrowWeekdayUz,
+        count: tomorrowDistinct.length,
+        lessons: tomorrowDistinct
       },
       timetable,
-      grouped_by_weekday: Object.entries(weekdays).map(([day, val]) => ({
-        weekday: Number(day),
-        name: val.name,
-        lessons: val.lessons
-      }))
+      grouped_by_weekday: Object.values(weekdays)
     });
   } catch (err) {
     console.error('LMS Timetable error:', err);

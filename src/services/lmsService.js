@@ -861,6 +861,143 @@ function getStudentTimetable(studentId) {
 }
 
 /**
+ * Guruh uchun Dars Jadvalini olish (Web portal / Rector / Tyutor kabinetlari uchun)
+ * Guruh kodi bo'yicha (masalan: FMC03, SAI02, SSE01, MAI01):
+ * Barcha ma'ruzalar, amaliyotlar va laboratoriyalar to'g'ri taqsimlanadi!
+ */
+function getGroupTimetable(groupCode) {
+  if (!groupCode) return null;
+  const gCode = groupCode.trim().toUpperCase();
+
+  // Guruhdagi talabalardan birini topamiz
+  const sampleStudent = db.prepare(`SELECT * FROM student WHERE UPPER(group_code) = ? LIMIT 1`).get(gCode);
+
+  let eligibleCourseIds = [];
+  const isYear1 = gCode.startsWith('F');
+  const isYear2 = gCode.startsWith('S');
+  const isYear3 = gCode.startsWith('M');
+
+  if (sampleStudent) {
+    eligibleCourseIds = getEligibleCoursesForStudent(sampleStudent);
+  } else {
+    const prefix = gCode.slice(0, 3);
+    if (prefix === 'FMC') eligibleCourseIds = [22, 23, 24, 25, 26, 28, 39];
+    else if (prefix === 'FDT') eligibleCourseIds = [21, 23, 24, 25, 26, 28, 39];
+    else if (prefix === 'SSE' || prefix === 'SAI') eligibleCourseIds = [17, 29, 30, 31, 32, 33, 39];
+    else if (prefix === 'SDT') eligibleCourseIds = [17, 18, 19, 20, 21, 39];
+    else if (prefix === 'MAI') eligibleCourseIds = [23, 39];
+  }
+
+  let timetableEvents = [];
+  if (eligibleCourseIds.length > 0) {
+    const placeholders = eligibleCourseIds.map(() => '?').join(',');
+    const sql = `
+      SELECT * FROM lms_timetable 
+      WHERE (UPPER(group_code) = ? OR UPPER(group_name) LIKE ?)
+         OR ((group_code IS NULL OR group_code = '') AND course_id IN (${placeholders}))
+      ORDER BY weekday ASC, timestart ASC
+    `;
+    timetableEvents = db.prepare(sql).all(gCode, `%${gCode}%`, ...eligibleCourseIds);
+  } else {
+    const sql = `
+      SELECT * FROM lms_timetable 
+      WHERE UPPER(group_code) = ? OR UPPER(group_name) LIKE ?
+      ORDER BY weekday ASC, timestart ASC
+    `;
+    timetableEvents = db.prepare(sql).all(gCode, `%${gCode}%`);
+  }
+
+  // Hafta kunlari va vaqt slotlari bo'yicha to'qnashuvlarni tekshirish (aniq guruh darsini ustun qo'yish)
+  const slotMap = new Map();
+  for (const ev of timetableEvents) {
+    if (isYear1 && ev.subject_code && ev.subject_code.startsWith('PHYS111')) continue;
+    if (isYear2 && ev.subject_code && ev.subject_code.startsWith('PHYS101')) continue;
+
+    const slotKey = `${ev.weekday}_${ev.time_str}`;
+    if (!slotMap.has(slotKey)) {
+      slotMap.set(slotKey, []);
+    }
+    slotMap.get(slotKey).push(ev);
+  }
+
+  const resolvedLessons = [];
+  for (const [slotKey, list] of slotMap.entries()) {
+    const specific = list.filter(e => e.group_code && (e.group_code.toUpperCase() === gCode || (e.group_name && e.group_name.toUpperCase().includes(gCode))));
+    if (specific.length > 0) {
+      resolvedLessons.push(...specific);
+    } else {
+      const seenNames = new Set();
+      for (const gen of list) {
+        if (!seenNames.has(gen.subject_name)) {
+          seenNames.add(gen.subject_name);
+          resolvedLessons.push(gen);
+        }
+      }
+    }
+  }
+
+  resolvedLessons.sort((a, b) => {
+    if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+    return a.timestart - b.timestart;
+  });
+
+  const weekdaysMap = {
+    1: { weekday: 1, name: 'Dushanba', lessons: [] },
+    2: { weekday: 2, name: 'Seshanba', lessons: [] },
+    3: { weekday: 3, name: 'Chorshanba', lessons: [] },
+    4: { weekday: 4, name: 'Payshanba', lessons: [] },
+    5: { weekday: 5, name: 'Juma', lessons: [] },
+    6: { weekday: 6, name: 'Shanba', lessons: [] }
+  };
+
+  const nowTashkent = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }));
+  const rawDay = nowTashkent.getDay();
+  const currentDay = rawDay === 0 ? 7 : rawDay;
+  const tomorrowDay = (currentDay % 7) + 1;
+
+  const seenClassKeys = new Set();
+  const allUniqueLessons = [];
+
+  for (const ev of resolvedLessons) {
+    const key = `${ev.weekday}_${ev.time_str}_${ev.subject_name}`;
+    if (!seenClassKeys.has(key)) {
+      seenClassKeys.add(key);
+      const lessonObj = {
+        id: ev.id,
+        event_id: ev.event_id,
+        course_id: ev.course_id,
+        subject_code: ev.subject_code,
+        subject_name: ev.subject_name,
+        teacher_name: ev.teacher_name || 'Kafedra o\'qituvchisi',
+        room: ev.room || 'Xona ko\'rsatilmagan',
+        time_str: ev.time_str,
+        group_code: ev.group_code || gCode,
+        group_name: ev.group_name || `${gCode} guruhi`,
+        weekday: ev.weekday,
+        is_today: ev.weekday === currentDay,
+        is_tomorrow: ev.weekday === tomorrowDay
+      };
+      allUniqueLessons.push(lessonObj);
+      if (weekdaysMap[ev.weekday]) {
+        weekdaysMap[ev.weekday].lessons.push(lessonObj);
+      }
+    }
+  }
+
+  const todayClasses = weekdaysMap[currentDay] ? weekdaysMap[currentDay].lessons : [];
+  const tomorrowClasses = weekdaysMap[tomorrowDay] ? weekdaysMap[tomorrowDay].lessons : [];
+
+  return {
+    group_code: gCode,
+    today_classes: todayClasses,
+    tomorrow_classes: tomorrowClasses,
+    total_classes_week: allUniqueLessons.length,
+    all_lessons: allUniqueLessons,
+    weekly_schedule: Object.values(weekdaysMap)
+  };
+}
+
+/**
  * Talaba uchun Dars Davomati ma'lumotlarini olish (Mini App)
  */
 function getStudentAttendance(studentId) {
@@ -1279,6 +1416,7 @@ module.exports = {
   syncTimetable,
   syncAttendance,
   getStudentTimetable,
+  getGroupTimetable,
   getStudentAttendance,
   getAdminLmsOverview,
   getAdminLmsStudents,
