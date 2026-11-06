@@ -440,20 +440,79 @@ router.get('/students', authenticateSuperadminOrRegistrator, (req, res) => {
 
 /**
  * GET /api/admin/students/template
- * Namuna Excel shablonini yuklab olish (Foydalanuvchi talab qilgan 8 ustunli format)
- * Ustunlar: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
+ * GET /api/admin/students/template/:type
+ * Namuna Excel shablonini yuklab olish (Bakalavriat va Magistratura uchun alohida)
+ * Ustunlar: ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi, bosqich
  */
-router.get('/students/template', (req, res) => {
-  const filePath1 = path.join(__dirname, '../../public/downloads/talabalar_import_shablon.xlsx');
-  const filePath2 = path.join(__dirname, '../../public/talabalar_import_shablon.xlsx');
-  if (fs.existsSync(filePath1)) {
-    return res.download(filePath1, 'talabalar_import_shablon.xlsx');
-  }
-  if (fs.existsSync(filePath2)) {
-    return res.download(filePath2, 'talabalar_import_shablon.xlsx');
-  }
+function handleStudentTemplateDownload(req, res) {
+  const typeParam = req.params.type || req.query.level || req.query.type || '';
+  const isMag = typeParam.toLowerCase().startsWith('mag') || typeParam.toLowerCase().startsWith('mas');
 
-  const sampleData = [
+  const filename = isMag
+    ? 'talabalar_magistratura_shablon.xlsx'
+    : (typeParam.toLowerCase().startsWith('bak') ? 'talabalar_bakalavriat_shablon.xlsx' : 'talabalar_import_shablon.xlsx');
+
+  const sheetName = isMag ? 'Magistratura' : 'Bakalavriat';
+
+  const magSampleData = [
+    {
+      'ID': 'AM2105011',
+      'Ism': 'SHOHRUH',
+      'Familiya': 'QODIROV',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'MAI01',
+      'telefon raqami': '+998-90-123-45-67',
+      'jinsi': 'Erkak',
+      'kursi': 1,
+      'bosqich': 'Magistratura'
+    },
+    {
+      'ID': 'AM2105012',
+      'Ism': 'DILRABO',
+      'Familiya': 'XUDOYBERGANOVA',
+      'yo\'nalishi': 'Sun\'iy intellekt',
+      'guruh': 'MAI01',
+      'telefon raqami': '+998-91-234-56-78',
+      'jinsi': 'Ayol',
+      'kursi': 1,
+      'bosqich': 'Magistratura'
+    },
+    {
+      'ID': 'AM2105013',
+      'Ism': 'JASURBEK',
+      'Familiya': 'YUSUPOV',
+      'yo\'nalishi': 'Dasturiy injiniring',
+      'guruh': 'MAI01',
+      'telefon raqami': '+998-93-345-67-89',
+      'jinsi': 'Erkak',
+      'kursi': 2,
+      'bosqich': 'Magistratura'
+    },
+    {
+      'ID': 'AM2105014',
+      'Ism': 'MADINAXON',
+      'Familiya': 'RAHIMOVA',
+      'yo\'nalishi': 'Kompyuter ilmlari',
+      'guruh': 'MAI01',
+      'telefon raqami': '+998-97-456-78-90',
+      'jinsi': 'Ayol',
+      'kursi': 1,
+      'bosqich': 'Magistratura'
+    },
+    {
+      'ID': 'AM2105015',
+      'Ism': 'BOBURBEK',
+      'Familiya': 'KARIMOV',
+      'yo\'nalishi': 'Axborot xavfsizligi',
+      'guruh': 'MAI01',
+      'telefon raqami': '+998-99-567-89-01',
+      'jinsi': 'Erkak',
+      'kursi': 2,
+      'bosqich': 'Magistratura'
+    }
+  ];
+
+  const bakSampleData = [
     {
       'ID': 'AE1126333',
       'Ism': 'AYGUL',
@@ -462,7 +521,8 @@ router.get('/students/template', (req, res) => {
       'guruh': 'FMC04',
       'telefon raqami': '+998-93-374-19-80',
       'jinsi': 'Ayol',
-      'kursi': 1
+      'kursi': 1,
+      'bosqich': 'Bakalavriat'
     },
     {
       'ID': 'AE3547765',
@@ -472,7 +532,8 @@ router.get('/students/template', (req, res) => {
       'guruh': 'FMC04',
       'telefon raqami': '+998-99-469-43-30',
       'jinsi': 'Erkak',
-      'kursi': 1
+      'kursi': 1,
+      'bosqich': 'Bakalavriat'
     },
     {
       'ID': 'AD9349433',
@@ -482,7 +543,8 @@ router.get('/students/template', (req, res) => {
       'guruh': 'FMC02',
       'telefon raqami': '+998-91-616-05-30',
       'jinsi': 'Ayol',
-      'kursi': 1
+      'kursi': 1,
+      'bosqich': 'Bakalavriat'
     },
     {
       'ID': 'AD8170783',
@@ -492,7 +554,8 @@ router.get('/students/template', (req, res) => {
       'guruh': 'FMC01',
       'telefon raqami': '+998-95-192-17-34',
       'jinsi': 'Erkak',
-      'kursi': 1
+      'kursi': 1,
+      'bosqich': 'Bakalavriat'
     },
     {
       'ID': 'AD6634372',
@@ -502,36 +565,43 @@ router.get('/students/template', (req, res) => {
       'guruh': 'FMC05',
       'telefon raqami': '+998-97-577-01-08',
       'jinsi': 'Erkak',
-      'kursi': 1
+      'kursi': 1,
+      'bosqich': 'Bakalavriat'
     }
   ];
+
+  const sampleData = isMag ? magSampleData : bakSampleData;
 
   const ws = xlsx.utils.json_to_sheet(sampleData);
   ws['!cols'] = [
     { wch: 15 },
     { wch: 18 },
     { wch: 22 },
-    { wch: 22 },
+    { wch: 26 },
     { wch: 12 },
     { wch: 22 },
     { wch: 10 },
-    { wch: 8 }
+    { wch: 8 },
+    { wch: 16 }
   ];
 
   const wb = xlsx.utils.book_new();
-  xlsx.utils.book_append_sheet(wb, ws, 'Talabalar');
+  xlsx.utils.book_append_sheet(wb, ws, sheetName);
   const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
   try {
     const dir = path.join(__dirname, '../../public/downloads');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filePath1, buffer);
+    fs.writeFileSync(path.join(dir, filename), buffer);
   } catch (e) {}
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="talabalar_import_shablon.xlsx"');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(buffer);
-});
+}
+
+router.get('/students/template', handleStudentTemplateDownload);
+router.get('/students/template/:type', handleStudentTemplateDownload);
 
 /**
  * GET /api/admin/students/photos/export-zip
@@ -1149,13 +1219,14 @@ router.post('/import/students', authenticateSuperadminOrRegistrator, upload.sing
       return res.status(400).json({ error: 'Excel yoki CSV fayl tanlanmagan' });
     }
 
+    const targetLevel = (req.body && (req.body.target_level || req.body.level)) || req.query.level || '';
     const filePath = req.file.path;
-    const normalizedRows = parseStudentsFromWorkbook(filePath);
+    const normalizedRows = parseStudentsFromWorkbook(filePath, { targetLevel });
 
     if (!normalizedRows || normalizedRows.length === 0) {
       try { fs.unlinkSync(filePath); } catch (e) {}
       return res.status(400).json({
-        error: 'Fayldagi qatorlar formati mos kelmadi. Talab qilinadigan ustunlar: ID, Ism, Familiya, yo\'nalishi, guruh, telefon raqami, jinsi, kursi'
+        error: 'Fayldagi qatorlar formati mos kelmadi. Talab qilinadigan ustunlar: ID, Ism, Familiya, yo\'nalishi, guruh, telefon raqami, jinsi, kursi (ixtiyoriy: bosqich)'
       });
     }
 

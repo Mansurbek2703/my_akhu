@@ -20,9 +20,10 @@ function normalizeKey(str) {
 /**
  * Excel / CSV faylni o'qish va talabalar ro'yxatini chiqarib olish
  * Talab qilingan ustunlar:
- * ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi
+ * ID, Ism, Familiya, yo'nalishi, guruh, telefon raqami, jinsi, kursi (ixtiyoriy: bosqich)
  */
-function parseStudentsFromWorkbook(filePath) {
+function parseStudentsFromWorkbook(filePath, options = {}) {
+  const targetLevel = (options && (options.targetLevel || options.level)) ? String(options.targetLevel || options.level).toLowerCase() : '';
   const workbook = xlsx.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
@@ -215,6 +216,14 @@ function parseStudentsFromWorkbook(filePath) {
       } else {
         level = 'bak';
       }
+    } else if (targetLevel === 'mag' || targetLevel.includes('mag')) {
+      level = 'mag';
+    } else if (targetLevel === 'bak' || targetLevel.includes('bak')) {
+      level = 'bak';
+    } else if (groupCode && (/^m[a-z]{1,4}\d+/i.test(groupCode) || groupCode.toUpperCase().startsWith('MAG'))) {
+      level = 'mag';
+    } else if (programCode && programCode.toLowerCase().includes('magistr')) {
+      level = 'mag';
     } else {
       level = 'bak';
     }

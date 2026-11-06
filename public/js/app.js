@@ -9059,10 +9059,30 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
           ${canImport ? `
-            <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: background 0.15s ease;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#FFFFFF'" title="Excel import uchun namunaviy shablon faylini yuklab olish">
-              <span style="color: #2563EB; display: inline-flex; align-items: center;">${icon('download', 15)}</span>
-              <span style="color: #1E293B;">Shablonni Yuklab Olish</span>
-            </a>
+            <div class="dropdown" style="position: relative; display: inline-block;">
+              <button id="btn-template-dropdown" class="btn" onclick="toggleTemplateDropdownMenu(event)" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer;" title="Excel import uchun shablon fayllarini yuklab olish">
+                <span style="color: #2563EB; display: inline-flex; align-items: center;">${icon('download', 15)}</span>
+                <span>Shablon Yuklab Olish</span>
+                <span style="font-size: 10px; color: #64748B; margin-left: 2px;">▼</span>
+              </button>
+              <div id="template-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 5px); right: 0; min-width: 260px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); z-index: 1000; padding: 6px;">
+                <a href="/api/admin/students/template?level=bak" download="talabalar_bakalavriat_shablon.xlsx" onclick="closeTemplateDropdownMenu()" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px; color: #1E293B; text-decoration: none; transition: background 0.15s ease;" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background='transparent'">
+                  <span style="font-size: 20px;">🎓</span>
+                  <div>
+                    <div style="font-weight: 700; color: #1E3A8A; font-size: 13px;">Bakalavriat Shabloni</div>
+                    <div style="font-size: 11px; color: #64748B;">Bakalavr talabalari uchun (.xlsx)</div>
+                  </div>
+                </a>
+                <div style="height: 1px; background: #E2E8F0; margin: 4px 0;"></div>
+                <a href="/api/admin/students/template?level=mag" download="talabalar_magistratura_shablon.xlsx" onclick="closeTemplateDropdownMenu()" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px; color: #1E293B; text-decoration: none; transition: background 0.15s ease;" onmouseover="this.style.background='#F5F3FF'" onmouseout="this.style.background='transparent'">
+                  <span style="font-size: 20px;">🔬</span>
+                  <div>
+                    <div style="font-weight: 700; color: #7C3AED; font-size: 13px;">Magistratura Shabloni</div>
+                    <div style="font-size: 11px; color: #6D28D9;">Magistrantlar uchun (.xlsx)</div>
+                  </div>
+                </a>
+              </div>
+            </div>
             <button class="btn btn-primary" onclick="toggleImportPanel()" style="display: inline-flex; align-items: center; gap: 6px;">
               ${icon('fileSpreadsheet', 14)} <span>Excel Import</span>
             </button>
@@ -9092,32 +9112,48 @@ async function renderStudentsManagement(container, roleTitle = 'Registrator') {
       <div class="card-body">
         <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; align-items: start;">
           <div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
               <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0; font-weight: 600;">
-                Excel fayldagi talab qilinadigan 8 ta ustun tartibi:
+                Namuna Excel shablonlarini yuklab olish:
               </p>
-              <a href="/api/admin/students/template" download="talabalar_import_shablon.xlsx" class="btn btn-sm btn-outline" style="background: white; color: #2563EB; border-color: #93C5FD; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; text-decoration: none; padding: 4px 10px; font-size: 12px;">
-                ${icon('download', 13)} <span>Namuna Shablon (.xlsx)</span>
-              </a>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <a href="/api/admin/students/template?level=bak" download="talabalar_bakalavriat_shablon.xlsx" class="btn btn-sm btn-outline" style="background: white; color: #2563EB; border-color: #93C5FD; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; text-decoration: none; padding: 4px 10px; font-size: 12px;" title="Bakalavriat uchun namunaviy shablon">
+                  ${icon('download', 13)} <span>🎓 Bakalavriat Shablon</span>
+                </a>
+                <a href="/api/admin/students/template?level=mag" download="talabalar_magistratura_shablon.xlsx" class="btn btn-sm btn-outline" style="background: #F5F3FF; color: #7C3AED; border-color: #DDD6FE; display: inline-flex; align-items: center; gap: 5px; font-weight: 700; text-decoration: none; padding: 4px 10px; font-size: 12px;" title="Magistratura uchun namunaviy shablon">
+                  ${icon('download', 13)} <span>🔬 Magistratura Shablon</span>
+                </a>
+              </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 12px;">
-              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>1. ID</strong> (masalan, AE1126333)</div>
-              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>2. Ism</strong> (masalan, AYGUL)</div>
-              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>3. Familiya</strong> (SHADIMURATOVA)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>1. ID</strong> (masalan, AM2105011 yoki AE1126333)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>2. Ism</strong> (masalan, SHOHRUH)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>3. Familiya</strong> (QODIROV)</div>
               <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>4. yo'nalishi</strong> (Sun'iy intellekt)</div>
-              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>5. guruh</strong> (masalan, FMC04)</div>
+              <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>5. guruh</strong> (masalan, MAI01 yoki FMC04)</div>
               <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>6. telefon raqami</strong> (+998...)</div>
               <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>7. jinsi</strong> (Ayol / Erkak)</div>
               <div style="background: white; padding: 6px 10px; border-radius: 4px; border: 1px solid #E2E8F0;"><strong>8. kursi</strong> (1, 2, 3, 4)</div>
+              <div style="background: #F8FAFC; padding: 6px 10px; border-radius: 4px; border: 1px dashed #93C5FD; grid-column: 1 / -1; font-size: 11.5px; color: #1E3A8A;">
+                <strong>9. bosqich</strong> (Ixtiyoriy: <code>Magistratura</code> yoki <code>Bakalavriat</code> deb yozishingiz mumkin)
+              </div>
             </div>
-            <p style="font-size: 11.5px; color: #2563EB; display: flex; align-items: center; gap: 6px;">
+            <p style="font-size: 11.5px; color: #2563EB; display: flex; align-items: center; gap: 6px; margin-bottom: 0;">
               ${icon('info', 14)} <span>ID mavjud bo'lsa yangilanadi, yangilari esa avtomatik qo'shiladi va tegishli tyutor biriktiriladi.</span>
             </p>
           </div>
 
           <div style="background: white; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
             <div class="form-group mb-3">
-              <label class="form-label">Excel / CSV faylini tanlang:</label>
+              <label class="form-label" style="font-weight: 600; font-size: 12.5px;">Ta'lim bosqichini belgilang:</label>
+              <select id="import-target-level" class="form-control" style="padding: 7px 10px; font-size: 13px;">
+                <option value="auto">✨ Avtomatik (Fayldagi guruh va ma'lumotlar bo'yicha)</option>
+                <option value="bak">🎓 Bakalavriat</option>
+                <option value="mag">🔬 Magistratura (Master)</option>
+              </select>
+            </div>
+            <div class="form-group mb-3">
+              <label class="form-label" style="font-weight: 600; font-size: 12.5px;">Excel / CSV faylini tanlang:</label>
               <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" class="form-control" style="padding: 8px;">
             </div>
             <button id="btn-do-import" class="btn btn-primary w-100" onclick="handleStudentExcelUpload()" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
@@ -10695,6 +10731,24 @@ async function handleDeleteStudentPhoto(studentId) {
   }
 }
 
+function toggleTemplateDropdownMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('template-dropdown-menu');
+  if (menu) {
+    const isShown = menu.style.display === 'block';
+    menu.style.display = isShown ? 'none' : 'block';
+  }
+}
+
+function closeTemplateDropdownMenu() {
+  const menu = document.getElementById('template-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+window.toggleTemplateDropdownMenu = toggleTemplateDropdownMenu;
+window.closeTemplateDropdownMenu = closeTemplateDropdownMenu;
+document.addEventListener('click', () => closeTemplateDropdownMenu());
+
 // EXCEL YUKLASH TUGMASI HODISASI
 async function handleStudentExcelUpload() {
   const fileInput = document.getElementById('import-file-input');
@@ -10709,6 +10763,11 @@ async function handleStudentExcelUpload() {
   const file = fileInput.files[0];
   const formData = new FormData();
   formData.append('file', file);
+
+  const levelSelect = document.getElementById('import-target-level');
+  if (levelSelect && levelSelect.value && levelSelect.value !== 'auto') {
+    formData.append('target_level', levelSelect.value);
+  }
 
   btn.disabled = true;
   btn.innerHTML = `<div class="spinner"></div> <span>Import qilinmoqda...</span>`;
